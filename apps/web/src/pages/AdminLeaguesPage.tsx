@@ -145,7 +145,9 @@ export function AdminLeaguesPage() {
           {result.items.map((league) => (
             <li key={league.id} className="fa-admin-leagues__item">
               <strong className="fa-admin-leagues__name">{league.name}</strong>
-              <span className="fa-admin-leagues__state">{leagueStateLabel(league.state as LeagueState)}</span>
+              <span className={`fa-admin-leagues__state fa-admin-leagues__state--${league.state}`}>
+                {leagueStateLabel(league.state as LeagueState)}
+              </span>
               <span className="fa-admin-leagues__owner">Admin: {league.ownerDisplayName ?? "—"}</span>
               <Button
                 variant="danger"

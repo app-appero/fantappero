@@ -8200,6 +8200,1029 @@ button.fa-starter-row:disabled {
   color: #a61e1e;
 }
 
+/* ══ Pannello operatore, Listone e Turni: rifinitura grafica (proposte di design del 22/11) ══
+   /admin/listone (tabella, finestra «Aggiorna listone», anteprima dei ruoli dal fornitore,
+   «Ripristina i ruoli cambiati da un aggiornamento», barra dell'aggiornamento) e /admin/turni
+   (legenda, azioni massive, Ricalcola storico, Leghe attive): solo misure, spazi,
+   allineamenti e colori, nessun cambio di testi o di comportamento. Ogni blocco porta il
+   numero della proposta (design_oper1/proposals.json), così si può tenere o togliere da solo.
+   Sta prima delle regole iPhone in fondo al file, che restano l'ultima parola su
+   env(safe-area-inset-*) e campi da 16px. */
+
+/* [Operatore Listone/Turni 1] Su telefono le due pagine uscivano dallo schermo e venivano
+   tagliate a destra, senza poter scorrere: la colonna della pagina si allargava quanto la
+   tabella più larga (483px nel Listone, 759px nei Turni, con lo schermo a 374px). Nei Turni
+   metà della legenda e le colonne Omologazione, Calendario aggiornato e Azioni non si
+   vedevano; nel Listone «Posizione provider», «Successiva» e la fine dei testi. Ora la
+   colonna è larga quanto lo schermo: le schede stanno dentro e ciò che resta largo scorre
+   nel suo riquadro. */
+.fa-page-container__body:has(> [data-testid="admin-listone-card"]),
+.fa-page-container__body:has(> [data-testid="admin-turni-legend"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-testid="admin-listone-card"] .fa-tabs,
+[data-testid="admin-listone-card"] .fa-tab-panel {
+  min-width: 0;
+}
+
+/* [Operatore Listone/Turni 2] Listone su telefono: ogni calciatore su due righe. Sopra il
+   nome (da toccare, 44px) e il ruolo; sotto club e posizione del fornitore, più piccoli.
+   Prima quattro colonne strette: nomi e club su due righe, «Centrocampista» a capo sotto
+   il bollino, «Posizione provider» fuori dallo schermo. L'intestazione della tabella resta
+   per lo screen reader. Le schede dei ruoli (Tutti · Portieri · …) scorrono su una riga
+   come nel listone della Rosa; «Precedente» e «Successiva» ai lati, la pagina al centro. */
+@media (max-width: 640px) {
+  [data-testid="admin-listone-card"] .fa-tablist {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-testid="admin-listone-card"] .fa-tablist::-webkit-scrollbar {
+    display: none;
+  }
+
+  [data-testid="admin-listone-card"] .fa-tab {
+    flex: 0 0 auto;
+  }
+
+  [data-testid^="admin-listone-table-"],
+  [data-testid^="admin-listone-table-"] > tbody {
+    display: block;
+    width: 100%;
+  }
+
+  [data-testid^="admin-listone-table-"] > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name role"
+      "club pos";
+    align-items: center;
+    column-gap: var(--fa-space-sm);
+    padding: 0.25rem var(--fa-space-md) 0.625rem;
+    border-bottom: 1px solid var(--fa-color-border);
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr:last-child {
+    border-bottom: 0;
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr > td:nth-child(1) {
+    grid-area: name;
+  }
+
+  [data-testid^="admin-listone-table-"] .fa-athlete-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    max-width: 100%;
+    font-size: var(--fa-text-base, 1rem);
+    font-weight: 600;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr > td:nth-child(2) {
+    grid-area: role;
+    justify-self: end;
+    white-space: nowrap;
+    font-size: var(--fa-text-sm);
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr > td:nth-child(3) {
+    grid-area: club;
+    font-size: var(--fa-text-sm);
+    color: var(--fa-color-foreground-muted);
+  }
+
+  [data-testid^="admin-listone-table-"] > tbody > tr > td:nth-child(4) {
+    grid-area: pos;
+    justify-self: end;
+    text-align: right;
+    font-size: var(--fa-text-sm);
+    color: var(--fa-color-foreground-muted);
+  }
+
+  .fa-admin-listone__pagination {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--fa-space-xs);
+    text-align: center;
+  }
+
+  .fa-admin-listone__pagination > .fa-btn {
+    padding-inline: var(--fa-space-sm);
+  }
+}
+
+/* [Operatore Listone/Turni 3] Turni su telefono: ogni lega attiva è una scheda. Sopra il
+   nome della lega, sotto turno, stato e omologazione in una riga, poi la data del
+   calendario e i quattro comandi in due colonne, bottoni da 44px con bordo. Prima sei
+   colonne in 342px: righe alte 250px con i bottoni uno sotto l'altro e le ultime colonne
+   fuori dallo schermo. La data porta l'etichetta della sua colonna («Calendario
+   aggiornato»), le altre sono chiare da sole; l'intestazione resta per lo screen reader. */
+@media (max-width: 640px) {
+  [data-testid="admin-turni-table"],
+  [data-testid="admin-turni-table"] > tbody {
+    display: block;
+    width: 100%;
+  }
+
+  [data-testid="admin-turni-table"] > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "name name name"
+      "turn state homol"
+      "cal cal cal"
+      "act act act";
+    align-items: center;
+    column-gap: var(--fa-space-sm);
+    row-gap: 0.375rem;
+    padding: var(--fa-space-md);
+    border-bottom: 1px solid var(--fa-color-border);
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr:last-child {
+    border-bottom: 0;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(1) {
+    grid-area: name;
+    font-size: var(--fa-text-base, 1rem);
+    font-weight: 700;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(2) {
+    grid-area: turn;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(3) {
+    grid-area: state;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(4) {
+    grid-area: homol;
+    justify-self: start;
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(5) {
+    grid-area: cal;
+    font-size: var(--fa-text-sm);
+    color: var(--fa-color-foreground-muted);
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(5)::before {
+    content: "Calendario aggiornato: ";
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(6) {
+    grid-area: act;
+    margin-top: var(--fa-space-xs);
+  }
+
+  [data-testid="admin-turni-table"] td > .fa-ds-showcase__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  [data-testid="admin-turni-table"] td > .fa-ds-showcase__row > .fa-btn {
+    width: 100%;
+    padding-inline: var(--fa-space-sm);
+    border-color: var(--fa-color-border);
+    line-height: 1.2;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+/* [Operatore Listone/Turni 4] Turni su computer: i quattro comandi di ogni lega in due
+   colonne invece che uno sotto l'altro. Le righe passano da 230 a circa 100px e le dieci
+   leghe si vedono in uno schermo e mezzo invece di tre; «Turno 12» non va più a capo. */
+@media (min-width: 641px) {
+  [data-testid="admin-turni-table"] td > .fa-ds-showcase__row {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 0 var(--fa-space-xs);
+  }
+
+  [data-testid="admin-turni-table"] td > .fa-ds-showcase__row > .fa-btn {
+    justify-content: flex-start;
+    padding-inline: var(--fa-space-sm);
+  }
+
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(2),
+  [data-testid="admin-turni-table"] > tbody > tr > td:nth-child(5) {
+    white-space: nowrap;
+  }
+}
+
+/* [Operatore Listone/Turni 5] Azioni massive su telefono: bottoni in due colonne uguali da
+   44px, «Sincronizza turni» (il principale) a tutta larghezza sopra. Prima sette bottoni di
+   larghezze diverse andavano a capo in modo irregolare. In «Ricalcola storico» il bottone si
+   stacca dal campo «Motivo della correzione» (era a 0px) e su telefono è largo quanto il
+   campo. */
+[data-testid="admin-turni-repair"] .fa-card__body > .fa-btn {
+  margin-top: var(--fa-space-sm);
+}
+
+@media (max-width: 640px) {
+  [data-testid="admin-turni-massive"] .fa-card__body > .fa-ds-showcase__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  [data-testid="admin-turni-massive"] .fa-card__body > .fa-ds-showcase__row > .fa-btn {
+    width: 100%;
+    padding-inline: var(--fa-space-sm);
+    line-height: 1.2;
+    white-space: normal;
+    text-align: center;
+  }
+
+  [data-testid="admin-turni-massive"] .fa-card__body > .fa-ds-showcase__row > .fa-btn:first-child {
+    grid-column: 1 / -1;
+  }
+
+  [data-testid="admin-turni-repair"] .fa-card__body > .fa-btn {
+    width: 100%;
+  }
+}
+
+/* [Operatore Listone/Turni 6] Legenda «Cosa fanno questi comandi?» su telefono più
+   compatta: riquadri con margine 12px e 16px (erano 16px e 24px), 8px fra uno e l'altro
+   (erano 16px), descrizioni da 14px. A 390px le dieci voci passano da 1.470 a 1.260px di
+   altezza e i bottoni arrivano prima. */
+@media (max-width: 640px) {
+  [data-testid="admin-turni-legend"] dl {
+    gap: var(--fa-space-sm);
+    margin: 0;
+  }
+
+  [data-testid="admin-turni-legend"] dl > div {
+    padding: 0.75rem var(--fa-space-md);
+    border-radius: var(--fa-radius-md);
+  }
+
+  [data-testid="admin-turni-legend"] dt {
+    margin-bottom: 0.125rem;
+  }
+
+  [data-testid="admin-turni-legend"] dd {
+    font-size: var(--fa-text-sm);
+    line-height: 1.45;
+  }
+}
+
+/* [Operatore Listone/Turni 7] Finestra «Aggiorna listone dal provider»: la scelta fatta si
+   vede subito (bordo e fondo del colore principale, prima solo il pallino del radio) e
+   l'avviso «Alcuni calciatori possono cambiare ruolo…» è un riquadro giallo con il testo
+   nel colore principale, come gli altri avvisi di quota (prima testo giallo libero). Su
+   telefono i due bottoni sono uno sotto l'altro a tutta larghezza, il principale sopra:
+   «Aggiorna e mostra i ruoli» non va più a capo a metà. */
+.fa-admin-listone-refresh-choice__option {
+  padding: 0.75rem var(--fa-space-md) 0.75rem 0.75rem;
+  border-radius: var(--fa-radius-lg);
+}
+
+.fa-admin-listone-refresh-choice__option input {
+  accent-color: var(--fa-color-accent);
+}
+
+.fa-admin-listone-refresh-choice__option:has(input:checked) {
+  border-color: var(--fa-color-accent);
+  box-shadow: inset 0 0 0 1px var(--fa-color-accent);
+  background: color-mix(in srgb, var(--fa-color-accent) 8%, transparent);
+}
+
+.fa-admin-listone-refresh-choice__option:has(input:focus-visible) {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-admin-listone-refresh-choice__warning {
+  margin-top: var(--fa-space-md);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-left: 3px solid var(--fa-color-warning);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-warning) 12%, transparent);
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-sm);
+  line-height: var(--fa-leading-snug, 1.4);
+}
+
+@media (max-width: 480px) {
+  .fa-modal__dialog:has(.fa-admin-listone-refresh-choice) .fa-modal__footer {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-modal__dialog:has(.fa-admin-listone-refresh-choice) .fa-modal__footer > .fa-btn {
+    width: 100%;
+  }
+}
+
+/* [Operatore Listone/Turni 8] «Ruoli che cambierebbero dal fornitore» e «Ripristina i
+   ruoli» su telefono: ogni calciatore è una scheda. Sopra nome e club, poi i due ruoli
+   affiancati con una freccia fra il ruolo di ora e quello nuovo (o di prima), sotto le leghe
+   in cui è in rosa. Prima cinque colonne in 342px: righe alte fino a 280px, nomi spezzati
+   («Berghe-») e le ultime colonne fuori dallo schermo. */
+@media (max-width: 640px) {
+  [data-testid="admin-listone-role-preview-table"],
+  [data-testid="admin-listone-role-preview-table"] > tbody,
+  [data-testid="admin-listone-restore-table"],
+  [data-testid="admin-listone-restore-table"] > tbody {
+    display: block;
+    width: 100%;
+  }
+
+  [data-testid="admin-listone-role-preview-table"] > thead,
+  [data-testid="admin-listone-restore-table"] > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  [data-testid="admin-listone-role-preview-table"] > tbody > tr,
+  [data-testid="admin-listone-restore-table"] > tbody > tr {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "name name name"
+      "club club club"
+      "now new ."
+      "leagues leagues leagues";
+    align-items: center;
+    column-gap: 1.75rem;
+    row-gap: 0.25rem;
+    padding: 0.75rem var(--fa-space-md);
+    border-bottom: 1px solid var(--fa-color-border);
+  }
+
+  [data-testid="admin-listone-role-preview-table"] > tbody > tr:last-child,
+  [data-testid="admin-listone-restore-table"] > tbody > tr:last-child {
+    border-bottom: 0;
+  }
+
+  [data-testid="admin-listone-role-preview-table"] > tbody > tr > td,
+  [data-testid="admin-listone-restore-table"] > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  [data-testid="admin-listone-role-preview-table"] td:nth-child(1),
+  [data-testid="admin-listone-restore-table"] td:nth-child(1) {
+    grid-area: name;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  [data-testid="admin-listone-role-preview-table"] td:nth-child(2),
+  [data-testid="admin-listone-restore-table"] td:nth-child(2) {
+    grid-area: club;
+    font-size: var(--fa-text-sm);
+    color: var(--fa-color-foreground-muted);
+  }
+
+  [data-testid="admin-listone-role-preview-table"] td:nth-child(3),
+  [data-testid="admin-listone-restore-table"] td:nth-child(3) {
+    grid-area: now;
+    margin-top: 0.25rem;
+  }
+
+  [data-testid="admin-listone-role-preview-table"] td:nth-child(4),
+  [data-testid="admin-listone-restore-table"] td:nth-child(4) {
+    position: relative;
+    grid-area: new;
+    margin-top: 0.25rem;
+  }
+
+  /* Freccia disegnata (nessun testo): dal ruolo di ora al ruolo nuovo o di prima. */
+  [data-testid="admin-listone-role-preview-table"] td:nth-child(4)::before,
+  [data-testid="admin-listone-restore-table"] td:nth-child(4)::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -1.125rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-top: 2px solid var(--fa-color-foreground-muted);
+    border-right: 2px solid var(--fa-color-foreground-muted);
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  [data-testid="admin-listone-role-preview-table"] td:nth-child(5),
+  [data-testid="admin-listone-restore-table"] td:nth-child(5) {
+    grid-area: leagues;
+    margin-top: 0.25rem;
+    font-size: var(--fa-text-sm);
+    color: var(--fa-color-foreground-muted);
+    line-height: 1.4;
+  }
+}
+
+/* [Operatore Listone/Turni 9] Anteprima e ripristino dei ruoli su telefono: campo della data
+   e bottoni a tutta larghezza, uno sotto l'altro. Prima «Mostra cosa cambia» finiva fuori
+   dallo schermo accanto al campo, e «Annulla: i ruoli restano come sono» oltre il bordo.
+   Sopra la tabella il riepilogo («Da ripristinare: 3 · …») ha un fondo tenue che lo
+   separa dalla tabella. */
+.fa-admin-listone-restore__title {
+  line-height: 1.25;
+}
+
+[data-testid="admin-listone-role-preview-summary"],
+[data-testid="admin-listone-restore-summary"] {
+  margin: 0 0 var(--fa-space-sm);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+  line-height: 1.5;
+}
+
+[data-testid="admin-listone-role-preview"] .fa-admin-listone-restore__actions {
+  margin-top: var(--fa-space-md);
+}
+
+@media (max-width: 640px) {
+  .fa-admin-listone-restore__form .fa-field {
+    flex: 1 1 100%;
+  }
+
+  .fa-admin-listone-restore__form > .fa-btn,
+  .fa-admin-listone-restore__preview > .fa-btn {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .fa-admin-listone-restore__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fa-admin-listone-restore__actions > .fa-btn {
+    width: 100%;
+    white-space: normal;
+    line-height: 1.2;
+    text-align: center;
+  }
+}
+
+/* [Operatore Listone/Turni 10] Barra dell'aggiornamento del listone in basso: il testo
+   («Listone 2026: Rose dei club: 5 di 12 (42%)») sta sopra una linea sottile che si
+   riempie, sul fondo della pagina. Prima era scritto sopra il riempimento blu, scuro su blu
+   (contrasto fra 2,9 e 3,3:1 nel tema chiaro) per la parte già riempita. La pagina lascia
+   sotto lo spazio della barra, così le ultime righe non restano coperte. */
+.fa-listone-refresh-bar {
+  border-top: 1px solid var(--fa-color-border);
+}
+
+.fa-listone-refresh-bar .fa-progress-bar {
+  height: 2rem;
+  border-radius: 0;
+  background: transparent;
+}
+
+.fa-listone-refresh-bar .fa-progress-bar::before {
+  content: "";
+  position: absolute;
+  right: var(--fa-space-sm);
+  bottom: 0.125rem;
+  left: var(--fa-space-sm);
+  height: 0.375rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 12%, transparent);
+}
+
+.fa-listone-refresh-bar .fa-progress-bar__fill {
+  position: absolute;
+  bottom: 0.125rem;
+  left: var(--fa-space-sm);
+  max-width: calc(100% - 2 * var(--fa-space-sm));
+  height: 0.375rem;
+}
+
+.fa-listone-refresh-bar .fa-progress-bar__label {
+  inset: 0 0 0.5rem;
+}
+
+/* Con il menu aperto (telefono) la barra passa sotto il menu: prima ne copriva «Esci». */
+body:has(.fa-nav-drawer) .fa-listone-refresh-bar {
+  z-index: var(--fa-z-overlay);
+}
+
+body:has(.fa-listone-refresh-bar) .fa-page-container {
+  margin-bottom: 3rem;
+}
+
+/* ══ Pannello operatore, Utenti e Leghe globali: rifinitura grafica (proposte di design del 22/11) ══
+   /admin/utenti (Utenti, Richieste tester, Lista nera, finestre «Tester» ed «Elimina utente») e
+   /admin/leghe (elenco e conferma di eliminazione): solo misure, spazi, allineamenti e
+   colori, nessun cambio di testi o di comportamento. Ogni blocco porta il numero della
+   proposta (design_oper2/proposals.json), così si può tenere o togliere da solo. Sta prima
+   delle regole iPhone in fondo al file, che restano l'ultima parola su
+   env(safe-area-inset-*) e campi da 16px. */
+
+/* [Operatore Utenti/Leghe 1] Lista nera: su telefono la scheda usciva dallo schermo e veniva
+   tagliata a destra (452px con lo schermo a 390 o 360): l'intestazione «Email · Motivo ·
+   Data» della tabella da computer restava visibile, con le parole una sopra l'altra, e
+   allargava tutta la colonna. Su computer un indirizzo lungo scavalcava il motivo e le due
+   scritte si sovrapponevano. Ora su telefono l'intestazione sparisce (ogni riga dice già cosa
+   contiene), la colonna è larga quanto lo schermo e gli indirizzi lunghi vanno a capo. */
+.fa-page-container__body:has([data-testid="admin-blocklist"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fa-admin-users__identity > strong {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 899px) {
+  .fa-admin-users__head--block {
+    display: none;
+  }
+}
+
+/* [Operatore Utenti/Leghe 2] Leghe: la conferma «Eliminare definitivamente la lega …?»
+   compariva sopra l'elenco, fuori dallo schermo se si toccava «Elimina» su una lega più in
+   basso: sembrava che il bottone non facesse nulla. Ora la conferma resta in vista sotto
+   l'header mentre si scorre, in un riquadro rosso tenue con il bordo a sinistra, e su
+   telefono «Conferma eliminazione» e «Annulla» sono due bottoni uguali da 44px. */
+[data-testid="admin-leagues-confirm"] {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
+  z-index: var(--fa-z-raised, 10);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-md);
+  border: 1px solid color-mix(in srgb, var(--fa-color-danger) 55%, var(--fa-color-border));
+  border-left-width: 4px;
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-danger) 8%, var(--fa-color-background-elevated));
+  box-shadow: var(--fa-shadow-lg);
+}
+
+[data-testid="admin-leagues-confirm"] > p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  [data-testid="admin-leagues-confirm"] {
+    top: 5.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  [data-testid="admin-leagues-confirm"] > .fa-btn {
+    flex: 1 1 0;
+    padding-inline: var(--fa-space-sm);
+  }
+}
+
+/* [Operatore Utenti/Leghe 3] Utenti su telefono: scheda più ordinata. I due bollini
+   (Utente/Operatore e Tester) stanno vicini, subito sotto l'email (prima «Tester» finiva a
+   metà riga, staccato); sotto, «Abilita/Revoca tester» e «Impersona» sono due bottoni
+   uguali, entrambi con il bordo, e «⋯» ha l'area di tocco da 44px (era 40). Senza uno dei
+   due bottoni (operatori, sé stessi) l'altro prende tutto lo spazio. */
+@media (max-width: 899px) {
+  .fa-admin-users__list--table > .fa-admin-users__item--user {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--fa-space-sm);
+    row-gap: 0;
+    padding: 0.75rem var(--fa-space-md);
+  }
+
+  .fa-admin-users__item--user > .fa-admin-users__identity {
+    flex: 1 1 100%;
+  }
+
+  .fa-admin-users__item--user > :nth-child(2),
+  .fa-admin-users__item--user > :nth-child(3) {
+    flex: 0 0 auto;
+    margin-top: 0.5rem;
+  }
+
+  .fa-admin-users__item--user::after {
+    content: "";
+    order: 1;
+    flex: 1 1 100%;
+  }
+
+  .fa-admin-users__item--user > .fa-admin-users__col--access,
+  .fa-admin-users__item--user > .fa-admin-users__col--assist,
+  .fa-admin-users__item--user > .fa-admin-users__col--more {
+    order: 2;
+    margin-top: 0.625rem;
+  }
+
+  .fa-admin-users__item--user > .fa-admin-users__col--access,
+  .fa-admin-users__item--user > .fa-admin-users__col--assist {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .fa-admin-users__item--user > .fa-admin-users__col--access:empty,
+  .fa-admin-users__item--user > .fa-admin-users__col--assist:empty {
+    display: none;
+  }
+
+  .fa-admin-users__item--user > .fa-admin-users__col--more {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .fa-admin-users__col--assist > .fa-btn--ghost {
+    border-color: var(--fa-color-border);
+  }
+
+  .fa-admin-users__more > summary {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/* [Operatore Utenti/Leghe 4] Leghe in colonne, come la tabella degli utenti: su computer
+   nome, stato, amministratore ed «Elimina» sono sempre alla stessa altezza (prima stato e
+   «Admin: …» si spostavano a seconda della lunghezza del nome), in un unico riquadro con
+   le righe divise da una linea. Su telefono ogni lega ha nome e stato sopra, amministratore
+   ed «Elimina» sotto (prima «Elimina» finiva a volte accanto al nome dell'amministratore e
+   a volte da solo su una riga). L'amministratore è da 14px, secondario rispetto al nome. */
+.fa-admin-leagues__list {
+  gap: 0;
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+  overflow: hidden;
+}
+
+.fa-admin-leagues__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) 8rem minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--fa-space-md);
+  padding: 0.75rem var(--fa-space-md) 0.75rem var(--fa-space-lg);
+  border: 0;
+  border-top: 1px solid var(--fa-color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.fa-admin-leagues__item:first-child {
+  border-top: 0;
+}
+
+.fa-admin-leagues__name {
+  min-width: 0;
+  font-size: var(--fa-text-md, 1rem);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.fa-admin-leagues__state {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.fa-admin-leagues__owner {
+  min-width: 0;
+  font-size: var(--fa-text-sm);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .fa-admin-leagues__item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name state"
+      "owner action";
+    row-gap: var(--fa-space-xs);
+    column-gap: var(--fa-space-sm);
+    padding: 0.75rem var(--fa-space-md);
+  }
+
+  .fa-admin-leagues__name {
+    grid-area: name;
+  }
+
+  .fa-admin-leagues__state {
+    grid-area: state;
+    justify-self: end;
+    align-self: start;
+  }
+
+  .fa-admin-leagues__owner {
+    grid-area: owner;
+  }
+
+  .fa-admin-leagues__item > .fa-btn {
+    grid-area: action;
+  }
+}
+
+/* [Operatore Utenti/Leghe 5] Richieste tester: la casella di selezione era un quadratino di
+   13px, da solo al centro della scheda su telefono. Ora è una casella da 22px con area di
+   tocco da 44px, accanto al nome. Su telefono «Approva» e «Rifiuta» sono due bottoni uguali
+   (Rifiuta con il bordo) e in alto «Mostra tutte» sta su una riga e «Approva selezionate» e
+   «Rifiuta selezionate» affiancate sotto (prima «Rifiuta selezionate» finiva da solo, al
+   centro, senza bordo). */
+[data-testid="admin-requests-list"] input[type="checkbox"] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
+  border: 0;
+  border-radius: var(--fa-radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]::before,
+[data-testid="admin-requests-list"] input[type="checkbox"]::after {
+  content: "";
+  grid-area: 1 / 1;
+  place-self: center;
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]::before {
+  box-sizing: border-box;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 2px solid var(--fa-color-foreground-muted);
+  border-radius: 6px;
+  background: var(--fa-color-background-elevated);
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]::after {
+  width: 0.75rem;
+  height: 0.75rem;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  background: var(--fa-color-accent-contrast);
+  transform: scale(0);
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]:hover::before {
+  border-color: var(--fa-color-accent);
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]:checked::before {
+  border-color: var(--fa-color-accent);
+  background: var(--fa-color-accent);
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]:checked::after {
+  transform: scale(1);
+}
+
+[data-testid="admin-requests-list"] input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--fa-color-focus-ring);
+  outline-offset: -2px;
+}
+
+@media (max-width: 44rem) {
+  [data-testid="admin-requests-list"] > li:has(> input[type="checkbox"]) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--fa-space-xs);
+  }
+
+  [data-testid="admin-requests-list"] > li > input[type="checkbox"] {
+    margin: -0.5rem 0 0 -0.5rem;
+  }
+
+  [data-testid="admin-requests-list"] > li > .fa-admin-users__actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: var(--fa-space-xs);
+  }
+
+  [data-testid="admin-requests-list"] .fa-btn--ghost,
+  [data-testid="admin-tester-requests"] > .fa-admin-users__actions > .fa-btn--ghost {
+    border-color: var(--fa-color-border);
+  }
+
+  [data-testid="admin-tester-requests"] > .fa-admin-users__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  [data-testid="admin-tester-requests"] > .fa-admin-users__actions > .fa-btn {
+    width: 100%;
+    padding-inline: var(--fa-space-sm);
+  }
+
+  [data-testid="admin-tester-requests"] > .fa-admin-users__actions > .fa-btn:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* [Operatore Utenti/Leghe 6] Bottoni ripetuti più calmi: «Abilita tester» (una ventina per
+   pagina), «Approva» delle richieste ed «Elimina» delle leghe erano tutti pieni, con il
+   gradiente e l'alone colorato, e la pagina sembrava piena di bottoni principali. Ora sono
+   colorati ma tenui: azzurro chiaro con testo blu, ed «Elimina» rosso con il bordo e
+   senza alone (pieno al passaggio del mouse). Restano pieni i bottoni che confermano
+   davvero l'azione, nelle finestre e nella conferma di eliminazione. */
+.fa-admin-users__col--access > .fa-btn--primary,
+[data-testid="admin-requests-list"] .fa-admin-users__actions > .fa-btn--primary {
+  border-color: color-mix(in srgb, var(--fa-color-accent) 45%, transparent);
+  background-color: color-mix(in srgb, var(--fa-color-accent) 14%, var(--fa-color-background-elevated));
+  background-image: none;
+  color: var(--fa-color-accent-muted);
+  box-shadow: none;
+}
+
+.fa-admin-users__col--access > .fa-btn--primary:hover:not(:disabled),
+[data-testid="admin-requests-list"] .fa-admin-users__actions > .fa-btn--primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--fa-color-accent) 24%, var(--fa-color-background-elevated));
+  filter: none;
+}
+
+.fa-admin-leagues__item > .fa-btn--danger {
+  border-color: color-mix(in srgb, var(--fa-danger-500) 60%, transparent);
+  background-color: transparent;
+  color: var(--fa-danger-400);
+  box-shadow: none;
+}
+
+[data-color-scheme="light"] .fa-admin-leagues__item > .fa-btn--danger {
+  color: var(--fa-danger-600);
+}
+
+.fa-admin-leagues__item > .fa-btn--danger:hover:not(:disabled) {
+  border-color: transparent;
+  background-color: var(--fa-danger-600);
+  color: #ffffff;
+}
+
+/* [Operatore Utenti/Leghe 7] Stato delle leghe a colori: prima tutti i bollini erano grigi
+   e Attiva, Asta o Conclusa si distinguevano solo leggendo. Ora Attiva è verde, Asta
+   ambra, Bozza e Configurazione azzurro; Conclusa e Archiviata restano grigie (archiviata
+   con il testo più tenue). Testo sempre almeno 4,5:1 nei due temi. */
+.fa-admin-leagues__state--active {
+  background: color-mix(in srgb, var(--fa-color-success) 11%, transparent);
+  color: var(--fa-color-success);
+}
+
+.fa-admin-leagues__state--auction {
+  background: color-mix(in srgb, var(--fa-color-warning) 18%, transparent);
+  color: var(--fa-color-warning);
+}
+
+.fa-admin-leagues__state--draft,
+.fa-admin-leagues__state--configuring {
+  background: color-mix(in srgb, var(--fa-color-accent) 14%, transparent);
+  color: var(--fa-color-accent-muted);
+}
+
+.fa-admin-leagues__state--archived {
+  color: var(--fa-color-foreground-muted);
+}
+
+/* [Operatore Utenti/Leghe 8] Moduli «Aggiungi»: nella Lista nera «Motivo (facoltativo)» era
+   largo meno della metà di «Email da bloccare» (195 contro 558px su computer, 216px su
+   telefono); ora i due campi sono uguali. Su telefono «Aggiungi alla lista nera» e
+   «Aggiungi» (finestra Tester) sono larghi quanto il campo. Nella finestra Tester fra il
+   bottone «Aggiungi» e «Cerca tester» c'erano 0px: ora 16px fra un blocco e l'altro. Sotto
+   ogni tester «Rimuovi» ha il bordo ed è allineato a destra, come gli altri bottoni delle
+   schede (prima era una scritta azzurra sola al centro). */
+.fa-admin-testmode__add > .fa-field {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+[data-testid="admin-testers-modal"] {
+  display: grid;
+  gap: var(--fa-space-md);
+}
+
+[data-testid="admin-testers-modal"] > * {
+  margin-block: 0;
+}
+
+@media (max-width: 44rem) {
+  .fa-admin-testmode__add > .fa-btn {
+    flex: 1 1 100%;
+  }
+
+  [data-testid="admin-testers-list"] > li > .fa-admin-users__actions {
+    justify-content: flex-end;
+  }
+
+  [data-testid="admin-testers-list"] > li > .fa-admin-users__actions > .fa-btn {
+    flex: 0 0 auto;
+  }
+
+  [data-testid="admin-testers-list"] .fa-btn--ghost {
+    border-color: var(--fa-color-border);
+  }
+}
+
+/* [Operatore Utenti/Leghe 9] Finestra «Elimina utente» su telefono: i tre bottoni stavano
+   su una riga e «Elimina e lista nera» andava a capo su tre righe dentro una pillola stretta.
+   Ora sono uno sotto l'altro a tutta larghezza, come nella finestra «Aggiorna listone»:
+   sopra «Elimina e lista nera», poi «Elimina», in fondo «Annulla». */
+@media (max-width: 480px) {
+  .fa-modal__dialog:has([data-testid="admin-user-delete-and-block"]) .fa-modal__footer {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-modal__dialog:has([data-testid="admin-user-delete-and-block"]) .fa-modal__footer > .fa-btn {
+    width: 100%;
+  }
+}
+
+/* [Operatore Utenti/Leghe 10] «Precedente · Pagina 1 di 2 · Successiva» su telefono (Utenti,
+   Leghe, finestra Tester): come nel Listone, i due bottoni ai lati e la pagina al centro, in
+   14px. A 360px il testo andava a capo su tre righe allineate a sinistra. */
+@media (max-width: 640px) {
+  [data-testid="admin-users-pager"],
+  [data-testid="admin-leagues-pager"],
+  [data-testid="admin-testers-pager"] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fa-space-xs);
+    font-size: var(--fa-text-sm);
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  [data-testid="admin-users-pager"] > .fa-btn,
+  [data-testid="admin-leagues-pager"] > .fa-btn,
+  [data-testid="admin-testers-pager"] > .fa-btn {
+    padding-inline: var(--fa-space-md);
+  }
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.
