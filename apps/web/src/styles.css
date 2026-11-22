@@ -7838,6 +7838,368 @@ button.fa-starter-row:disabled {
   }
 }
 
+/* ══ Home lega, Turni e Classifica su telefono: rifinitura grafica (proposte di design del 22/11) ══
+   Stato stagione, Home lega del partecipante, Calendario fantallenatori (scontri H2H, pannello
+   e finestra «Genera/Conferma calendario»), Turni europei, dettaglio dello scontro e
+   Classifica: solo misure, spazi, allineamenti e colori, nessun cambio di testi o di
+   comportamento. Ogni blocco porta il numero della proposta (design_home/proposals.json),
+   così si può tenere o togliere da solo. Sta prima delle regole iPhone in fondo al file,
+   che restano l'ultima parola su env(safe-area-inset-*) e campi da 16px. */
+
+/* [Home/Turni 1] Classifica su telefono: a 360px le schede del podio e di «Ranking lega»
+   uscivano dallo schermo di 16px e tagliavano i punti e «PUNTI» (la colonna si allargava
+   fino al nome più lungo). Ora la colonna si stringe allo schermo, il nome va a capo su due
+   righe invece di finire con «…» ed è un'area di tocco da 44px, le quattro etichette (Gare,
+   Gol fatti, Gol subiti, Fantapunti) passano da 9 a 11px in quattro colonne uguali. */
+@media (max-width: 720px) {
+  .fa-standings-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fa-standings-card {
+    min-width: 0;
+    padding: 10px 14px 12px;
+  }
+
+  .fa-standings-card__name {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
+  .fa-standings-card__stats {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .fa-standings-card__stats dt {
+    font-size: 0.6875rem;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .fa-podium__card,
+  .fa-podium__name {
+    min-width: 0;
+  }
+
+  .fa-podium__name {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* [Home/Turni 2] Stato stagione (Amministrazione lega): a 360px «3 Conclusa» andava da
+   solo sulla seconda riga. Su telefono i tre passi stanno su una riga, uguali, con il
+   numero sopra e il nome sotto (13px). */
+@media (max-width: 480px) {
+  .fa-lifecycle-stepper {
+    flex-wrap: nowrap;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-lifecycle-step {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    padding: var(--fa-space-sm) 4px;
+    text-align: center;
+  }
+
+  .fa-lifecycle-step__label {
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* [Home/Turni 3] Home lega del partecipante: «Vai alla rosa», «Vai alla formazione» e
+   «Vai ai turni» erano link da 24px attaccati tra loro; su telefono diventano pillole da
+   44px. I titoli «Calendario» e «Prossime fasi» perdono il margine in più sopra (lo spazio
+   tra le sezioni era di circa 70px). */
+@media (max-width: 767px) {
+  .fa-lhome > section > h2 {
+    margin-top: 0;
+  }
+
+  .fa-lhome section[aria-labelledby="league-home-next-title"] > p {
+    margin: var(--fa-space-sm) 0;
+  }
+
+  .fa-lhome section[aria-labelledby="league-home-next-title"] .fa-ds-showcase__row > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 var(--fa-space-md);
+    border: 1px solid var(--fa-color-border);
+    border-radius: var(--fa-radius-pill);
+    background: var(--fa-color-background-elevated);
+    color: var(--fa-color-accent);
+    font-weight: 600;
+    text-decoration: none;
+  }
+}
+
+/* [Home/Turni 4] Calendario fantallenatori: «Gol fantasy» e «Punti» sembravano una seconda
+   scheda staccata sotto lo scontro. Ora sono il fondo della stessa scheda (angoli in basso
+   tondi solo lì, fondo appena più scuro). Su telefono margine interno 16px (era 24) e, se
+   non c'è posto, «Calcolato il …» resta su una riga e lo stato va sotto, centrato. */
+.fa-matchday-matchup .fa-match-card {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fa-matchday-matchup .fa-h2h-score {
+  margin: 0;
+  padding: var(--fa-space-sm) var(--fa-space-lg);
+  border-top: 0;
+  border-radius: 0 0 var(--fa-radius-xl) var(--fa-radius-xl);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+.fa-matchday-matchup .fa-h2h-score:has(+ .fa-h2h-score__hint) {
+  border-bottom: 0;
+  border-radius: 0;
+  padding-bottom: 2px;
+}
+
+.fa-matchday-matchup .fa-h2h-score__hint {
+  margin: 0;
+  padding: 0 var(--fa-space-lg) var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-top: 0;
+  border-radius: 0 0 var(--fa-radius-xl) var(--fa-radius-xl);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+@media (max-width: 480px) {
+  .fa-matchday-matchup .fa-card__body,
+  .fa-matchday-fixture .fa-card__body {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-matchday-matchup .fa-h2h-score,
+  .fa-matchday-matchup .fa-h2h-score__hint {
+    padding-inline: var(--fa-space-md);
+  }
+
+  .fa-matchday-matchup .fa-match-card__footer,
+  .fa-matchday-fixture .fa-match-card__footer {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: var(--fa-space-xs);
+  }
+
+  .fa-matchday-matchup .fa-match-card__kickoff,
+  .fa-matchday-fixture .fa-match-card__kickoff {
+    white-space: nowrap;
+  }
+}
+
+/* [Home/Turni 5] Dettaglio dello scontro, Panchina e Tribuna: a 360px i nomi erano tagliati
+   di netto («Simone Manci», «Pierfrancesco De») accanto al voto o al countdown; ora vanno a
+   capo. Nel tema chiaro il voto finale era una pillola bianca su scheda bianca: sembrava
+   testo spostato a destra, non allineato con le pillole LIVE e S.V.; ora ha un fondo grigio
+   chiaro e un bordo, come le altre. */
+@media (max-width: 480px) {
+  .fa-mlist .fa-mrow {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .fa-mlist .fa-mrow__order {
+    min-width: 22px;
+  }
+
+  .fa-mlist .fa-mrow__name {
+    flex-wrap: wrap;
+    row-gap: 0;
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .fa-mlist .fa-mrow__name .fa-athlete-name {
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .fa-mlist .fa-mrow__vote,
+  .fa-mlist .fa-mrow__countdown {
+    flex-shrink: 0;
+  }
+}
+
+[data-color-scheme="light"] .fa-mrow__vote--final {
+  background: var(--fa-color-background-subtle);
+  box-shadow: inset 0 0 0 1px var(--fa-color-border-strong);
+}
+
+/* [Home/Turni 6] Dettaglio dello scontro su telefono: «Campo · Affiancata», «Panchina ·
+   Tribuna» e «← Torna al calendario fantallenatori» con un'area di tocco da 44px (erano
+   31, 33 e 19px). */
+@media (max-width: 767px) {
+  .fa-mview__btn,
+  .fa-mtabs__tab {
+    min-height: 2.75rem;
+  }
+
+  [data-testid="matchup-back"] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+}
+
+/* [Home/Turni 7] Finestra «Genera calendario» / «Conferma calendario» con rose non in
+   regola: su un telefono basso (iPhone 13 con le barre di Safari) «Conferma comunque»
+   finiva tagliato sul fondo e bisognava scorrere dentro la finestra per trovarlo. Ora
+   titolo e bottoni restano fermi e scorre solo il testo; l'elenco delle squadre è in un
+   riquadro giallo; su telefono il bottone principale occupa lo spazio a destra di «Annulla». */
+.fa-modal__dialog.fa-calendar-action-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fa-calendar-action-modal .fa-modal__header,
+.fa-calendar-action-modal .fa-modal__footer {
+  flex: 0 0 auto;
+}
+
+.fa-calendar-action-modal .fa-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fa-calendar-action-modal .fa-modal__body p {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+.fa-calendar-action-modal .fa-modal__body p:last-child {
+  margin-bottom: 0;
+}
+
+.fa-calendar-action-modal__issues {
+  list-style: none;
+  margin: 0 0 var(--fa-space-md);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid color-mix(in srgb, var(--fa-color-warning) 55%, transparent);
+  border-left-width: 4px;
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-warning) 10%, transparent);
+}
+
+@media (max-width: 480px) {
+  .fa-calendar-action-modal .fa-modal__footer .fa-btn--primary {
+    flex: 1 1 auto;
+  }
+}
+
+/* [Home/Turni 8] Pannello «Calendario fantallenatori» (calendario in anteprima o da
+   generare): stava sotto una riga grigia con oltre 60px vuoti sopra e un titolo grande quanto
+   quello della pagina. Ora è una scheda con titolo da 20px, testi a 8px l'uno dall'altro
+   e, su telefono, «Genera calendario» e «Conferma calendario» a tutta larghezza uno sotto
+   l'altro. */
+.fa-calendar-panel {
+  margin-top: var(--fa-space-md);
+  padding: var(--fa-space-lg);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+}
+
+.fa-calendar-panel > h2 {
+  margin: 0 0 var(--fa-space-sm);
+  font-size: var(--fa-text-lg);
+}
+
+.fa-calendar-panel > p {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+.fa-calendar-panel > .fa-ds-showcase__row {
+  margin-top: var(--fa-space-md);
+}
+
+@media (max-width: 480px) {
+  .fa-calendar-panel {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-calendar-panel > .fa-ds-showcase__row > .fa-btn {
+    flex: 1 1 12rem;
+  }
+}
+
+/* [Home/Turni 9] Turni su telefono: fra i blocchi 16px (erano 40px più i margini dei
+   paragrafi, fino a 70px vuoti sotto «Provvisorio»), «Giornata» e «Turno europeo» a tutta
+   larghezza (prima lasciavano un buco a destra) e il motivo di un «Turno saltato» in un
+   riquadro giallo invece che in un paragrafo qualunque. */
+@media (max-width: 767px) {
+  .fa-matchday-h2h,
+  .fa-matchday-europei,
+  .fa-matchday-europei-detail {
+    gap: var(--fa-space-md);
+  }
+
+  .fa-matchday-europei-detail > p {
+    margin: 0;
+  }
+
+  .fa-matchday-toolbar {
+    gap: var(--fa-space-md);
+  }
+
+  .fa-matchday-toolbar .fa-field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .fa-matchday-round__header {
+    gap: var(--fa-space-sm);
+  }
+}
+
+.fa-matchday-skip-reason {
+  margin: 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid color-mix(in srgb, var(--fa-color-warning) 55%, transparent);
+  border-left-width: 4px;
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-warning) 10%, transparent);
+  color: var(--fa-color-foreground);
+  font-weight: 600;
+}
+
+/* [Home/Turni 10] Contrasto (minimo 4,5:1): i voti «LIVE» delle righe erano bianco su blu
+   chiaro (3,7:1), il numero di «Panchina 10» sulla scheda attiva 3,9:1, «Gol fantasy» e
+   «Punti» nel riepilogo dello scontro 4,2:1 nel tema chiaro, i «Gol subiti» della propria
+   squadra in Classifica 4,4:1 nel tema chiaro. */
+.fa-mrow__vote--live {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
+
+.fa-mtabs__tab--active .fa-mtabs__count {
+  opacity: 1;
+}
+
+[data-color-scheme="light"] [data-testid="matchup-result-summary"] .fa-h2h-score__term {
+  color: var(--fa-color-foreground);
+}
+
+[data-color-scheme="light"] .fa-standings-card--current .fa-standings-card__stat--danger dd {
+  color: #a61e1e;
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.
