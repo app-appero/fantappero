@@ -1,5 +1,7 @@
 /** League configuration contracts (EP03-02). */
 
+import type { AthleteCareerRow, AthleteMarketFields } from "./athleteValue.js";
+
 export type LeagueState =
   | "draft"
   | "configuring"
@@ -747,7 +749,8 @@ export interface LeagueListoneOverride {
   reason: string | null;
 }
 
-export interface LeagueListoneEntry {
+/** `marketValue` e `seasonAverage` (1.3): vedi `AthleteMarketFields`. */
+export interface LeagueListoneEntry extends AthleteMarketFields {
   athleteId: string;
   canonicalName: string;
   photoUrl: string | null;
@@ -794,7 +797,7 @@ export interface AthleteCardAssignment {
 }
 
 /** Scheda calciatore: anagrafica provider e associazione di lega. */
-export interface AthleteCard {
+export interface AthleteCard extends AthleteMarketFields {
   athleteId: string;
   providerId: number;
   canonicalName: string;
@@ -819,6 +822,12 @@ export interface AthleteCard {
   seasonStats?: AthleteCardSeasonStats | null;
   /** Voto attuale, solo se la partita del calciatore è in corso. */
   live?: AthleteCardLive | null;
+  /**
+   * Storico (1.3): le due stagioni passate e quella in corso, dalla più recente; una riga per
+   * club + competizione (un trasferimento a metà stagione dà due righe). Assente da un backend
+   * più vecchio.
+   */
+  career?: AthleteCareerRow[];
 }
 
 export interface AthleteCardSeasonStats {

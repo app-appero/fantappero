@@ -502,6 +502,16 @@ export type {
   AdminListoneRoleRestoreEntry,
   AdminListoneRoleRestoreRequest,
   AdminListoneRoleRestoreResult,
+  AdminMarketValuesRefreshRequest,
+  AdminMarketValuesRefreshResult,
+  AdminSeasonHistoryEstimate,
+  AdminSeasonHistoryImportRequest,
+  AdminSeasonHistoryImportResponse,
+  AdminSeasonHistoryJob,
+  AdminSeasonHistoryProgress,
+  AdminSeasonHistoryResult,
+  AdminSeasonHistorySeasonEstimate,
+  AdminSeasonHistoryStopReason,
   AdminOverview,
   AdminResultRecoveryJob,
   AdminResultRecoveryProgress,
@@ -708,3 +718,15 @@ export {
   rosterRoleQuota,
 } from "./rosterQuota.js";
 export type { ListoneQuotaContext, RoleQuotaMessageOptions, RoleQuotaStat, RoleQuotaTeam, RosterRoleQuota } from "./rosterQuota.js";
+
+export type {
+  AthleteCareerRow,
+  AthleteCareerSource,
+  AthleteMarketFields,
+  AthleteSeasonAverage,
+} from "./athleteValue.js";
+export {
+  compareBySeasonAverageDesc,
+  seasonLabel,
+  sortBySeasonAverageDesc,
+} from "./athleteValue.js";

@@ -400,3 +400,106 @@ export interface AdminTesterRequest {
 export interface AdminTesterRequestList {
   requests: AdminTesterRequest[];
 }
+
+
+// --- Storico stagioni dal fornitore, media stagionale e Valore (1.3) --------------------------
+
+/**
+ * «Importa lo storico» (POST /admin/listone/storico, solo operatore). `seasonYear` è la stagione
+ * in corso del listone (2026): si importano le due precedenti (2025/26 e 2024/25).
+ */
+export interface AdminSeasonHistoryImportRequest {
+  seasonYear: number;
+  /** Default `true`: solo il conto delle chiamate, nessuna chiamata al fornitore. */
+  dryRun?: boolean;
+  /** Tetto di chiamate di questa esecuzione (default 2000); si riprende rilanciando. */
+  maxCalls?: number;
+}
+
+export interface AdminSeasonHistorySeasonEstimate {
+  seasonYear: number;
+  seasonLabel: string;
+  leaguePagesDone: number;
+  leaguePagesRemaining: number;
+  /** `false` finché la prima pagina di qualche campionato non dice quante sono (stima). */
+  leaguePagesExact: boolean;
+  listoneAthletes: number;
+  athletesWithRows: number;
+  athletesChecked: number;
+  athletesToFill: number;
+  /** `false` finché mancano pagine di campionato (stima). */
+  athletesToFillExact: boolean;
+  rowsStored: number;
+  estimatedCalls: number;
+}
+
+export interface AdminSeasonHistoryEstimate {
+  seasonYear: number;
+  seasons: AdminSeasonHistorySeasonEstimate[];
+  estimatedCalls: number;
+  estimatedMinutes: number;
+  requestsPerMinute: number;
+}
+
+export interface AdminSeasonHistoryJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+export interface AdminSeasonHistoryImportResponse {
+  dryRun: boolean;
+  estimate: AdminSeasonHistoryEstimate;
+  /** Il job avviato (o quello già in corso); `null` in modalità conta. */
+  job: AdminSeasonHistoryJob | null;
+}
+
+/** POST /admin/listone/valori/ricalcola (solo operatore). */
+export interface AdminMarketValuesRefreshRequest {
+  seasonYear: number;
+  /** Default `true`: ricalcola anche se voti e storico non sono cambiati. */
+  force?: boolean;
+}
+
+export interface AdminMarketValuesRefreshResult {
+  seasonYear: number;
+  skipped: boolean;
+  currentSeasonRows: number;
+  athletesValued: number;
+  athletesWithHistory: number;
+  athletesWithCurrentAverage: number;
+  athletesWithPreviousAverage: number;
+  computedAt: string | null;
+}
+
+export type AdminSeasonHistoryStopReason = "max_calls" | "quota_reserve" | "too_many_errors";
+
+export interface AdminSeasonHistoryResult {
+  seasonYear: number;
+  seasons: number[];
+  calls: number;
+  leaguePages: number;
+  athletesChecked: number;
+  athletesFound: number;
+  rowsCreated: number;
+  rowsUpdated: number;
+  snapshotsCreated: number;
+  errors: number;
+  /** `null` se finito; altrimenti fermato prima: rilanciare l'import per continuare. */
+  stoppedReason: AdminSeasonHistoryStopReason | null;
+  message: string;
+  marketValues: AdminMarketValuesRefreshResult | null;
+  /** Quello che resta da scaricare dopo questa esecuzione. */
+  remaining: AdminSeasonHistoryEstimate | null;
+}
+
+/** GET /admin/listone/storico (job attivo o `null`) e GET /admin/listone/storico/{jobId}. */
+export interface AdminSeasonHistoryProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode: string | null;
+  result: AdminSeasonHistoryResult | null;
+}
