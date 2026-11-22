@@ -256,7 +256,10 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     expect(html).toContain('data-testid="admin-leagues-list"');
     expect(html).toContain("Lega Globale");
     // Lo stato si legge in italiano, non come codice dell'API.
-    expect(html).toContain('<span class="fa-admin-leagues__state">Attiva</span>');
+    // La classe col codice dello stato serve solo al colore del bollino (design 1.3).
+    expect(html).toContain(
+      '<span class="fa-admin-leagues__state fa-admin-leagues__state--active">Attiva</span>',
+    );
     expect(html).not.toContain(">active<");
     unmount();
   });
