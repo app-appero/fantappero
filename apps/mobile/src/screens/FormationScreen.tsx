@@ -1292,7 +1292,7 @@ export function FormationScreen() {
               stateLabel = "Schierato qui";
             } else if (row.exceedsRoleQuota) {
               state = "bloccato";
-              stateLabel = "Fuori rosa, in attesa";
+              stateLabel = "Fuori rosa, in esubero";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";
@@ -1359,7 +1359,7 @@ export function FormationScreen() {
               stateLabel = "Titolare";
             } else if (row.exceedsRoleQuota) {
               state = "bloccato";
-              stateLabel = "Fuori rosa, in attesa";
+              stateLabel = "Fuori rosa, in esubero";
             } else {
               // Chi non prende il voto non può entrare tra i titolari, ma in panchina e in tribuna
               // sì (come sul web e sul server): prima non si poteva sceglierlo, e se era l'unico

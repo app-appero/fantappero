@@ -1968,7 +1968,7 @@ export function FormationPage() {
           playerLocked(roster, row.athleteId, clock, lockMarginMinutes) ? "bloccato" : null,
           // Scambio accettato col ruolo già al completo: resta visibile in rosa (altrimenti
           // sembra "scomparso") ma non selezionabile finché non si libera uno slot (EP08-10).
-          row.exceedsRoleQuota ? "fuori rosa, in attesa" : null,
+          row.exceedsRoleQuota ? "fuori rosa, in esubero" : null,
           displayBench.includes(row.athleteId) && row.athleteId !== currentId
             ? displayBench.indexOf(row.athleteId) < benchActive
               ? `Panchina ${displayBench.indexOf(row.athleteId) + 1}°`
