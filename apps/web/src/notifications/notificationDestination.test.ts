@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { notificationLeagueToActivate, resolveNotificationDestination } from "./notificationDestination";
+import {
+  notificationLeagueToActivate,
+  resolveNotificationDestination,
+  resolveNotificationExternalLink,
+} from "./notificationDestination";
 
 describe("resolveNotificationDestination", () => {
   it("manda l'invito di lega agli inviti ricevuti", () => {
@@ -61,5 +65,21 @@ describe("notificationLeagueToActivate (Rosario 21/11)", () => {
     expect(notificationLeagueToActivate("/inviti", session)).toBeNull();
     expect(notificationLeagueToActivate("/classifica?lega=lega-lasciata", session)).toBeNull();
     expect(notificationLeagueToActivate("https://example.com/?lega=lega-a", session)).toBeNull();
+  });
+});
+describe("resolveNotificationExternalLink (release 1.4)", () => {
+  it("solo la notifica della nuova versione dell'app, e solo con un link https", () => {
+    const title = "È disponibile la versione 1.4 dell'app";
+    expect(resolveNotificationExternalLink({ title, deepLink: "https://drive.google.com/x" })).toBe(
+      "https://drive.google.com/x",
+    );
+    expect(resolveNotificationExternalLink({ title, deepLink: "http://drive.google.com/x" })).toBeNull();
+    expect(resolveNotificationExternalLink({ title, deepLink: "javascript:alert(1)" })).toBeNull();
+    expect(resolveNotificationExternalLink({ title, deepLink: null })).toBeNull();
+    expect(
+      resolveNotificationExternalLink({ title: "Avviso", deepLink: "https://drive.google.com/x" }),
+    ).toBeNull();
+    // Il link esterno non è una pagina del sito.
+    expect(resolveNotificationDestination({ title, deepLink: "https://drive.google.com/x" })).toBeNull();
   });
 });

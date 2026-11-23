@@ -60,6 +60,14 @@ vi.mock("./api/admin", () => ({
   deleteUser: vi.fn(),
   fetchAppVersionConfig: vi.fn().mockResolvedValue({ android: null }),
   saveAppVersionConfig: vi.fn(),
+  fetchAppVersionUsers: vi.fn().mockResolvedValue({
+    generatedAt: "2026-11-23T11:00:00Z",
+    announced: null,
+    totalUsers: 2,
+    appUsers: 1,
+    upToDateUsers: 0,
+    groups: [],
+  }),
 }));
 
 import { ToastProvider } from "@fantappero/ui";
@@ -231,6 +239,8 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     expect(operator.html).toContain('data-testid="admin-appversion-page"');
     expect(operator.html).toContain('data-testid="admin-appversion"');
     expect(operator.html).toContain("Nessuna versione impostata");
+    // Release 1.4: sotto il modulo, chi ha quale versione.
+    expect(operator.html).toContain('data-testid="admin-appversion-users"');
     operator.unmount();
   });
 

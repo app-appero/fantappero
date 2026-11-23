@@ -2416,6 +2416,13 @@ a.fa-member-list__identity:focus-visible {
   color: var(--fa-color-foreground-muted);
 }
 
+/* Nuova versione dell'app (1.4): la notifica apre il download in una nuova scheda. */
+.fa-notification-center__item-link {
+  font-size: var(--fa-text-sm);
+  font-weight: 700;
+  color: var(--fa-color-accent);
+}
+
 /* ── Matchday / turni ───────────────────────────────────────────────── */
 
 .fa-matchday-h2h,
@@ -10208,12 +10215,116 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   font-weight: 700;
 }
 
+/* «Chi ha quale versione» (release 1.4, Rosario 23/11): un gruppo per versione, apribile. */
+.fa-admin-appusage {
+  display: grid;
+  gap: var(--fa-space-sm);
+  margin-top: var(--fa-space-lg);
+  padding: var(--fa-space-lg);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+}
+
+.fa-admin-appusage h2,
+.fa-admin-appusage p {
+  margin: 0;
+}
+
+.fa-admin-appusage h2 {
+  font-size: var(--fa-text-lg);
+}
+
+.fa-admin-appusage__summary {
+  font-weight: 700;
+}
+
+.fa-admin-appusage__hint {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-admin-appusage__group {
+  border-top: 1px solid var(--fa-color-border);
+  padding-top: var(--fa-space-sm);
+}
+
+.fa-admin-appusage__group > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fa-admin-appusage__group > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Il triangolino di apertura (il `display: flex` toglie quello del browser). */
+.fa-admin-appusage__group > summary::before {
+  content: "▸";
+  flex: none;
+  width: 1em;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-appusage__group[open] > summary::before {
+  content: "▾";
+}
+
+.fa-admin-appusage__group > summary:focus-visible {
+  outline: 2px solid var(--fa-color-accent);
+  outline-offset: 2px;
+  border-radius: var(--fa-radius-sm, 4px);
+}
+
+.fa-admin-appusage__title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.fa-admin-appusage__badge {
+  padding: 0 var(--fa-space-sm);
+  border: 1px solid var(--fa-color-success);
+  border-radius: 999px;
+  color: var(--fa-color-success);
+  font-size: var(--fa-text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fa-admin-appusage__users {
+  display: grid;
+  gap: var(--fa-space-xs);
+  margin: var(--fa-space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fa-admin-appusage__users li {
+  display: grid;
+  gap: 2px;
+  padding: var(--fa-space-xs) 0 var(--fa-space-xs) var(--fa-space-sm);
+  border-left: 2px solid var(--fa-color-border);
+  min-width: 0;
+}
+
+.fa-admin-appusage__email,
+.fa-admin-appusage__seen {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
   .fa-admin-summary {
     gap: var(--fa-space-md);
   }
 
-  .fa-admin-appversion-page .fa-admin-appversion {
+  .fa-admin-appversion-page .fa-admin-appversion,
+  .fa-admin-appusage {
     padding: var(--fa-space-md);
   }
 

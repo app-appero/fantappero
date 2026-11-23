@@ -1,4 +1,4 @@
-import type { LeagueSummary, NotificationItem } from "@fantappero/contracts";
+import { isHttpsDownloadUrl, type LeagueSummary, type NotificationItem } from "@fantappero/contracts";
 
 /** Destinazione di riserva quando il deep link non è arrivato col payload. */
 const DESTINATION_BY_TITLE: Record<string, string> = {
@@ -25,6 +25,24 @@ const DESTINATION_BY_TITLE: Record<string, string> = {
   "Turno omologato": "/classifica",
   "Correzione al turno omologato": "/classifica",
 };
+
+/** Titolo della notifica della nuova versione (backend, template `sistema.versione_app`). */
+const APP_UPDATE_TITLE = /^È disponibile (la versione \S+|una nuova versione) dell'app$/;
+
+/**
+ * Link esterno da aprire in una nuova scheda: solo per «È disponibile la versione X dell'app»
+ * (release 1.4), il download dell'APK; solo https. Per le altre notifiche un link esterno non
+ * apre nulla, come prima. `null` se non c'è.
+ */
+export function resolveNotificationExternalLink(
+  item: Pick<NotificationItem, "deepLink" | "title">,
+): string | null {
+  const link = item.deepLink?.trim() ?? "";
+  if (!APP_UPDATE_TITLE.test(item.title) || !isHttpsDownloadUrl(link)) {
+    return null;
+  }
+  return link;
+}
 
 function isInternalPath(value: string): boolean {
   return value.startsWith("/") && !value.startsWith("//") && !value.includes("://");

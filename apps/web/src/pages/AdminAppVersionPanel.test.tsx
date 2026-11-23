@@ -75,7 +75,7 @@ describe("AdminAppVersionPanel", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("Versione dell'app Android");
     expect(text).toContain(
-      "Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi ha un'app più vecchia vedrà l'avviso.",
+      "Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi non ha ancora quella versione riceve una notifica (nell'elenco e push) e, a ogni ingresso nell'app, l'avviso con «Scarica».",
     );
     expect(text).toContain("Nessuna versione impostata");
     expect(field("app-version-name").value).toBe("");
@@ -83,7 +83,7 @@ describe("AdminAppVersionPanel", () => {
 
   it("salva versione, versionCode, link e messaggio", async () => {
     fetchMock.mockResolvedValue({ android: null });
-    saveMock.mockResolvedValue({ android: { ...SAVED, message: "Più veloce" } });
+    saveMock.mockResolvedValue({ android: { ...SAVED, message: "Più veloce" }, notifiedUsers: 7 });
     await render();
     await act(async () => {
       setValue(field("app-version-name"), " 1.3.0 ");
@@ -99,7 +99,10 @@ describe("AdminAppVersionPanel", () => {
       message: "Più veloce",
     });
     const text = container.textContent ?? "";
-    expect(text).toContain("Versione salvata");
+    // Release 1.4: il salvataggio dice a quanti è partita la notifica.
+    expect(text).toContain(
+      "Versione salvata: notifica inviata a 7 utenti che non hanno ancora questa versione.",
+    );
     expect(text).toContain("Ora annunciata: 1.3.0 (versionCode 4).");
   });
 

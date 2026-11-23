@@ -1,6 +1,7 @@
 import {
   EMPTY_APP_VERSION_FORM,
   appVersionFormFrom,
+  appVersionSavedMessage,
   appVersionUpdateFrom,
   validateAppVersionForm,
   type AppVersionFormErrors,
@@ -21,8 +22,15 @@ type FieldErrors = AppVersionFormErrors;
  * Pannello operatore: ultima versione dell'APK Android, annunciata a chi ha un'app più vecchia.
  * Dalla 1.4 sta nella pagina «Versione app» (`AdminAppVersionPage`), che ha già il suo titolo:
  * lì il titolo della sezione resta solo per i lettori di schermo (`hideTitle`).
+ *
+ * Decisione di Rosario del 23/11: salvare una versione nuova manda anche la notifica a chi non
+ * ce l'ha; il messaggio dopo «Salva» dice a quanti. `onSaved` avvisa la pagina (rilegge
+ * l'elenco «Chi ha quale versione»).
  */
-export function AdminAppVersionPanel({ hideTitle = false }: { hideTitle?: boolean } = {}) {
+export function AdminAppVersionPanel({
+  hideTitle = false,
+  onSaved,
+}: { hideTitle?: boolean; onSaved?: () => void } = {}) {
   const [current, setCurrent] = useState<AppVersionInfo | null>(null);
   const [fields, setFields] = useState<Fields>(EMPTY_APP_VERSION_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -76,7 +84,8 @@ export function AdminAppVersionPanel({ hideTitle = false }: { hideTitle?: boolea
       const saved = await saveAppVersionConfig(session.accessToken, appVersionUpdateFrom(fields));
       setCurrent(saved);
       setFields(appVersionFormFrom(saved));
-      setMessage("Versione salvata: chi ha un'app più vecchia vedrà l'avviso.");
+      setMessage(appVersionSavedMessage(saved));
+      onSaved?.();
     } catch (cause) {
       setError(getApiErrorMessage(cause, "Salvataggio non riuscito."));
     } finally {
@@ -96,8 +105,9 @@ export function AdminAppVersionPanel({ hideTitle = false }: { hideTitle?: boolea
         Versione dell'app Android
       </h2>
       <p className="fa-admin-appversion__hint">
-        Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi ha un'app più vecchia
-        vedrà l'avviso.
+        Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi non ha ancora quella
+        versione riceve una notifica (nell'elenco e push) e, a ogni ingresso nell'app, l'avviso con
+        «Scarica».
       </p>
       {current ? (
         <p data-testid="admin-appversion-current">
