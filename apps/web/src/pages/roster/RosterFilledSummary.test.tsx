@@ -74,6 +74,17 @@ describe("Rosa: nome e badge «In attesa» in colonna stretta (QA 20-21/11, WEB-
   });
 });
 
+describe("Rosa › Storico a 390 px: «Al» e «Fonte» raggiungibili (QA 22→23/11)", () => {
+  it("la colonna della pagina non si allarga quanto la tabella più larga", () => {
+    // Senza questa regola la griglia del corpo della pagina ha una colonna «auto» larga quanto
+    // la tabella «Intervalli di possesso» (611 px con lo schermo a 374 px): la card usciva dallo
+    // schermo invece di far scorrere la tabella nel suo riquadro. Stessa cura di Listone e Turni.
+    expect(stylesCss).toMatch(
+      /(?:^|\n)\.fa-roster-page > \.fa-page-container__body \{\s*grid-template-columns: minmax\(0, 1fr\);\s*\}/,
+    );
+  });
+});
+
 describe("Rosa: tabelle dei ruoli senza scorrimento a 1280 px (QA 20-21/11, WEB-2)", () => {
   it("le tabelle della Rosa sono container e diventano compatte quando sono strette", () => {
     expect(stylesCss).toMatch(

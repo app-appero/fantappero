@@ -7563,6 +7563,14 @@ button.fa-starter-row:disabled {
   font-weight: 700;
 }
 
+/* Rosa › Storico su telefono (QA 22→23/11): la colonna della pagina si allargava quanto la
+   tabella «Intervalli di possesso» (611px con lo schermo a 374px) e «Al» e «Fonte» restavano
+   fuori dallo schermo, senza poterci arrivare. Come nel Listone e nei Turni, la colonna è
+   larga quanto lo schermo e la tabella scorre nel suo riquadro. */
+.fa-roster-page > .fa-page-container__body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* ══ Parti comuni su telefono: rifinitura grafica (proposte di design del 21/11) ══════
    Header, «Prossimo blocco», titoli delle pagine, finestre, avvisi, banda d'assistenza,
    schede e bottoni piccoli: solo misure, spazi, livelli e posizioni, nessun cambio di
