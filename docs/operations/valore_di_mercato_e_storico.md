@@ -186,7 +186,7 @@ Il Valore è un **prezzo consigliato**, non un minimo: la validazione delle offe
 
 `seasonAverage` = `{value, seasonYear, seasonLabel, isCurrent}`. Ogni riga di `career` ha stagione ed etichetta, `isCurrent`, `source` (`provider` o `fantappero`), club e competizione (id nostro se c'è, altrimenti solo il nome), presenze, minuti, `averageRating` (media voto), `votes`, `fantasyAverage`, gol, assist, gol subiti, parate, rigori parati, cartellini e `cleanSheets` (solo portieri della stagione in corso; `null` altrove). Tipi condivisi in `packages/contracts/src/athleteValue.ts`.
 
-Il listone arriva intero e si ordina nelle app: «Ordina per media» usa `sortBySeasonAverageDesc` dei contratti (dalla media più alta, chi non ha media in fondo). Il backend non ordina.
+Il listone arriva intero e si ordina nelle app: «Ordina per media» usa `sortBySeasonAverageDesc` dei contratti: prima tutti quelli con la media della stagione in corso (verde), dalla più alta alla più bassa, poi quelli con la sola media della stagione scorsa (rossa, «25/26»), dalla più alta alla più bassa, in fondo chi non ha media; a parità resta l'ordine del listone (decisione di Rosario del 23/11: prima le due medie erano mescolate). Il backend non ordina.
 
 ## 7. Limiti noti
 

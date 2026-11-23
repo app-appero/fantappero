@@ -155,14 +155,15 @@ describe("listone con Valore e media (1.3)", () => {
     expect(price(view, "ferraro").value).toBe("1");
   });
 
-  it("«Ordina per media» mette la media più alta in cima e chi non ce l'ha in fondo", () => {
+  it("«Ordina per media»: prima la stagione in corso, poi la scorsa, chi non ha media in fondo", () => {
     const view = render();
     expect(names(view)).toEqual(["A. Bianchi", "M. Ferraro", "D. Greco", "A. Marchi", "L. Santoro"]);
     const sort = byTestId(view, "roster-listone-sort-average") as HTMLInputElement;
     expect(sort.checked).toBe(false);
     expect(sort.closest(".fa-listone-filters__checks")?.textContent).toContain("Solo disponibili");
     toggle(view, "roster-listone-sort-average");
-    expect(names(view)).toEqual(["M. Ferraro", "L. Santoro", "D. Greco", "A. Marchi", "A. Bianchi"]);
+    // Rosario 23/11: Marchi (5,90 di quest'anno) prima di Greco (6,30 della stagione scorsa).
+    expect(names(view)).toEqual(["M. Ferraro", "L. Santoro", "A. Marchi", "D. Greco", "A. Bianchi"]);
     toggle(view, "roster-listone-sort-average");
     expect(names(view)).toEqual(["A. Bianchi", "M. Ferraro", "D. Greco", "A. Marchi", "L. Santoro"]);
   });

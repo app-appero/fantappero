@@ -79,22 +79,30 @@ export function seasonLabel(seasonYear: number): string {
   return `${String(start).padStart(2, "0")}/${String(end).padStart(2, "0")}`;
 }
 
+/** 0: media della stagione in corso, 1: solo quella della scorsa, 2: nessuna media. */
+function seasonAverageTier(average: AthleteSeasonAverage | null | undefined): 0 | 1 | 2 {
+  if (!average || typeof average.value !== "number" || Number.isNaN(average.value)) return 2;
+  return average.isCurrent ? 0 : 1;
+}
+
 /**
- * Ordine «Ordina per media»: dalla media più alta alla più bassa, chi non ha media in fondo.
+ * Ordine «Ordina per media» (Rosario 23/11): prima tutti quelli con la media della stagione in
+ * corso (`isCurrent: true`, verde), dalla più alta alla più bassa; poi quelli con la sola media
+ * della stagione scorsa (`isCurrent: false`, rossa), dalla più alta alla più bassa; in fondo chi
+ * non ha media. Prima del 23/11 le due medie erano mescolate: un 6,30 della stagione scorsa
+ * passava davanti a un 5,90 di quest'anno.
  * Il listone si ordina in app (il backend lo restituisce intero); a parità resta l'ordine dato.
  */
 export function compareBySeasonAverageDesc(
   left: AthleteMarketFields,
   right: AthleteMarketFields,
 ): number {
-  const a = left.seasonAverage?.value;
-  const b = right.seasonAverage?.value;
-  const aMissing = a === undefined || a === null;
-  const bMissing = b === undefined || b === null;
-  if (aMissing && bMissing) return 0;
-  if (aMissing) return 1;
-  if (bMissing) return -1;
-  return b - a;
+  const leftTier = seasonAverageTier(left.seasonAverage);
+  const rightTier = seasonAverageTier(right.seasonAverage);
+  if (leftTier !== rightTier) return leftTier - rightTier;
+  if (leftTier === 2) return 0;
+  // Stesso gruppo e media presente in entrambi (tier 0 o 1).
+  return (right.seasonAverage?.value ?? 0) - (left.seasonAverage?.value ?? 0);
 }
 
 /** Copia ordinata con `compareBySeasonAverageDesc` (stabile: a parità resta l'ordine dato). */

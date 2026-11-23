@@ -367,7 +367,8 @@ export function RosterAdminManualCard({
     },
     { fold: foldSearchText, ownedAthleteIds },
   );
-  // «Ordina per media»: dalla media più alta, chi non l'ha in fondo (contracts, come il sito).
+  // «Ordina per media»: prima la stagione in corso, poi la scorsa, ognuna dalla media più alta;
+  // chi non l'ha in fondo (contracts, come il sito; Rosario 23/11).
   const rows = orderListoneRows(filteredRows, sortByAverage, sortBySeasonAverageDesc);
   // Quota per ruolo della squadra a cui si assegna: stessa regola del server (contracts).
   const quota = useMemo(() => rosterRoleQuota(targetTeam), [targetTeam]);
