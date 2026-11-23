@@ -1,8 +1,9 @@
-import { playerAvatarUrl } from "@fantappero/contracts";
+import { FAQ_HELP, playerAvatarUrl } from "@fantappero/contracts";
 import type { FantasyRole, FantasyTeam } from "@fantappero/contracts";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
+import { FaqHelpButton } from "../../components/FaqHelpButton";
 import { PlayerPhotoRing } from "../../components/PlayerPhotoRing";
 import {
   compositionStatusLabel,
@@ -175,9 +176,17 @@ function RosterRoleSection({
                         {slot.clubName ?? "—"} · slot {slot.slotIndex + 1}
                       </Text>
                       {slot.exceedsRoleQuota ? (
-                        <Text style={styles.playerPendingBadge} numberOfLines={1}>
-                          In attesa (fuori rosa)
-                        </Text>
+                        // Il «?» apre «Ho un giocatore in esubero: cosa faccio?» (FAQ 1.4).
+                        <View style={styles.playerPendingRow}>
+                          <Text style={[styles.playerPendingBadge, styles.playerPendingBadgeInRow]} numberOfLines={1}>
+                            In attesa (fuori rosa)
+                          </Text>
+                          <FaqHelpButton
+                            faqId={FAQ_HELP.surplus}
+                            style={styles.playerPendingHelp}
+                            testID={`roster-pending-help-${slot.athleteId ?? slot.slotIndex}`}
+                          />
+                        </View>
                       ) : null}
                     </View>
                     <View style={styles.playerPrice}>

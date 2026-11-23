@@ -36,6 +36,7 @@ import {
   planModuleChange,
   fantasyBadgesFromBonusMalus,
   playerAvatarUrl,
+  FAQ_HELP,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
@@ -75,6 +76,7 @@ import {
   clearLineupSuccessMessage,
 } from "./formation/clearLineup";
 import { LockCountdown } from "../components/LockCountdown";
+import { FaqHelpButton } from "../components/FaqHelpButton";
 import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
 import { OptionPicker } from "../components/OptionPicker";
@@ -1421,14 +1423,18 @@ export function FormationScreen() {
           style={styles.statusRow}
           onLayout={(event) => setStatusBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height + 80)}
         >
-          <Text style={styles.turnTitle} testID="formation-cutoff">
-            {/* Prima diceva "cutoff" accanto al conto alla rovescia del blocco: due orari
-                diversi (calcio d'inizio e blocco) senza spiegazione (QA emulatore 18/11). */}
-            Turno {context.roundNumber} · primo calcio d'inizio {formatDateTime(context.cutoffAt)}
-            {(context.lineupLockMarginMinutes ?? 0) > 0
-              ? ` · ogni giocatore si blocca ${context.lineupLockMarginMinutes} min prima della sua partita`
-              : ""}
-          </Text>
+          <View style={styles.turnTitleRow}>
+            <Text style={[styles.turnTitle, styles.turnTitleText]} testID="formation-cutoff">
+              {/* Prima diceva "cutoff" accanto al conto alla rovescia del blocco: due orari
+                  diversi (calcio d'inizio e blocco) senza spiegazione (QA emulatore 18/11). */}
+              Turno {context.roundNumber} · primo calcio d'inizio {formatDateTime(context.cutoffAt)}
+              {(context.lineupLockMarginMinutes ?? 0) > 0
+                ? ` · ogni giocatore si blocca ${context.lineupLockMarginMinutes} min prima della sua partita`
+                : ""}
+            </Text>
+            {/* Il «?» apre «Quando si blocca la formazione?» (FAQ 1.4). */}
+            <FaqHelpButton faqId={FAQ_HELP.lineupLock} style={styles.turnTitleHelp} testID="formation-lock-help" />
+          </View>
           <View style={styles.movesRow}>
             <View style={styles.movesChip}>
               <Text style={styles.movesText} testID="formation-moves">
@@ -2182,6 +2188,21 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
     fontSize: typography.fontSize.md,
     fontWeight: "700",
+  },
+  // Orario del blocco e il «?» delle Domande frequenti accanto (1.4): il testo va a capo, il
+  // «?» resta in cima a destra con l'area di tocco di 44px.
+  turnTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.xs,
+  },
+  turnTitleText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  turnTitleHelp: {
+    marginTop: -spacing.sm,
+    marginRight: -spacing.sm,
   },
   movesChip: {
     borderRadius: radius.pill,

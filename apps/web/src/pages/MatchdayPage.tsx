@@ -8,6 +8,7 @@ import type {
   PendingFixtureSummary,
 } from "@fantappero/contracts";
 import {
+  FAQ_HELP,
   TURN_DISPLAY_LABEL,
   exclusionProgressMessage,
   exclusionResultTone,
@@ -48,6 +49,7 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { FaqHelpButton } from "../components/FaqHelpButton";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
 import { useLockCountdown } from "../matchday/useLockCountdown";
@@ -375,6 +377,8 @@ export function MatchdayPage() {
     const index = turns.findIndex((turn) => turn.id === selected?.id);
     return index >= 0 ? (turnDisplayStates[index] ?? "upcoming") : "upcoming";
   }, [turns, turnDisplayStates, selected?.id]);
+  // «Turno saltato»: accanto c'è il «?» che apre la risposta delle Domande frequenti (1.4).
+  const selectedSkipped = selectedDisplayState === "skipped";
   const [pendingFixtures, setPendingFixtures] = useState<PendingFixtureSummary[]>([]);
   const [loading, setLoading] = useState(() => {
     if (isDemoMode) {
@@ -881,7 +885,11 @@ export function MatchdayPage() {
 
             {!loading && !loadError && turns.length > 0 ? (
               <div className="fa-matchday-europei" data-testid="matchday-turn-list">
-                <div className="fa-matchday-toolbar">
+                <div
+                  className={
+                    selectedSkipped ? "fa-matchday-toolbar fa-matchday-toolbar--help" : "fa-matchday-toolbar"
+                  }
+                >
                   <Select
                     label="Turno europeo"
                     options={turns.map((turn, index) => ({
@@ -892,6 +900,10 @@ export function MatchdayPage() {
                     onChange={(event) => void selectTurn(event.target.value)}
                     data-testid="matchday-turn-select"
                   />
+                  {/* «?» accanto al turno scelto nel menù, se è saltato (FAQ 1.4). */}
+                  {selectedSkipped ? (
+                    <FaqHelpButton faqId={FAQ_HELP.skippedTurn} data-testid="matchday-turn-select-help" />
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -903,6 +915,12 @@ export function MatchdayPage() {
                     <h2>Turno {selected.number}</h2>
                     <p className="fa-matchday-lede">
                       Stato: <strong>{TURN_DISPLAY_LABEL[selectedDisplayState]}</strong>
+                      {selectedSkipped ? (
+                        <>
+                          {" "}
+                          <FaqHelpButton faqId={FAQ_HELP.skippedTurn} data-testid="matchday-turn-skipped-help" />
+                        </>
+                      ) : null}
                     </p>
                     <p className="fa-matchday-hint">
                       Finestra {formatDateTime(selected.windowStartAt)} →{" "}

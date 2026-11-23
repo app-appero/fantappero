@@ -280,6 +280,11 @@ export interface LeagueRules {
   lineupLockMarginMinutes: number;
   /** Minutes required for a statistical vote (1–30, default 15). */
   minutesThreshold: number;
+  /**
+   * Cambi automatici dalla panchina (0–5, standard 5). Il backend lo manda sempre; facoltativo
+   * qui solo per i dati di prova più vecchi. Si legge in «Regolamento» (FAQ 1.4).
+   */
+  maxAutomaticSubstitutions?: number;
   /** Credit refund percent for a voluntary release (0–100, EP08-04). */
   voluntaryReleaseRefundPercent: number;
   /** Credit refund percent for a release on exit from all five leagues (0–100, EP08-04). */

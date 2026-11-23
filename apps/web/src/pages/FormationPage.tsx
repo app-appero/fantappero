@@ -9,6 +9,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   APPROVED_MODULES,
+  FAQ_HELP,
   playerVoteState,
   BENCH_ACTIVE_SIZE,
   CLEAR_LINEUP_CANCEL_LABEL,
@@ -87,6 +88,7 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { FaqHelpButton } from "../components/FaqHelpButton";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
@@ -2136,7 +2138,9 @@ export function FormationPage() {
                 Primo calcio d'inizio: {formatDateTime(context.cutoffAt)}
                 {(context.lineupLockMarginMinutes ?? 0) > 0
                   ? ` — ogni giocatore si blocca ${context.lineupLockMarginMinutes} min prima della sua partita`
-                  : " — blocco progressivo per giocatore"}
+                  : " — blocco progressivo per giocatore"}{" "}
+                {/* Il «?» apre «Quando si blocca la formazione?» (FAQ 1.4). */}
+                <FaqHelpButton faqId={FAQ_HELP.lineupLock} data-testid="formation-lock-help" />
               </p>
               {countdown && countdown.roundId === context.roundId ? (
                 <LockCountdown

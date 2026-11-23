@@ -10469,6 +10469,192 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   margin: 0;
 }
 
+/* «?» delle Domande frequenti 1.4 */
+/* ══ Il piccolo «?» accanto a «Turno saltato», «In attesa» (in esubero) e all'orario del
+   blocco (canvas approvato da Rosario il 22/11) ══════════════════════════════════════════
+   Il cerchio si vede di 22px, l'area di tocco è di 44px: i margini negativi la tengono fuori
+   dall'altezza della riga, così la scritta accanto non si sposta. Un tocco apre la risposta:
+   dal basso sul telefono (fino a 640px), come finestra al centro sul computer. Solo colori
+   del tema: valgono nel tema chiaro e in quello scuro. */
+.fa-faq-help {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -11px -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fa-color-accent);
+  font: inherit;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fa-faq-help__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .fa-faq-help:hover .fa-faq-help__glyph {
+    background: color-mix(in srgb, currentColor 16%, transparent);
+  }
+}
+
+.fa-faq-help:active .fa-faq-help__glyph,
+.fa-faq-help[aria-expanded="true"] .fa-faq-help__glyph {
+  background: color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.fa-faq-help:focus-visible {
+  outline: none;
+}
+
+.fa-faq-help:focus-visible .fa-faq-help__glyph {
+  outline: 2px solid var(--fa-color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* La domanda si legge come nella pagina (canvas: grassetto normale), non nel maiuscolo
+   corsivo dei titoli delle altre finestre. */
+.fa-faq-sheet .fa-modal__title {
+  font-family: var(--fa-font-sans);
+  font-size: var(--fa-text-md);
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.fa-faq-sheet__answer {
+  display: grid;
+  gap: var(--fa-space-sm);
+  color: var(--fa-color-foreground-muted);
+  line-height: 1.5;
+}
+
+.fa-faq-sheet__answer p {
+  margin: 0;
+}
+
+.fa-faq-sheet .fa-modal__footer {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fa-faq-sheet__all {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--fa-color-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.fa-faq-sheet__all:focus-visible {
+  outline: 2px solid var(--fa-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--fa-radius-sm, 4px);
+}
+
+/* Telefono: la risposta sale dal basso, a tutta larghezza, con la maniglia in cima. */
+@media (max-width: 640px) {
+  .fa-modal:has(> .fa-faq-sheet) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .fa-modal__dialog.fa-faq-sheet {
+    width: 100%;
+    max-height: 85vh;
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .fa-modal__dialog.fa-faq-sheet::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 10px auto 0;
+    border-radius: 999px;
+    background: var(--fa-color-border-strong);
+  }
+
+  .fa-faq-sheet .fa-modal__header {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .fa-faq-sheet .fa-modal__footer {
+    flex-direction: column;
+    align-items: stretch;
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .fa-faq-sheet .fa-modal__footer > .fa-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .fa-modal__dialog.fa-faq-sheet {
+    animation: fa-faq-sheet-up 0.18s ease-out;
+  }
+}
+
+@keyframes fa-faq-sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Accanto a «Stato: Turno saltato», al menù dei turni, al badge «In attesa» e all'orario del
+   blocco: il «?» segue la scritta, sulla stessa riga quando c'è posto. */
+.fa-faq-help-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 2px;
+}
+
+.fa-matchday-toolbar.fa-matchday-toolbar--help {
+  flex-wrap: nowrap;
+  gap: var(--fa-space-xs);
+}
+
+.fa-matchday-toolbar--help > .fa-faq-help {
+  /* Centrato sul menù (alto 44px circa), non sull'etichetta sopra. */
+  margin: 0 -6px 0 0;
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.

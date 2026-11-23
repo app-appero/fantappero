@@ -8,6 +8,7 @@ import type {
   PendingFixtureSummary,
 } from "@fantappero/contracts";
 import {
+  FAQ_HELP,
   TURN_DISPLAY_LABEL,
   exclusionProgressMessage,
   isUnplayedFixtureStatus,
@@ -51,6 +52,7 @@ import type { RootStackParamList } from "../navigation/types";
 import { MatchdayH2HPanel } from "./matchday/MatchdayH2HPanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
+import { FaqHelpButton } from "../components/FaqHelpButton";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -132,6 +134,8 @@ export function MatchdayScreen() {
     return index >= 0 ? (turnDisplayStates[index] ?? "upcoming") : "upcoming";
   }, [turns, turnDisplayStates, selected?.id]);
   const selectedSkipReason = selected ? turnSkipReason(selected, selectedDisplayState) : null;
+  // «Turno saltato»: accanto c'è il «?» che apre la risposta delle Domande frequenti (1.4).
+  const selectedSkipped = selectedDisplayState === "skipped";
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -356,7 +360,8 @@ export function MatchdayScreen() {
             testID="matchday-empty"
           />
         ) : (
-          <View style={styles.section} testID="matchday-turn-list">
+          <View style={[styles.section, selectedSkipped ? styles.pickerRow : null]} testID="matchday-turn-list">
+            <View style={selectedSkipped ? styles.pickerGrow : null}>
             <OptionPicker
               label="Turno europeo"
               value={selected?.id ?? ""}
@@ -380,13 +385,25 @@ export function MatchdayScreen() {
               scrollToValue={resolveDefaultEuropeanTurn(turns)?.id}
               testID="matchday-turn-select"
             />
+            </View>
+            {/* «?» accanto al turno scelto nel menù, se è saltato (FAQ 1.4). */}
+            {selectedSkipped ? (
+              <FaqHelpButton faqId={FAQ_HELP.skippedTurn} style={styles.pickerHelp} testID="matchday-turn-select-help" />
+            ) : null}
           </View>
         )}
 
         {selected ? (
           <View style={styles.section} testID="matchday-turn-detail">
             <Text style={styles.heading}>Turno {selected.number}</Text>
-            <Text style={styles.body}>Stato: {TURN_DISPLAY_LABEL[selectedDisplayState]}</Text>
+            {selectedSkipped ? (
+              <View style={styles.statusRow}>
+                <Text style={styles.body}>Stato: {TURN_DISPLAY_LABEL[selectedDisplayState]}</Text>
+                <FaqHelpButton faqId={FAQ_HELP.skippedTurn} testID="matchday-turn-skipped-help" />
+              </View>
+            ) : (
+              <Text style={styles.body}>Stato: {TURN_DISPLAY_LABEL[selectedDisplayState]}</Text>
+            )}
             {selectedSkipReason ? (
               <Text style={styles.skipReason} testID="matchday-turn-skip-reason">
                 {selectedSkipReason}
@@ -638,6 +655,27 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
+  },
+  // Menù dei turni con il «?» accanto quando il turno scelto è saltato (FAQ 1.4).
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.xs,
+  },
+  pickerGrow: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pickerHelp: {
+    marginRight: -spacing.xs,
+  },
+  // «Stato: Turno saltato» e il «?» sulla stessa riga; il «?» va a capo con il testo grande.
+  statusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: 2,
+    marginVertical: -spacing.sm,
   },
   heading: {
     color: colors.foreground,

@@ -273,6 +273,10 @@ export function LeagueHomeScreen() {
                 ["Soglia minuti per il voto", `${league.rules.minutesThreshold} min`],
                 ["Lock formazione", `${league.rules.lineupLockMarginMinutes} min`],
                 ["Titolari minimi per il turno", `${Math.round(league.rules.turnCoverageThreshold * 100)}%`],
+                // Le «Domande frequenti» (1.4) rimandano qui per il numero di cambi della lega.
+                ...(league.rules.maxAutomaticSubstitutions != null
+                  ? [["Cambi automatici (max)", `${league.rules.maxAutomaticSubstitutions}`]]
+                  : []),
                 ["Scambi", league.rules.options.allowTrades ? "Attivi" : "Disattivati"],
                 ["Inviti manuali", league.rules.options.allowManualInvites ? "Attivi" : "Disattivati"],
                 ["Approvazione scambi", league.rules.options.requireTradeApproval ? "Richiesta" : "Non richiesta"],

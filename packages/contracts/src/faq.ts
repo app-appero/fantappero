@@ -6,6 +6,11 @@
  * ordine, stesse parole. «Cos'è la regola del 75%?» riassume il capitolo 2 dello stesso file.
  * Le risposte descrivono il comportamento del codice: se una regola cambia, aggiorna insieme
  * il regolamento e questo file.
+ *
+ * Numeri che ogni lega può cambiare (Rosario, 23/11): soglia dei titolari (`turnCoverageThreshold`,
+ * 50%-100%, standard 75% cioè 9 su 11), cambi automatici (`maxAutomaticSubstitutions`, 0-5,
+ * standard 5) e minuti del blocco (`lineupLockMarginMinutes`, 0-60, standard 15). Dove una
+ * risposta li cita, dice che sono la regola standard e rimanda a «Regolamento» (home della lega).
  */
 
 /** Una domanda con la sua risposta, divisa in paragrafi brevi. */
@@ -42,7 +47,7 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
         id: "turno-saltato",
         question: "Perché un turno è «saltato»?",
         answer: [
-          "Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare almeno 9 titolari con giocatori che giocano davvero, per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.",
+          "Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare, con giocatori che giocano davvero, almeno 9 titolari (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»). Succede per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.",
         ],
       },
       {
@@ -51,21 +56,21 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
         answer: [
           "Un turno si gioca solo se ogni squadra della lega può coprire almeno il 75% degli 11 posti della formazione, cioè 9 su 11, con giocatori la cui squadra vera gioca in quel turno. Il sistema prova tutti i moduli e tiene quello che copre più posti.",
           "Qui «titolari» vuol dire gli 11 posti della formazione, non i titolari veri annunciati prima delle partite. Conta solo che la squadra vera del giocatore abbia una partita in quel turno, cosa che si sa settimane prima.",
-          "La percentuale la sceglie la lega, da 50% a 100%. La trovi nella home della lega, in «Regolamento», alla voce «Titolari minimi per il turno».",
+          "Il 75% è la regola standard: la percentuale la sceglie la lega, da 50% a 100%. La trovi nella home della lega, in «Regolamento», alla voce «Titolari minimi per il turno».",
         ],
       },
       {
         id: "titolare-non-gioca",
         question: "Se un mio titolare non gioca, prendo 0?",
         answer: [
-          "No: entra un giocatore della tua panchina, nell'ordine che hai scelto e rispettando il modulo, fino a 5 cambi. È il normale funzionamento del fantacalcio.",
+          "No: entra un giocatore della tua panchina, nell'ordine che hai scelto e rispettando il modulo, fino a 5 cambi (è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»). È il normale funzionamento del fantacalcio.",
         ],
       },
       {
         id: "campionati-diversi",
         question: "Ho tanti giocatori di campionati diversi: rischio?",
         answer: [
-          "Se in un turno gioca solo un campionato e tu non hai almeno 9 titolari possibili in quel campionato, il turno salta per tutti. Non prendi 0 da solo. Più la rosa è distribuita sui campionati della lega, meno turni saltano.",
+          "Se in un turno gioca solo un campionato e tu non hai almeno 9 titolari possibili in quel campionato (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»), il turno salta per tutti. Non prendi 0 da solo. Più la rosa è distribuita sui campionati della lega, meno turni saltano.",
         ],
       },
     ],
@@ -111,7 +116,7 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
         id: "blocco-formazione",
         question: "Quando si blocca la formazione?",
         answer: [
-          "Ogni giocatore si blocca poco prima della sua partita, di solito 15 minuti. Gli altri si possono ancora cambiare fino alla loro partita.",
+          "Ogni giocatore si blocca poco prima della sua partita, di solito 15 minuti (è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»). Gli altri giocatori si possono ancora cambiare fino alla loro partita.",
         ],
       },
     ],
@@ -143,4 +148,40 @@ export function toggleFaqItem(openIds: readonly string[], id: string): string[] 
 /** Link diretto a una domanda della pagina del sito. */
 export function faqQuestionHref(id: string): string {
   return `${FAQ_PATH}?${FAQ_QUESTION_PARAM}=${encodeURIComponent(id)}`;
+}
+
+/**
+ * Le risposte che un piccolo «?» apre accanto a una scritta (1.4, canvas del 22/11): «Turno
+ * saltato» in Turni, il giocatore «In attesa» (in esubero) in Rosa, l'orario del blocco in
+ * Formazione. Sito e app usano gli stessi id.
+ */
+export const FAQ_HELP = {
+  skippedTurn: "turno-saltato",
+  surplus: "esubero",
+  lineupLock: "blocco-formazione",
+} as const;
+
+export type FaqHelpId = (typeof FAQ_HELP)[keyof typeof FAQ_HELP];
+
+/** Il link in fondo alla risposta aperta da un «?»: porta alla pagina con quella domanda aperta. */
+export const FAQ_HELP_ALL_LABEL = "Tutte le domande frequenti";
+
+/** Il tasto che chiude la risposta aperta da un «?». */
+export const FAQ_HELP_CLOSE_LABEL = "Ho capito";
+
+/** La domanda che un «?» apre; i suoi id sono in `FAQ_HELP` e i test ne controllano l'esistenza. */
+export function faqHelpItem(id: FaqHelpId, groups: readonly FaqGroup[] = FAQ_GROUPS): FaqItem {
+  const item = findFaqItem(id, groups);
+  if (!item) {
+    throw new Error(`Domanda frequente sconosciuta: ${id}`);
+  }
+  return item;
+}
+
+/**
+ * Nome accessibile del «?»: la domanda senza le virgolette «», che il lettore di schermo
+ * leggerebbe ad alta voce. «Perché un turno è «saltato»?» → «Perché un turno è saltato?».
+ */
+export function faqHelpLabel(item: Pick<FaqItem, "question">): string {
+  return item.question.replace(/[«»]/g, "").replace(/\s+/g, " ").trim();
 }

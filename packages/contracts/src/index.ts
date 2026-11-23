@@ -723,16 +723,21 @@ export type { PrivacyNoticeSection } from "./privacyNotice.js";
 
 export {
   FAQ_GROUPS,
+  FAQ_HELP,
+  FAQ_HELP_ALL_LABEL,
+  FAQ_HELP_CLOSE_LABEL,
   FAQ_INTRO,
   FAQ_PATH,
   FAQ_QUESTION_PARAM,
   FAQ_TITLE,
+  faqHelpItem,
+  faqHelpLabel,
   faqItems,
   faqQuestionHref,
   findFaqItem,
   toggleFaqItem,
 } from "./faq.js";
-export type { FaqGroup, FaqItem } from "./faq.js";
+export type { FaqGroup, FaqHelpId, FaqItem } from "./faq.js";
 
 export { probableToneOf } from "./probableTone.js";
 export type { ProbableTone } from "./probableTone.js";

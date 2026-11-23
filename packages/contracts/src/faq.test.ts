@@ -3,9 +3,14 @@ import { test } from "node:test";
 
 import {
   FAQ_GROUPS,
+  FAQ_HELP,
+  FAQ_HELP_ALL_LABEL,
+  FAQ_HELP_CLOSE_LABEL,
   FAQ_INTRO,
   FAQ_PATH,
   FAQ_TITLE,
+  faqHelpItem,
+  faqHelpLabel,
   faqItems,
   faqQuestionHref,
   findFaqItem,
@@ -74,6 +79,40 @@ test("le risposte riportano le regole in vigore (soglia 75%, 5 cambi, blocco di 
   assert.match(answer("esubero"), /non si può schierare/);
 });
 
+test("ogni numero che la lega può cambiare dice che è la regola standard e rimanda a «Regolamento»", () => {
+  const answer = (id: string) => findFaqItem(id)?.answer.join(" ") ?? "";
+  // Soglia dei titolari (50%-100% per lega): 9 su 11 vale solo con il 75% standard.
+  assert.match(
+    answer("turno-saltato"),
+    /almeno 9 titolari \(è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»\)/,
+  );
+  assert.match(
+    answer("campionati-diversi"),
+    /almeno 9 titolari possibili in quel campionato \(è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»\)/,
+  );
+  assert.match(answer("regola-75"), /Il 75% è la regola standard: la percentuale la sceglie la lega/);
+  // Cambi automatici (0-5 per lega) e minuti del blocco (0-60 per lega).
+  assert.match(
+    answer("titolare-non-gioca"),
+    /fino a 5 cambi \(è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»\)/,
+  );
+  assert.match(
+    answer("blocco-formazione"),
+    /di solito 15 minuti \(è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»\)/,
+  );
+  // Nessun altro numero di regola senza la nota: le risposte senza numeri restano come sono.
+  const withNote = new Set(["turno-saltato", "regola-75", "titolare-non-gioca", "campionati-diversi", "blocco-formazione"]);
+  for (const item of faqItems()) {
+    const text = item.answer.join(" ");
+    if (withNote.has(item.id)) {
+      assert.match(text, /regola standard/, `manca la nota sulla regola standard: ${item.id}`);
+    } else {
+      assert.doesNotMatch(text, /regola standard/, `nota sulla regola standard di troppo: ${item.id}`);
+      assert.doesNotMatch(text, /\b\d+ (titolari|cambi|minuti)\b|\d+%/, `numero di regola senza nota: ${item.id}`);
+    }
+  }
+});
+
 test("findFaqItem trova la domanda del link diretto e ignora gli id sconosciuti", () => {
   assert.equal(findFaqItem("esubero")?.question, "Ho un giocatore «in esubero»: cosa faccio?");
   assert.equal(findFaqItem(" turno-saltato ")?.id, "turno-saltato");
@@ -91,4 +130,22 @@ test("toggleFaqItem apre e chiude una domanda senza toccare le altre", () => {
 test("faqQuestionHref porta alla pagina del sito con la domanda aperta", () => {
   assert.equal(FAQ_PATH, "/domande-frequenti");
   assert.equal(faqQuestionHref("turno-saltato"), "/domande-frequenti?domanda=turno-saltato");
+});
+
+test("i «?» aprono domande che esistono, con un nome accessibile senza virgolette", () => {
+  assert.deepEqual(FAQ_HELP, {
+    skippedTurn: "turno-saltato",
+    surplus: "esubero",
+    lineupLock: "blocco-formazione",
+  });
+  for (const id of Object.values(FAQ_HELP)) {
+    assert.equal(faqHelpItem(id).id, id);
+  }
+  assert.equal(faqHelpLabel(faqHelpItem(FAQ_HELP.skippedTurn)), "Perché un turno è saltato?");
+  assert.equal(faqHelpLabel(faqHelpItem(FAQ_HELP.surplus)), "Ho un giocatore in esubero: cosa faccio?");
+  assert.equal(faqHelpLabel(faqHelpItem(FAQ_HELP.lineupLock)), "Quando si blocca la formazione?");
+  assert.equal(FAQ_HELP_ALL_LABEL, "Tutte le domande frequenti");
+  assert.equal(FAQ_HELP_CLOSE_LABEL, "Ho capito");
+  assert.equal(faqQuestionHref(FAQ_HELP.surplus), "/domande-frequenti?domanda=esubero");
+  assert.throws(() => faqHelpItem("non-esiste" as never), /sconosciuta/);
 });
