@@ -51,6 +51,7 @@ from market.trade_validators import (
     validate_trade_sides_not_empty,
     validate_trades_enabled,
 )
+from market.valuation_service import LeagueMarketInfoCache
 from market.windows import effective_trade_status
 from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_teams
@@ -92,6 +93,8 @@ _MONTHS_IT = ("gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ot
 class TradeService:
     def __init__(self, session: Session) -> None:
         self._session = session
+        # Valore e media stagionale dei calciatori della proposta (1.3), una lettura per lega.
+        self._market_info = LeagueMarketInfoCache(session)
 
     def create_proposal(
         self,
@@ -525,6 +528,13 @@ class TradeService:
             .where(TradeProposal.league_id == league_access.league.id, or_(*conditions))
             .order_by(TradeProposal.created_at.desc())
         ).all()
+        by_league: dict[UUID, list[UUID]] = {}
+        for row in rows:
+            by_league.setdefault(row.league_id, []).extend(
+                UUID(value) for value in [*row.offered_athlete_ids, *row.requested_athlete_ids]
+            )
+        for league_id, athlete_ids in by_league.items():
+            self._market_info.get(league_id, athlete_ids)  # una lettura per tutta la lista
         return TradeProposalListResponse(proposals=[self._to_response(row) for row in rows])
 
     def get_proposal(
@@ -915,8 +925,10 @@ class TradeService:
 
     def _to_response(self, proposal: TradeProposal) -> TradeProposalResponse:
         now = datetime.now(UTC)
-        offered = self._athlete_labels(proposal.offered_athlete_ids)
-        requested = self._athlete_labels(proposal.requested_athlete_ids)
+        offered = self._athlete_labels(proposal.offered_athlete_ids, league_id=proposal.league_id)
+        requested = self._athlete_labels(
+            proposal.requested_athlete_ids, league_id=proposal.league_id
+        )
         return TradeProposalResponse(
             id=str(proposal.id),
             leagueId=str(proposal.league_id),
@@ -939,16 +951,22 @@ class TradeService:
             ),
         )
 
-    def _athlete_labels(self, raw_ids: list[str]) -> list[TradeAthleteResponse]:
+    def _athlete_labels(
+        self, raw_ids: list[str], *, league_id: UUID | None = None
+    ) -> list[TradeAthleteResponse]:
+        """Nomi dei calciatori; con ``league_id`` anche Valore e media stagionale (1.3)."""
         if not raw_ids:
             return []
         ids = [UUID(value) for value in raw_ids]
         rows = self._session.scalars(select(Athlete).where(Athlete.id.in_(ids))).all()
         by_id = {row.id: row for row in rows}
+        market = self._market_info.get(league_id, ids) if league_id is not None else {}
         return [
             TradeAthleteResponse(
                 id=str(athlete_id),
                 name=by_id[athlete_id].canonical_name if athlete_id in by_id else "Calciatore",
+                marketValue=market[athlete_id].market_value if athlete_id in market else None,
+                seasonAverage=market[athlete_id].season_average if athlete_id in market else None,
             )
             for athlete_id in ids
         ]

@@ -27,10 +27,18 @@ import {
   submitWaiverBid,
   withdrawWaiverBid,
 } from "../api/market";
-import { fetchLeagueListone, fetchMyCredits, fetchMyFantasyTeam } from "../api/leagues";
+import {
+  fetchLeagueListone,
+  fetchMyCredits,
+  fetchMyFantasyTeam,
+  fetchRosterOccupancy,
+} from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { AthleteChooser } from "../components/AthleteChooser";
+import { AthleteMarketTags } from "../market/AthleteValueTags";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
+import { OfferValueSummary, useValuePrefilledBid } from "../market/useValuePrefilledBid";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -67,6 +75,7 @@ export function WaiverPage() {
   const canManageSession = can(["market:manage"]);
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
+  const [ownedAthleteIds, setOwnedAthleteIds] = useState<Set<string>>(() => new Set());
   const [balance, setBalance] = useState<number | null>(isDemoMode ? 380 : null);
   const [rosterOptions, setRosterOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
@@ -94,12 +103,17 @@ export function WaiverPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [listoneRows, credits, myTeam] = await Promise.all([
+      const [listoneRows, credits, myTeam, occupancy] = await Promise.all([
         fetchLeagueListone(stored.accessToken, activeLeagueId),
         fetchMyCredits(stored.accessToken, activeLeagueId).catch(() => null),
         fetchMyFantasyTeam(stored.accessToken, activeLeagueId).catch(() => null),
+        // Chi è già in una rosa non si offre: la lista mostra solo gli svincolati (1.3).
+        Promise.resolve()
+          .then(() => fetchRosterOccupancy(stored.accessToken, activeLeagueId))
+          .catch(() => []),
       ]);
       setEntries(listoneRows);
+      setOwnedAthleteIds(new Set(occupancy.map((row) => row.athleteId)));
       if (credits) {
         setBalance(credits.balance);
       }
@@ -151,8 +165,10 @@ export function WaiverPage() {
     });
   }
 
-  const [bidAthleteId, setBidAthleteId] = useState("");
-  const [bidAmount, setBidAmount] = useState("");
+  // L'offerta parte dal Valore del calciatore scelto, o dai crediti rimasti se sono meno (1.3).
+  const bidForm = useValuePrefilledBid(entries, balance);
+  const bidAthleteId = bidForm.athleteId;
+  const bidAmount = bidForm.amount;
   const [releaseAthleteId, setReleaseAthleteId] = useState("");
 
   function handleSubmitBid(event: FormEvent<HTMLFormElement>) {
@@ -164,16 +180,18 @@ export function WaiverPage() {
     void flow
       .submitBid(bidAthleteId, { amountCredits: amount, releaseAthleteId })
       .then(() => {
-        setBidAthleteId("");
-        setBidAmount("");
+        bidForm.reset();
         setReleaseAthleteId("");
       });
   }
 
-  const playerOptions = useMemo(
-    () => entries.map((entry) => ({ value: entry.athleteId, label: entry.canonicalName })),
-    [entries],
-  );
+  const entryById = useMemo(() => {
+    const map = new Map<string, LeagueListoneEntry>();
+    for (const entry of entries) {
+      map.set(entry.athleteId, entry);
+    }
+    return map;
+  }, [entries]);
 
   const athleteNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -382,13 +400,26 @@ export function WaiverPage() {
                   budgetValue={balance !== null ? `${balance} crediti` : "—"}
                   playerLabel="Giocatore da acquisire"
                   playerPlaceholder="Scegli un giocatore…"
-                  playerOptions={isDemoMode ? undefined : playerOptions}
-                  playerValue={isDemoMode ? undefined : bidAthleteId}
-                  onPlayerChange={isDemoMode ? undefined : (event) => setBidAthleteId(event.target.value)}
+                  playerField={
+                    isDemoMode ? undefined : (
+                      // Elenco degli svincolati con Valore e media in ogni riga (1.3), come nell'Asta.
+                      <div className="fa-auction-panel__chooser">
+                        <p className="fa-athlete-chooser__count">Giocatore da acquisire</p>
+                        <AthleteChooser
+                          testId="waiver-bid-player"
+                          entries={entries}
+                          ownedAthleteIds={ownedAthleteIds}
+                          selected={bidAthleteId ? [bidAthleteId] : []}
+                          onToggle={(id) => bidForm.selectAthlete(id === bidAthleteId ? "" : id)}
+                          single
+                        />
+                      </div>
+                    )
+                  }
                   bidLabel="Offerta (crediti)"
                   bidPlaceholder="Es. 20"
                   bidValue={isDemoMode ? undefined : bidAmount}
-                  onBidChange={isDemoMode ? undefined : (event) => setBidAmount(event.target.value)}
+                  onBidChange={isDemoMode ? undefined : (event) => bidForm.changeAmount(event.target.value)}
                   onSubmit={isDemoMode ? undefined : handleSubmitBid}
                   submitting={flow.bidSubmitting}
                   disabled={isDemoMode || !flow.currentSession}
@@ -398,15 +429,22 @@ export function WaiverPage() {
                   errorMessage={isDemoMode ? undefined : (flow.bidError ?? undefined)}
                   extraField={
                     isDemoMode ? undefined : (
-                      <Select
-                        label="Giocatore da svincolare"
-                        name="waiver-release-athlete"
-                        options={rosterOptions}
-                        placeholder="Scegli chi tagliare…"
-                        value={releaseAthleteId}
-                        onChange={(event) => setReleaseAthleteId(event.target.value)}
-                        disabled={isDemoMode || !flow.currentSession}
-                      />
+                      <>
+                        <OfferValueSummary
+                          selected={bidForm.selected}
+                          prefill={bidForm.prefill}
+                          testId="waiver-bid-value"
+                        />
+                        <Select
+                          label="Giocatore da svincolare"
+                          name="waiver-release-athlete"
+                          options={rosterOptions}
+                          placeholder="Scegli chi tagliare…"
+                          value={releaseAthleteId}
+                          onChange={(event) => setReleaseAthleteId(event.target.value)}
+                          disabled={isDemoMode || !flow.currentSession}
+                        />
+                      </>
                     )
                   }
                 />
@@ -439,6 +477,10 @@ export function WaiverPage() {
                           <AthleteName athleteId={bid.athleteId}>
                             {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
                           </AthleteName>
+                          <AthleteMarketTags
+                            marketValue={bid.marketValue ?? entryById.get(bid.athleteId)?.marketValue}
+                            seasonAverage={bid.seasonAverage ?? entryById.get(bid.athleteId)?.seasonAverage}
+                          />
                         </TableCell>
                         <TableCell>
                           {bid.releaseAthleteId ? (

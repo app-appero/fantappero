@@ -14,6 +14,8 @@ import { fetchAthleteCard } from "../api/leagues";
 import { getApiErrorMessage } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { MarketValueBadge } from "../market/AthleteValueTags";
+import { AthleteCareer } from "./AthleteCareer";
 
 const ROLE_LABEL: Record<string, string> = {
   P: "Portiere",
@@ -148,6 +150,8 @@ export function AthleteCardView({ card }: { card: AthleteCard }) {
             {[card.firstName, card.lastName].filter(Boolean).join(" ") || card.canonicalName}
           </p>
           <p className="fa-athlete-card__club">{card.clubName ?? "Club non disponibile"}</p>
+          {/* «Valore 58» sotto il nome (canvas «Scheda calciatore», 1.3). */}
+          <MarketValueBadge value={card.marketValue} />
         </div>
       </div>
       <dl className="fa-athlete-card__facts">
@@ -158,23 +162,29 @@ export function AthleteCardView({ card }: { card: AthleteCard }) {
           </div>
         ))}
       </dl>
-      <section className="fa-athlete-card__section">
-        <h3>Stagioni</h3>
-        {card.seasons.length === 0 ? (
-          <p className="fa-athlete-card__muted">Nessuna stagione salvata dal provider.</p>
-        ) : (
-          <ul className="fa-athlete-card__list">
-            {card.seasons.map((season) => (
-              <li key={`${season.seasonYear}-${season.clubName}-${season.shirtNumber ?? ""}`}>
-                {season.seasonYear} · {season.clubName}
-                {season.shirtNumber != null ? ` · n. ${season.shirtNumber}` : ""}
-                {season.positionRaw ? ` · ${season.positionRaw}` : ""}
-                {season.isActive ? " · in rosa" : ""}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {card.career ? (
+        // 1.3: l'elenco «Stagioni» diventa la carriera stagione per stagione.
+        <AthleteCareer rows={card.career} role={card.role ?? card.effectiveRole} />
+      ) : (
+        // Backend più vecchio, senza `career`: resta l'elenco di prima.
+        <section className="fa-athlete-card__section">
+          <h3>Stagioni</h3>
+          {card.seasons.length === 0 ? (
+            <p className="fa-athlete-card__muted">Nessuna stagione salvata dal provider.</p>
+          ) : (
+            <ul className="fa-athlete-card__list">
+              {card.seasons.map((season) => (
+                <li key={`${season.seasonYear}-${season.clubName}-${season.shirtNumber ?? ""}`}>
+                  {season.seasonYear} · {season.clubName}
+                  {season.shirtNumber != null ? ` · n. ${season.shirtNumber}` : ""}
+                  {season.positionRaw ? ` · ${season.positionRaw}` : ""}
+                  {season.isActive ? " · in rosa" : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -176,10 +176,11 @@ def test_create_trade_proposal_validates_ownership_on_both_sides(
     assert ok.status_code == 201
     body = ok.json()
     assert body["status"] == "proposed"
-    assert body["offeredAthletes"] == [
+    # Dal 1.3 ogni calciatore porta anche marketValue e seasonAverage (campi additivi).
+    assert [{"id": a["id"], "name": a["name"]} for a in body["offeredAthletes"]] == [
         {"id": str(proposer_athlete.id), "name": "Offerto Dal Proponente"}
     ]
-    assert body["requestedAthletes"] == [
+    assert [{"id": a["id"], "name": a["name"]} for a in body["requestedAthletes"]] == [
         {"id": str(recipient_athlete.id), "name": "Richiesto Al Destinatario"}
     ]
 

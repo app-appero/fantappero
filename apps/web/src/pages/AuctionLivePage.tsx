@@ -49,6 +49,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { useMarketGate } from "../market/MarketGateContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveAuctionPolling } from "../market/useLiveAuctionPolling";
+import { AthleteMarketTags } from "../market/AthleteValueTags";
 import { LiveAuctionTable } from "./auction-live/LiveAuctionTable";
 
 const SESSION_STATUS_LABEL: Record<string, string> = {
@@ -763,6 +764,13 @@ export function AuctionLivePage() {
                     </h3>
                   </CardHeader>
                   <CardBody>
+                    {/* Valore e media del lotto (1.3): solo mostrati, il rilancio non parte dal Valore. */}
+                    <AthleteMarketTags
+                      className="fa-auction-live-lot__value"
+                      marketValue={currentLot.marketValue}
+                      seasonAverage={currentLot.seasonAverage}
+                      testId="auction-live-lot-value"
+                    />
                     <div className="fa-auction-live-lot__summary">
                       <p>
                         Prezzo attuale: <strong>{currentLot.currentAmountCredits}</strong> crediti
@@ -860,6 +868,7 @@ export function AuctionLivePage() {
                         <AthleteName athleteId={lot.athleteId}>{lot.athleteName}</AthleteName>:{" "}
                         {LOT_STATUS_LABEL[lot.status]}
                         {lot.status === "sold" ? ` (${lot.currentLeaderTeamName} · ${lot.currentAmountCredits} crediti)` : null}
+                        <AthleteMarketTags marketValue={lot.marketValue} seasonAverage={lot.seasonAverage} />
                       </li>
                     ))}
                   </ul>

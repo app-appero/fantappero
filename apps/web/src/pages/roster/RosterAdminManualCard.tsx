@@ -9,6 +9,7 @@ import {
   roleQuotaBlockedLabel,
   roleQuotaCountLabel,
   rosterRoleQuota,
+  sortBySeasonAverageDesc,
 } from "@fantappero/contracts";
 import type {
   FantasyRole,
@@ -39,6 +40,8 @@ import {
 } from "@fantappero/ui";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { useEffect, useMemo, useState } from "react";
+import { AthleteMarketTags, MarketPriceHint } from "../../market/AthleteValueTags";
+import { hasMarketData, manualPriceMinimum, marketValuePrefill } from "../../market/athleteValue";
 import { ListoneFilterControls } from "./ListoneFilterControls";
 import { RosterActionButton, RosterColLabel } from "./RosterActionButton";
 import {
@@ -58,6 +61,9 @@ function ListoneAssignRow({
   quotaReason,
   canRelease,
   adminBusy,
+  showMarket,
+  remainingCredits,
+  priceMinimum,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
@@ -68,12 +74,25 @@ function ListoneAssignRow({
   quotaReason: string | null;
   canRelease: boolean;
   adminBusy: boolean;
+  /** Colonna Valore e media (1.3): solo se il backend manda Valore o medie. */
+  showMarket: boolean;
+  /** Crediti rimasti della squadra a cui si assegna (`null` se non noti). */
+  remainingCredits: number | null;
+  /** Partecipante almeno 1, admin anche 0 (regole di oggi). */
+  priceMinimum: number;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
-  const [draft, setDraft] = useState("1");
+  // Il prezzo parte dal Valore, o dai crediti rimasti se sono meno; senza Valore da 1, come
+  // prima. Finché non lo tocchi segue Valore e crediti aggiornati; poi resta il tuo.
+  const prefill = owner
+    ? null
+    : marketValuePrefill({ marketValue: entry.marketValue, remainingCredits, minimum: priceMinimum });
+  const [editedDraft, setEditedDraft] = useState<string | null>(null);
+  const draft = editedDraft ?? (prefill ? String(prefill.price) : "1");
   const parsed = Number.parseInt(draft, 10);
-  const isValid = Number.isFinite(parsed) && parsed >= 1;
+  const isValid = Number.isFinite(parsed) && parsed >= priceMinimum;
+  const suggested = editedDraft === null && prefill !== null;
 
   return (
     <TableRow>
@@ -105,16 +124,36 @@ function ListoneAssignRow({
           <Badge variant="success">Libero</Badge>
         )}
       </TableCell>
+      {showMarket ? (
+        <TableCell
+          className="fa-roster-col fa-roster-col--value"
+          data-testid={`roster-admin-listone-value-${entry.athleteId}`}
+        >
+          <AthleteMarketTags marketValue={entry.marketValue} seasonAverage={entry.seasonAverage} />
+          {prefill?.notice ? (
+            <span
+              className="fa-market-hint fa-market-hint--row"
+              data-testid={`roster-admin-listone-capped-${entry.athleteId}`}
+            >
+              {prefill.notice}
+            </span>
+          ) : null}
+        </TableCell>
+      ) : null}
       <TableCell className="fa-roster-col fa-roster-col--price">
         {!owner ? (
           <Input
-            className="fa-roster-price-input"
+            className={
+              suggested
+                ? "fa-roster-price-input fa-roster-price-input--suggested"
+                : "fa-roster-price-input"
+            }
             type="number"
-            min={1}
+            min={priceMinimum}
             aria-label={`Prezzo acquisto ${entry.canonicalName}`}
             value={draft}
             disabled={adminBusy || !canAssign}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => setEditedDraft(event.target.value)}
             data-testid={`roster-admin-listone-price-${entry.athleteId}`}
           />
         ) : (
@@ -159,7 +198,11 @@ function ListoneTable({
   adminBusy,
   listoneQuery,
   onlyFree,
+  sortByAverage,
   placeKey,
+  showMarket,
+  remainingCredits,
+  priceMinimum,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
@@ -172,8 +215,13 @@ function ListoneTable({
   adminBusy: boolean;
   listoneQuery: string;
   onlyFree: boolean;
+  /** «Ordina per media»: cambiando l'ordine si torna a pagina 1. */
+  sortByAverage: boolean;
   /** Campionato e squadra scelti: cambiandoli si torna a pagina 1, come con testo e ruolo. */
   placeKey: string;
+  showMarket: boolean;
+  remainingCredits: number | null;
+  priceMinimum: number;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
@@ -181,7 +229,7 @@ function ListoneTable({
   const availabilityKey = listoneQuery.trim() ? "search" : onlyFree ? "free" : "all";
   useEffect(() => {
     setPage(0);
-  }, [listoneQuery, tabValue, availabilityKey, placeKey]);
+  }, [listoneQuery, tabValue, availabilityKey, placeKey, sortByAverage]);
   const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedRows = rows.slice(
@@ -191,7 +239,15 @@ function ListoneTable({
 
   return (
     <>
-      <Table compact className="fa-roster-table fa-roster-table--listone" data-testid={`roster-admin-listone-table-${tabValue}`}>
+      <Table
+        compact
+        className={
+          showMarket
+            ? "fa-roster-table fa-roster-table--listone fa-roster-table--with-value"
+            : "fa-roster-table fa-roster-table--listone"
+        }
+        data-testid={`roster-admin-listone-table-${tabValue}`}
+      >
         <TableHead>
           <TableRow>
             <TableHeaderCell className="fa-roster-col fa-roster-col--name">
@@ -202,6 +258,11 @@ function ListoneTable({
             </TableHeaderCell>
             <TableHeaderCell className="fa-roster-col fa-roster-col--club">Club</TableHeaderCell>
             <TableHeaderCell className="fa-roster-col fa-roster-col--status">Stato</TableHeaderCell>
+            {showMarket ? (
+              <TableHeaderCell className="fa-roster-col fa-roster-col--value">
+                <RosterColLabel full="Valore e media" short="Valore" />
+              </TableHeaderCell>
+            ) : null}
             <TableHeaderCell className="fa-roster-col fa-roster-col--price">
               <RosterColLabel full="Prezzo acquisto" short="Cr" />
             </TableHeaderCell>
@@ -225,6 +286,9 @@ function ListoneTable({
                 quotaReason={quotaReason}
                 canRelease={canRelease}
                 adminBusy={adminBusy}
+                showMarket={showMarket}
+                remainingCredits={remainingCredits}
+                priceMinimum={priceMinimum}
                 onReleaseAthlete={onReleaseAthlete}
                 onAssignAthlete={onAssignAthlete}
               />
@@ -279,6 +343,7 @@ export function RosterAdminManualCard({
   ownership,
   canReleaseAthlete,
   adminBusy,
+  remainingCredits = null,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
@@ -299,10 +364,19 @@ export function RosterAdminManualCard({
   ownership: Map<string, AthleteOwnership>;
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   adminBusy: boolean;
+  /**
+   * Crediti rimasti della squadra a cui si assegna (1.3): il prezzo parte dal Valore, ma non
+   * oltre questi crediti. `null` se non noti.
+   */
+  remainingCredits?: number | null;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
   const [onlyFree, setOnlyFree] = useState(false);
+  // «Ordina per media» (Rosario, 22/11): dalla media più alta, chi non ha media in fondo.
+  const [sortByAverage, setSortByAverage] = useState(false);
+  const showMarket = useMemo(() => hasMarketData(listone), [listone]);
+  const priceMinimum = manualPriceMinimum(isAdmin);
   const [chosenPlace, setChosenPlace] = useState<ListonePlaceFilters>(NO_LISTONE_PLACE_FILTERS);
   // Un listone ricaricato può non avere più il campionato o la squadra scelti: si torna a «tutti».
   const place = useMemo(
@@ -313,10 +387,10 @@ export function RosterAdminManualCard({
   const placeActive = hasListonePlaceFilters(place);
   const ownedAthleteIds = new Set(ownership.keys());
   const rowsByTab = new Map(
-    ROLE_TABS.map((tab) => [
-      tab.value,
-      filterListone(listone, tab.value, listoneQuery, onlyFree, ownedAthleteIds, place),
-    ]),
+    ROLE_TABS.map((tab) => {
+      const rows = filterListone(listone, tab.value, listoneQuery, onlyFree, ownedAthleteIds, place);
+      return [tab.value, sortByAverage ? sortBySeasonAverageDesc(rows) : rows] as const;
+    }),
   );
   // Quota per ruolo della squadra a cui si assegna: stessa regola del server (contracts).
   const quota = useMemo(() => rosterRoleQuota(targetTeam), [targetTeam]);
@@ -416,22 +490,42 @@ export function RosterAdminManualCard({
                     listone={listone}
                     place={place}
                     onChange={setChosenPlace}
-                    onResetAll={() => onRoleTabChange("all")}
+                    onResetAll={() => {
+                      // «Solo disponibili» resta com'è (Rosario, 22/11); l'ordine torna quello di prima.
+                      setSortByAverage(false);
+                      onRoleTabChange("all");
+                    }}
                   />
                   <div className="fa-listone-filters__free-row">
-                    <label className="fa-roster-listone__free">
-                      <input
-                        type="checkbox"
-                        checked={onlyFree}
-                        onChange={(event) => setOnlyFree(event.target.checked)}
-                        data-testid="roster-listone-only-free"
-                      />
-                      Solo disponibili
-                    </label>
+                    <div className="fa-listone-filters__checks">
+                      <label className="fa-roster-listone__free">
+                        <input
+                          type="checkbox"
+                          checked={onlyFree}
+                          onChange={(event) => setOnlyFree(event.target.checked)}
+                          data-testid="roster-listone-only-free"
+                        />
+                        Solo disponibili
+                      </label>
+                      <label className="fa-roster-listone__free">
+                        <input
+                          type="checkbox"
+                          checked={sortByAverage}
+                          onChange={(event) => setSortByAverage(event.target.checked)}
+                          data-testid="roster-listone-sort-average"
+                        />
+                        Ordina per media
+                      </label>
+                    </div>
                     <span className="fa-listone-filters__count" data-testid="roster-listone-count">
                       {listonePlayerCountLabel(rowsByTab.get(roleTab)?.length ?? 0)}
                     </span>
                   </div>
+                  {showMarket ? (
+                    <MarketPriceHint testId="roster-listone-value-hint">
+                      Il prezzo parte dal Valore: puoi cambiarlo prima di assegnare.
+                    </MarketPriceHint>
+                  ) : null}
                 </div>
                 <Tabs
                   value={roleTab}
@@ -499,7 +593,11 @@ export function RosterAdminManualCard({
                             adminBusy={adminBusy}
                             listoneQuery={listoneQuery}
                             onlyFree={onlyFree}
+                            sortByAverage={sortByAverage}
                             placeKey={placeKey}
+                            showMarket={showMarket}
+                            remainingCredits={remainingCredits}
+                            priceMinimum={priceMinimum}
                             onReleaseAthlete={onReleaseAthlete}
                             onAssignAthlete={onAssignAthlete}
                           />

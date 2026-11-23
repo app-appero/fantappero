@@ -6,6 +6,7 @@ from pydantic import Field
 
 from app.text_validation import AthleteNameStr, NoNulStr, NoSurrogateStr
 from auth.schemas import ApiModel
+from market.valuation_schemas import AthleteCareerRowResponse, AthleteSeasonAverageResponse
 
 
 class FantasyRosterSlotResponse(ApiModel):
@@ -350,3 +351,11 @@ class AthleteCardResponse(ApiModel):
     transfers: list[AthleteCardTransferResponse] = Field(default_factory=list)
     season_stats: AthleteCardSeasonStatsResponse | None = Field(default=None, alias="seasonStats")
     live: AthleteCardLiveResponse | None = None
+    #: Valore di mercato in crediti di questa lega (budget della lega, almeno 1); ``None`` se il
+    #: calciatore non è nel listone della stagione. Prezzo consigliato, non un minimo (1.3).
+    market_value: int | None = Field(default=None, alias="marketValue")
+    #: Media stagionale (in corso se ha almeno un voto, altrimenti la scorsa, es. «25/26»).
+    season_average: AthleteSeasonAverageResponse | None = Field(default=None, alias="seasonAverage")
+    #: Storico (1.3): le due stagioni passate e quella in corso, dalla più recente; una riga per
+    #: club + competizione. Porte inviolate solo dove note (portieri, stagione in corso).
+    career: list[AthleteCareerRowResponse] = Field(default_factory=list)

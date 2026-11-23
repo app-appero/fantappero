@@ -1,10 +1,11 @@
 # Copertura dei test QA e scaletta (web e mobile)
 
-Aggiornato il 22/11/2026 (prima: 18/11) con:
-- i rapporti del 21/11: verifica di giorno sulla 1.2 (corsa 04:13 ripresa), blocchi mobile M1-M5 e controlli della sera sul PC di Rosario;
-- le corse 00:43, 01:53 e 03:03 della notte 20→21/11 (di 22:23, 23:33 e 04:13 di quella notte non c'è il rapporto);
-- le sei corse della notte 21→22/11 e il riepilogo della mattina del 22/11;
-- `known_issues.md`: voci aperte e correzioni del 21/11, uscite con pilota-1.2.
+Aggiornato il 23/11/2026 (prima: 22/11, e prima ancora 18/11) con:
+- i blocchi M3, M4 e M5 del 22/11 sull'emulatore del PC di Rosario;
+- le cinque corse della notte 22→23/11 (22:23, 00:43, 01:53, 03:03 e 04:13; il Gruppo A quella notte non parte);
+- `known_issues.md` al 23/11: le correzioni della notte 21→22/11 (KI-118 … KI-123) e i problemi nuovi della notte 22→23/11, in correzione (KI-147 … KI-151).
+
+Prima, il 22/11: i rapporti del 21/11 (verifica sulla 1.2, blocchi M1-M5), le corse 00:43, 01:53 e 03:03 della notte 20→21/11 e le sei corse della notte 21→22/11.
 
 **Le corse leggono questo file**: ognuna guarda la colonna della sua piattaforma e prova solo le voci **DA FARE** delle sue aree, poi le **DA RIVERIFICARE**, e non ripete quelle **OK**. Nel rapporto ogni voce va riportata con il suo codice (es. `3.7`), la piattaforma e l'esito.
 
@@ -19,39 +20,43 @@ Aggiornato il 22/11/2026 (prima: 18/11) con:
   - **NV**: non verificabile, per il motivo indicato;
   - **–**: la voce non riguarda quella piattaforma.
 - **Ultima:** data dell'ultima prova (per le corse notturne, la data del piano: la notte 21→22/11 è il 22/11). «12-18/11» vuol dire provata fra il 12 e il 18/11.
-- **KI-N:** riga N della tabella di `known_issues.md` (numero di riga del file al 22/11).
+- **KI-N:** riga N della tabella di `known_issues.md` (numero di riga del file al 23/11).
 - **Prerequisiti:**
   - **[PREP]**: serve la lega preparata (vedi sotto);
   - **[OPER]**: serve un account operatore;
   - **[VIVO]**: serve un turno con calcio d'inizio vicino.
 
-## Riepilogo al 22/11
+## Riepilogo al 23/11
 
 Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; **problema aperto** se almeno una è APERTO; **da ricontrollare** se almeno una è DA RIVERIFICARE; **manca** se almeno una è DA FARE; **non verificabile** se il resto è NV.
 
 | Area | Voci | Fatto | Manca | Da ricontrollare | Problema aperto | Non verificabile |
 |---|---|---|---|---|---|---|
 | 1. Accesso, profilo, privacy | 16 | 11 | 0 | 3 | 1 | 1 |
-| 2. Leghe, inviti, partecipanti | 12 | 6 | 3 | 0 | 2 | 1 |
-| 3. Rosa, listone, crediti | 14 | 9 | 0 | 3 | 1 | 1 |
+| 2. Leghe, inviti, partecipanti | 12 | 7 | 2 | 0 | 2 | 1 |
+| 3. Rosa, listone, crediti | 14 | 12 | 0 | 0 | 1 | 1 |
 | 4. Mercato: scambi | 11 | 8 | 1 | 0 | 1 | 1 |
-| 5. Mercato: aste e svincolati | 12 | 7 | 3 | 0 | 1 | 1 |
-| 6. Formazione | 8 | 6 | 2 | 0 | 0 | 0 |
+| 5. Mercato: aste e svincolati | 12 | 7 | 2 | 0 | 2 | 1 |
+| 6. Formazione | 8 | 7 | 1 | 0 | 0 | 0 |
 | 7. Turni, calendario, classifica | 7 | 5 | 1 | 1 | 0 | 0 |
-| 8. Notifiche | 9 | 6 | 1 | 1 | 0 | 1 |
-| 9. Web | 5 | 2 | 0 | 1 | 2 | 0 |
-| 10. App mobile (browser ed emulatore) | 9 | 3 | 2 | 2 | 1 | 1 |
+| 8. Notifiche | 9 | 8 | 0 | 0 | 0 | 1 |
+| 9. Web | 5 | 4 | 0 | 0 | 1 | 0 |
+| 10. App mobile (browser ed emulatore) | 9 | 4 | 2 | 0 | 2 | 1 |
 | 11. Salute e prestazioni | 3 | 3 | 0 | 0 | 0 | 0 |
-| 12. App Android: azioni sull'app (solo EMU) | 25 | 11 | 14 | 0 | 0 | 0 |
-| **Totale** | **131** | **77** | **27** | **11** | **9** | **7** |
+| 12. App Android: azioni sull'app (solo EMU) | 25 | 18 | 6 | 0 | 1 | 0 |
+| **Totale** | **131** | **94** | **15** | **4** | **11** | **7** |
 | Totale al 18/11 | 124 | 33 | 66 | 12 | 5 | 8 |
 
-**Problemi nuovi del 22/11, non ancora in `known_issues.md`** (tutti di gravità bassa o medio-bassa; per i primi quattro c'è una patch pronta, non applicata):
-- **D1**, corsa 00:43, voce 3.11: le note dei movimenti crediti salvano il nome del calciatore con la codifica rovinata;
-- **P1**, corsa 03:03, voce 2.12: la notifica «Nuovo invito» resta dopo l'eliminazione della lega;
-- **P2**, corsa 03:03, voce 10.2: nella Home lega dell'app la scheda «Campionati» è tagliata;
-- **P3**, corsa 03:03, voce 9.3: in Formazione i nomi dei titolari «senza voto» sono sotto 4,5:1;
-- **P4**, corsa 03:03, voce 9.5: l'Amministrazione di una lega attiva dice ancora «Prima salva la configurazione…» (da decidere).
+**Problemi nuovi della notte 22→23/11** (in `known_issues.md` dal 23/11, tutti in correzione il 23/11 con l'approvazione di Rosario):
+- **KI-147**, corsa 04:13, voce 3.12 (W390), gravità alta: la correzione KI-100 non tiene più, in Rosa › Storico la tabella «Intervalli di possesso» è tagliata a 390 px;
+- **KI-148**, corsa 03:03, voce 2.7 (MobB, EMU), media: nell'app «Elimina lega» da Amministrazione lega elimina la lega, poi mostra la schermata d'errore;
+- **KI-149**, corsa 03:03, voce 10.1 (MobB), bassa: un membro che apre Fantallenatori fa 2 richieste di amministrazione che rispondono 403;
+- **KI-150**, corsa 03:03, voce 5.9 (MobB), bassa: nell'app «Spareggio aperto/annullato» stanno sotto «Scambi» invece che sotto «Asta»;
+- **KI-151**, corse 03:03 e 04:13, voce 9.3 (W1280, W390), bassa: sul campo la pastiglia «s.v.» è grigio scuro invece del gradiente viola.
+
+Dal blocco M5 del 22/11 resta aperta anche la voce 12.23 (KI-142): l'app avviata senza rete mostra l'accesso senza messaggio e non riparte quando la rete torna (da correggere nella 1.3).
+
+I problemi del 22/11 (D1, P1, P3, P4) sono corretti e riprovati OK il 23/11 (KI-118, KI-119, KI-120, KI-122); P2 (KI-123, voce 10.2) è da fare nella 1.3.
 
 ## Prerequisiti da preparare una volta sola
 
@@ -59,18 +64,18 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
    - 8 partecipanti (`qa-01` admin, poi `qa-02`…`qa-08`) e competizioni Serie A, Premier e LaLiga;
    - rose complete a 35, lega **attivata**, così ci sono calendario e turni veri;
    - serve a tutte le voci [PREP]. Le corse possono usarla, ma non devono eliminarla né modificarne le regole;
-   - **al 22/11 il turno #11 è bloccato dal 20/11 e non ancora omologato**: finché resta così, mercato e scambi sono fermi (`market_round_in_progress`) e non si possono provare 4.7, 5.7, 5.10 e 12.11-12.14.
+   - **al 23/11 il turno #11 è ancora bloccato (dal 20/11) e non omologato**: mancano le 3 partite della sera del 23/11. Finché resta così, mercato e scambi sono fermi (`market_round_in_progress`) e non si possono provare 4.7, 5.7, 5.10 e 12.11-12.14.
 2. **Lega preparata `QA-PREP-DISPARI`** (PRONTA dal 18/11: id `7a1b25b2-acfc-4ff3-a433-8056a7766330`, attiva, 5 × 35) con 5 partecipanti (`qa-01`…`qa-05`): serve al calendario dispari dal vivo.
 3. **Account operatore QA:** `qa-09@test.fantappero.it` (stessa password degli altri), PRONTO dal 18/11: le voci [OPER] si provano con `qa-09`.
 4. **Turno vivo:** il prossimo è il **#12**, primo calcio d'inizio il **27/11 alle 20:45** (ora di Roma), blocco della formazione alle **20:30**. In `QA-PREP-DISPARI` riposa `qa-02` nella giornata 12.
-5. **Pulizia:** su dev restano due leghe di prova attive di corse passate, `QA-2026-11-19-0153-B` e `QA-2026-11-21-0413-B` (admin `qa-01`): le può eliminare l'operatore `qa-09`.
+5. **Pulizia:** su dev restano due leghe di prova attive di corse passate, `QA-2026-11-19-0153-B` e `QA-2026-11-21-0413-B` (admin `qa-01`), e una in configurazione, `QA-2026-11-21-0043-B` (admin `qa-05`, vista dalla corsa 04:13 del 23/11): le può eliminare l'operatore `qa-09`.
 
 ## Area 1 – Accesso, profilo, privacy
 
 | Cod | Voce | API | W1280 | W390 | MobB | EMU | Ultima | Note |
 |---|---|---|---|---|---|---|---|---|
 | 1.1 | Registrazione: campi, email duplicata, risposta generica | OK | – | – | – | – | 12-18/11 |  |
-| 1.2 | Password comuni o uguali all'email rifiutate (decisione 12) | OK | DA RIVERIFICARE | – | DA RIVERIFICARE | – | 22/11 | API OK il 22/11 (corsa 23:33): `password_too_common`, `password_same_as_email` anche in maiuscolo; nel reset la password comune è rifiutata prima del controllo del token (per l'uguale all'email nel reset serve un token vero). Da rivedere il messaggio a schermo su W1280 e MobB |
+| 1.2 | Password comuni o uguali all'email rifiutate (decisione 12) | OK | DA RIVERIFICARE | – | OK | – | 23/11 | API OK il 22/11 (corsa 23:33): `password_too_common`, `password_same_as_email` anche in maiuscolo; nel reset la password comune è rifiutata prima del controllo del token (per l'uguale all'email nel reset serve un token vero). MobB OK il 23/11 (corsa 03:03; nell'app non c'è il cambio password dal profilo). Da rivedere il messaggio a schermo su W1280 |
 | 1.3 | Login, logout che chiude subito il token, refresh e catena | OK | – | – | – | – | 22/11 | riprovato il 22/11 |
 | 1.4 | Profilo: nome, nickname (sosia Unicode, punteggiatura) | OK | – | – | – | – | 22/11 | 22/11: nickname cirillico e nome oltre 80 caratteri rifiutati (sul profilo 400 invece di 422: solo incoerenza, suggerimento) |
 | 1.5 | Nickname univoco contro un altro account | OK | – | – | – | – | 22/11 | rifiutati anche maiuscole, larghezza piena, spazi, accenti e NFD (`nickname_taken`); il nickname lasciato torna libero |
@@ -79,12 +84,12 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 1.8 | Eliminazione account vera | OK | – | – | – | – | 22/11 | account usa e getta: senza password `invalid_password`, con la password eliminato, poi login 401 e nickname libero. Dall'app: 12.4 |
 | 1.9 | Informativa privacy a schermo | – | OK | OK | OK | OK | 21/11 | W1280 e W390 il 21/11 (link in accesso e registrazione, margini di `/privacy`); MobB 21/11 (corsa 03:03); EMU 21/11 (M1, versione 2026-11c) |
 | 1.10 | Rate limit registrazione e login | OK | – | – | – | – | 12-18/11 |  |
-| 1.11 | Login, logout e sessione dopo il riavvio dell'app | – | – | – | – | OK | 21/11 | flusso 04 passato anche il 21/11 (M5) |
-| 1.12 | Accesso con email nell'app | – | – | – | – | OK | 21/11 | flusso 01 passato più volte il 21/11 |
+| 1.11 | Login, logout e sessione dopo il riavvio dell'app | – | – | – | – | OK | 22/11 | flusso 04 passato anche il 21 e il 22/11 (M5) |
+| 1.12 | Accesso con email nell'app | – | – | – | – | OK | 22/11 | flusso 01 passato più volte il 21/11 e di nuovo il 22/11 (M5) |
 | 1.13 | Link di verifica email e di reset password aperti dall'app | – | – | – | – | OK | 18/11 | APK `2633ca4`: link `fantappero://…` e App Link dev `verified`, anche a freddo dal link web |
 | 1.14 | PATCH del nickname in parallelo, token push non cancellati all'eliminazione | APERTO | – | – | – | – | 12-18/11 | noto dalla sola lettura del codice (nessuna riga in `known_issues.md`) |
 | 1.15 | Email reali, accesso con Google, richiesta di accesso dei non tester | NV | – | – | – | – | – | su dev: email non reali e modalità test spenta (non va accesa) |
-| 1.16 | **Nuova (21/11, KI-107).** Informativa accettata anche con l'accesso con email | OK | DA RIVERIFICARE | – | DA RIVERIFICARE | OK | 22/11 | API 22/11 (`policyVersion` 2026-11c dopo l'accesso con email: corse 23:33 e 04:13); EMU 21/11 (profilo: «Hai accettato l'informativa privacy (versione 2026-11c)…»). Da vedere il messaggio del profilo sul sito e su MobB |
+| 1.16 | **Nuova (21/11, KI-107).** Informativa accettata anche con l'accesso con email | OK | DA RIVERIFICARE | – | OK | OK | 23/11 | API 22/11 (`policyVersion` 2026-11c dopo l'accesso con email: corse 23:33 e 04:13); EMU 21/11 (profilo: «Hai accettato l'informativa privacy (versione 2026-11c)…»); MobB OK il 23/11 (corsa 03:03). Da vedere il messaggio del profilo sul sito |
 
 ## Area 2 – Leghe, inviti, partecipanti
 
@@ -92,23 +97,23 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 |---|---|---|---|---|---|---|---|---|
 | 2.1 | Creazione lega, preset, crediti iniziali, codice invito e adesione | OK | – | – | – | – | 22/11 | rifatto in ogni corsa per preparare le leghe di prova; il mercato resta chiuso finché la lega non è al completo (KI-93) |
 | 2.2 | Invito nominale: accetta, rifiuta, revoca, duplicati | OK | – | – | – | – | 22/11 | 22/11: «Annulla invito» toglie la notifica; posti riservati agli inviti in attesa (`league_full`); notifiche d'invito senza doppioni |
-| 2.3 | Gli stessi flussi a schermo | – | DA FARE | DA FARE | DA FARE | OK | 21/11 | EMU OK il 21/11 (M1: registrazione, accesso, ingresso in lega; vedi 12.6 e 12.7). Il 22/11 la corsa 23:33 l'ha saltata (campione della domenica) |
+| 2.3 | Gli stessi flussi a schermo | – | DA FARE | DA FARE | OK | OK | 23/11 | EMU OK il 21/11 (M1: registrazione, accesso, ingresso in lega; vedi 12.6 e 12.7). MobB OK il 23/11 (corsa 03:03: creazione, ingresso con codice, invito nominale rifiutato e poi accettato). Il 22/11 la corsa 23:33 l'ha saltata (campione della domenica) |
 | 2.4 | Ingresso con link di invito aperto dall'app | – | – | – | – | OK | 18/11 | da collegato e da scollegato; il link web apre direttamente l'app |
 | 2.5 | Elenco partecipanti, ruoli, permessi admin e non membro | OK | – | – | – | – | 22/11 | 22/11: un membro riceve 403 su tutte le azioni da admin |
 | 2.6 | Sostituzione partecipante | OK | – | – | – | – | 22/11 | squadra, rosa e crediti passano al nuovo; il vecchio riceve 403; l'invito pendente del nuovo si chiude. Da decidere: chi è stato sostituito può rientrare col codice se resta un posto |
-| 2.7 | Eliminazione lega da admin (bozza) | OK | – | – | – | – | 22/11 |  |
-| 2.8 | Eliminazione lega da operatore, a schermo [OPER] | – | OK | – | DA FARE | DA FARE | 22/11 | W1280 il 22/11 con qa-09 (il 21/11 anche conferma e annulla, a 1280 e 390). MobB ed EMU: pulsante «Elimina» del pannello operatore dell'app (KI-68) |
-| 2.9 | Notifica "Lega eliminata" vista davvero | OK | OK | – | DA FARE | – | 22/11 | API e W1280 il 22/11: una notifica per membro, nessuna a chi elimina, preferenza spenta rispettata, link `/` |
+| 2.7 | Eliminazione lega da admin (bozza) | OK | – | – | APERTO | APERTO | 23/11 | API OK il 22/11. APERTO nell'app (KI-148, corsa 03:03 del 23/11, in correzione): «Elimina lega» da Amministrazione lega elimina la lega (204) ma poi mostra «Qualcosa è andato storto» (errore React #300); visto su MobB, il codice è lo stesso dell'app Android |
+| 2.8 | Eliminazione lega da operatore, a schermo [OPER] | – | OK | – | NV | DA FARE | 23/11 | W1280 il 22/11 con qa-09 (il 21/11 anche conferma e annulla, a 1280 e 390). MobB NV il 23/11: la conferma di «Elimina» usa `Alert.alert`, che nel browser non si apre. EMU: pulsante «Elimina» del pannello operatore dell'app (KI-68) |
+| 2.9 | Notifica "Lega eliminata" vista davvero | OK | OK | – | OK | – | 23/11 | API e W1280 il 22/11: una notifica per membro, nessuna a chi elimina, preferenza spenta rispettata, link `/`. MobB OK il 23/11 (corsa 03:03) |
 | 2.10 | Codici 400 invece di 403/404, badge inviti con la lega in asta | APERTO | – | – | – | – | 12-18/11 | KI-11 (stile, nessuna fuga di dati) |
 | 2.11 | Scadenza reale di un invito | NV | – | – | – | – | – | il minimo è 1 giorno |
-| 2.12 | **Nuova (22/11).** Notifica «Nuovo invito» tolta quando la lega viene eliminata | APERTO | – | – | – | – | 22/11 | difetto P1 della corsa 03:03 del 22/11 (bassa, patch pronta, non ancora in `known_issues.md`): l'invitato tiene la notifica che porta a `/inviti` vuota e non riceve «Lega eliminata» |
+| 2.12 | **Nuova (22/11).** Notifica «Nuovo invito» tolta quando la lega viene eliminata | OK | – | – | – | – | 23/11 | difetto P1 del 22/11 corretto (KI-119) e riprovato OK il 23/11 (corsa 04:13): «Nuovo invito» tolto e «Lega eliminata» ricevuta dall'invitato |
 
 ## Area 3 – Rosa, listone, crediti
 
 | Cod | Voce | API | W1280 | W390 | MobB | EMU | Ultima | Note |
 |---|---|---|---|---|---|---|---|---|
 | 3.1 | Listone: conteggi e filtro ruolo | OK | – | – | – | – | 12-18/11 | `?role=` non valido → 200: stile, non segnalare |
-| 3.2 | Ricerca senza accenti ("dembele" → "Dembélé") | OK | DA RIVERIFICARE | OK | OK | OK | 22/11 | listone della lega OK su API, W1280, W390 e MobB (21-22/11) ed EMU (21/11, M2). Resta su W1280 il listone dell'operatore `/admin/listone` [OPER] |
+| 3.2 | Ricerca senza accenti ("dembele" → "Dembélé") | OK | OK | OK | OK | OK | 23/11 | listone della lega OK su API, W1280, W390 e MobB (21-22/11) ed EMU (21/11, M2). Listone dell'operatore `/admin/listone` OK il 23/11 con qa-09 (corsa 00:43: «dembele», «DEMBELE», «Dembélé», «jovanovic», «o'shea») |
 | 3.3 | Listone solo con i club dei campionati della lega (decisione 14) | OK | – | – | – | – | 22/11 | 22/11: dopo «Aggiorna listone» nessun club fuori da Serie A, Liga e Premier. I rientrati dal prestito (Mandas, KI-109) ricompaiono solo dopo «Aggiorna listone» |
 | 3.4 | Override di ruolo: NUL nel motivo → 422 | OK | – | – | – | – | 22/11 |  |
 | 3.5 | Override di ruolo dal turno successivo [PREP] | OK | – | – | – | – | 21/11 | il 21/11 valeva dal turno 1 se mancava `currentRound` (corsa 00:43): corretto il 21/11 (KI-100) e riprovato OK lo stesso giorno. Resta il limite noto KI-66: rosa e mercato mostrano il ruolo ufficiale |
@@ -117,10 +122,10 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 3.8 | Import CSV: nomi ambigui risolvibili, niente `roster_full` sulle righe valide, punto e virgola (decisione 15) | OK | OK | – | – | – | 22/11 | API 22/11; W1280 21/11 (scelta dei nomi ambigui a schermo). La conferma rifiutata che salvava le scelte (21/11) è corretta (KI-100) e riprovata OK. Import da Excel: NV, manca lo strumento |
 | 3.9 | Riempimento casuale | OK | – | – | – | – | 12-18/11 | lento, circa 6 s |
 | 3.10 | Riempimento IA | NV | – | – | – | – | – | manca l'API per creare un fantallenatore IA |
-| 3.11 | Movimenti crediti = saldo, storico rosa, esubero in attesa | APERTO | – | – | – | – | 22/11 | saldo = somma dei movimenti OK il 22/11. APERTO: le note dei movimenti scritte dopo il 21/11 hanno ancora i nomi rovinati («Assegnazione L. JovanoviÄ…», «D. O&apos;Shea»): difetto D1 della corsa 00:43 del 22/11, patch pronta, non ancora in `known_issues.md` (KI-105 copre solo i testi salvati prima) |
-| 3.12 | Rosa e crediti a schermo con una rosa piena [PREP] | – | OK | OK | OK | OK | 22/11 | i difetti del 21/11 (nome dell'esubero nascosto a 390, tabelle da scorrere a 1280, nomi tagliati nel listone a 390) sono corretti (KI-100, KI-104) e riprovati OK il 21-22/11; MobB 21/11; EMU 21/11 (M2) |
-| 3.13 | **Nuova (21/11, KI-106 e KI-112).** Listone: filtri «Campionato» e «Squadra», «Azzera filtri» | – | OK | DA RIVERIFICARE | DA RIVERIFICARE | DA RIVERIFICARE | 22/11 | W1280 OK il 22/11 (corsa 04:13). EMU 21/11 (M3): filtri e conteggi OK, ma «Azzera filtri» lasciava il ruolo; cambiato il 21/11 (KI-112: ora torna anche il ruolo su «Tutti»), da riprovare sull'APK nuovo. I filtri sono solo su sito e app, non nell'API; non ancora nel listone dell'operatore |
-| 3.14 | **Nuova (21/11, KI-113).** Avviso quando un ruolo è al completo | OK | DA RIVERIFICARE | DA RIVERIFICARE | DA RIVERIFICARE | OK | 22/11 | API 22/11: rifiuto a ruolo pieno, conteggio uguale al server. EMU 21/11 (APK `04cc83b`): «Portieri al completo: 3 su 3…», swipe bloccato con il motivo, il ruolo torna libero dopo lo svincolo. Sito NV il 22/11 perché la rosa provata era piena: serve un ruolo pieno con altri posti liberi |
+| 3.11 | Movimenti crediti = saldo, storico rosa, esubero in attesa | OK | – | – | – | – | 23/11 | 23/11 (corse 00:43 e 04:13): saldo = saldo ricostruito = somma dei movimenti per 22 squadre; note dei movimenti, vecchie e nuove, con i nomi giusti («Acquisto L. Jovanović», «Acquisto D. O'Shea»): D1 del 22/11 corretto (KI-118). Note vecchie rovinate da riparare in lettura: NV, non ce ne sono più |
+| 3.12 | Rosa e crediti a schermo con una rosa piena [PREP] | – | OK | APERTO | OK | OK | 23/11 | i difetti del 21/11 (nome dell'esubero nascosto a 390, tabelle da scorrere a 1280, nomi tagliati nel listone a 390) sono corretti (KI-100, KI-104) e riprovati OK il 21-22/11; MobB 21/11; EMU 21/11 (M2). APERTO a 390 (KI-147, corsa 04:13 del 23/11, in correzione): in Rosa › Storico la tabella «Intervalli di possesso» è tagliata, «Al» e «Fonte» irraggiungibili (la correzione KI-100 non tiene più). A 1280 e le tabelle per ruolo a 390 OK |
+| 3.13 | **Nuova (21/11, KI-106 e KI-112).** Listone: filtri «Campionato» e «Squadra», «Azzera filtri» | – | OK | OK | OK | OK | 23/11 | W1280 OK il 22/11 (corsa 04:13); EMU OK il 22/11 (M3, «Azzera filtri» riporta anche il ruolo, KI-112); W390 e MobB OK il 23/11 (corse 00:43 e 03:03). «Azzera filtri» lascia ricerca e «Solo disponibili» per scelta (KI-138). Menu «Campionato» nascosto con un solo campionato: NV, una lega ne richiede almeno 3. I filtri sono solo su sito e app, non nell'API; non ancora nel listone dell'operatore |
+| 3.14 | **Nuova (21/11, KI-113).** Avviso quando un ruolo è al completo | OK | OK | OK | OK | OK | 23/11 | API 22/11: rifiuto a ruolo pieno, conteggio uguale al server. EMU 21/11 (APK `04cc83b`): «Portieri al completo: 3 su 3…», swipe bloccato con il motivo, il ruolo torna libero dopo lo svincolo. W1280, W390 e MobB OK il 23/11 (corsa 00:43, portieri 3/3 con altri posti liberi): avviso per membro e admin, «+» disattivati con il motivo, swipe «Pieno» su MobB |
 
 ## Area 4 – Mercato: scambi
 
@@ -145,12 +150,12 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 5.1 | Buste: sessione, offerta, ritiro, chiusura, risoluzione, spareggio | OK | – | – | – | – | 22/11 | il 22/11 sessione, offerte, spareggio e risoluzione di nuovo OK (corsa 22:23) |
 | 5.2 | Spareggio che finisce di nuovo in parità | OK | – | – | – | – | 22/11 | vince l'offerta inviata per prima, nessun secondo spareggio, un solo addebito (decisione del 19/11) |
 | 5.3 | Waiver in parità | OK | – | – | – | – | 22/11 | vince chi ha inviato per primo; «Spareggio svincolati aperto/annullato», «Svincolato aggiudicato/perso» |
-| 5.4 | Live: manuale, sequenziale, rilanci, timer, aggiudicazione | OK | – | – | – | – | 12-18/11 |  |
+| 5.4 | Live: manuale, sequenziale, rilanci, timer, aggiudicazione | OK | – | – | – | – | 22/11 | 22/11 sera (corsa 22:23): lotto live manuale aggiudicato con un solo addebito, seconda aggiudicazione 400 `market_live_lot_closed`, saldo = somma dei movimenti; nota «Assegnazione da asta a rilanci» (KI-85) giusta, anche nello storico della Rosa a 1280 |
 | 5.5 | Live: giro completo `turn_based` | OK | – | – | – | – | 22/11 | fuori turno → 400 `market_live_not_your_turn`; «salta» e «annulla» consumano il turno, come deciso |
 | 5.6 | Live: leader senza crediti all'aggiudicazione | OK | – | – | – | – | 22/11 | il lotto va all'offerta successiva valida, o passa; un solo addebito; «Lotto perso: crediti insufficienti» |
 | 5.7 | Live: scambio immediato a rosa 35/35 [PREP] | DA FARE | – | – | – | – | – | il 22/11 non si poteva fare: l'asta live non si apre con il turno 11 in corso. Lo scambio a ruolo pieno è OK (5.9) |
-| 5.8 | Selettore calciatori dell'asta (buste e live), a schermo | – | OK | OK | OK | – | 21/11 | buste e coda live OK il 21/11; sul sito non è ancora stata vista la scelta del calciatore da chiamare in un'asta live aperta |
-| 5.9 | Avvisi "Spareggio annullato", busta "non assegnabile", "Scelta richiesta: rosa al completo" visti davvero | OK | – | – | DA FARE | – | 22/11 | API il 22/11 (corsa 22:23) |
+| 5.8 | Selettore calciatori dell'asta (buste e live), a schermo | – | OK | OK | OK | – | 22/11 | buste e coda live OK il 21/11; scelta del calciatore da chiamare in un'asta live aperta OK a 1280 il 22/11 sera (corsa 22:23: ricerca, filtri per ruolo, pagine, «Chiama» disattivato senza scelta). Suggerimento: a 1280 la riga dei filtri per ruolo è tagliata a destra |
+| 5.9 | Avvisi "Spareggio annullato", busta "non assegnabile", "Scelta richiesta: rosa al completo" visti davvero | OK | – | – | APERTO | – | 23/11 | API il 22/11 (corsa 22:23). MobB 23/11 (corsa 03:03): gli avvisi arrivano e il link `/asta` è giusto, ma APERTO KI-150 (in correzione il 23/11): nel centro notifiche dell'app «Spareggio aperto/annullato» stanno sotto «Scambi» invece che sotto «Asta» |
 | 5.10 | Fare un'offerta in busta dall'app [PREP] | – | – | – | – | DA FARE | – | il 21/11 non si poteva fare: mercato fermo per il turno 11. Serve una sessione a buste aperta in `QA-PREP-PARI` (la apre l'admin `qa-01`) |
 | 5.11 | Rimborso del calciatore svincolato con il waiver | APERTO | – | – | – | – | 22/11 | KI-23, da decidere; ancora presente il 22/11 |
 | 5.12 | Risoluzione concorrente vera | NV | – | – | – | – | – | regola: una richiesta alla volta per account |
@@ -163,7 +168,7 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 6.2 | Bozza: al massimo 11 titolari, 1 portiere e i ruoli del modulo; DELETE solo a turno aperto | OK | – | – | – | – | 22/11 |  |
 | 6.3 | Bloccati, indisponibili, fuori rosa | OK | – | – | – | – | 22/11 | bloccati e fuori rosa OK; indisponibili reali NV (nessuno nei dati di dev) |
 | 6.4 | Copia formazione precedente | OK | – | – | – | – | 22/11 | non ancora visto il caso di un calciatore uscito dalla rosa dopo la formazione salvata |
-| 6.5 | Salvare la formazione a schermo [PREP] | – | – | OK | DA FARE | OK | 21/11 | W390 ed EMU (flusso 06) il 21/11. MobB: la schermata è OK, ma un membro non può scegliere il turno 12 mentre è in corso l'11 (`canChangeTurn` solo per admin e operatore): da decidere se va così |
+| 6.5 | Salvare la formazione a schermo [PREP] | – | – | OK | OK | OK | 23/11 | W390 il 21/11; EMU flusso 06 il 21 e 22/11. MobB OK il 23/11 (corsa 03:03: salvataggio 200, «Formazione salvata.» sul turno 11, senza modifiche; da controllare via API se il server accetta modifiche vere a calciatori già bloccati). Resta da decidere `canChangeTurn`: un membro non può scegliere il turno 12 mentre è in corso l'11 (corsa 00:43) |
 | 6.6 | Esubero di ruolo in formazione [PREP] | OK | – | – | – | – | 22/11 | `athlete_exceeds_role_quota` con il nome; in tribuna viene tolto senza errore |
 | 6.7 | Blocco progressivo, mosse tattiche, formazione automatica al primo blocco [PREP][VIVO] | DA FARE | – | – | – | – | 21/11 | 21/11: blocco progressivo del turno 11 OK in lettura; formazione automatica e margine di blocco ancora da vedere. Prossimo turno vivo: #12, blocco il 27/11 alle 20:30 |
 | 6.8 | Formazione dell'operatore [OPER] | OK | – | – | – | – | 21/11 |  |
@@ -178,7 +183,7 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 7.4 | Cutoff, ricalcolo, apertura manuale del turno, omologazione, correzioni [OPER] | OK | – | – | – | – | 22/11 | con qa-09. Da decidere: l'operatore può omologare un turno giocato prima che la lega esistesse |
 | 7.5 | Notifiche "formazione in scadenza" e "blocco imminente" [PREP][VIVO] | DA RIVERIFICARE | – | – | DA FARE | OK | 21/11 | il 21/11 (corsa 01:53) gli avvisi indicavano il calcio d'inizio invece del blocco e dicevano «della tua formazione»: corretti il 21/11 (KI-101, pilota-1.2). EMU 21/11: testo nuovo OK («4 calciatori della tua rosa si bloccano alle …»). Da rivedere al blocco del 27/11: orario, arrivo prima del blocco, nessun avviso a chi riposa (KI-102) |
 | 7.6 | Turni, calendario e classifica a schermo con una lega attiva [PREP] | – | OK | OK | OK | OK | 22/11 | il 21/11 un turno iniziato restava «Prossimo» (KI-101): corretto e riprovato OK (W1280 e W390 il 22/11, MobB il 21/11). «Turno saltato» OK su sito e MobB; EMU 21/11 (M3) |
-| 7.7 | Risultati, voti, fantapunti, classifica, scontro diretto | DA FARE | DA FARE | – | – | – | 22/11 | dal 21/11 ci sono partite giocate: risultati provvisori del turno 11 coerenti (totali = somma dei titolari). Da fare: risultati definitivi, omologazione e classifica dopo il 23/11; 5 partite del 21/11 ancora senza voti (probabile ritardo del fornitore su dev) |
+| 7.7 | Risultati, voti, fantapunti, classifica, scontro diretto | DA FARE | DA FARE | – | – | – | 23/11 | 23/11 (corsa 01:53): provvisori del turno 11 coerenti su API e W1280 (totali = somma dei titolari, nessuna sostituzione prima della fine del turno, scontri 0 gol e pareggio sotto 66, classifica a 0 perché nessuno scontro è definitivo). 4 partite del 22/11 ancora senza voti (ritardo del fornitore). Da fare dopo le 3 partite del 23/11 sera: definitivi, sostituzioni automatiche, omologazione e classifica; anche `QA-PREP-DISPARI`. Da decidere: «S.V.» con `scoreFinal` già vero quando i voti non sono ancora arrivati |
 
 ## Area 8 – Notifiche
 
@@ -189,8 +194,8 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 8.3 | Generate da invito, scambio e asta | OK | – | – | – | – | 22/11 | 22/11: inviti (ricevuto, accettato, rifiutato, revocato), nuovo partecipante, lega al completo, aste e svincolati. Avvisi di scambio: ultimi visti prima del 18/11 (mercato fermo) |
 | 8.4 | Link profondo sul web | OK | OK | – | – | – | 22/11 |  |
 | 8.5 | Tocco su una notifica di scambio nell'app → Mercato › Scambi | – | – | – | – | OK | 18/11 |  |
-| 8.6 | Tocco su ogni altro tipo di notifica (asta, turno, invito, fantallenatori, operatore) | – | OK | – | OK | DA FARE | 22/11 | MobB OK il 21 e 22/11 (18 tipi, poi 7 con la lega giusta). W1280 22/11. EMU: OK scambio, lega partita, turno aperto, nuovo invito, «Carica altre» (18/11) e blocco formazione (21/11); mancano asta e lega eliminata (provarle con un account con poche notifiche) e operatore |
-| 8.7 | Notifica di una lega eliminata: apre Scambi senza lega | – | OK | – | DA RIVERIFICARE | DA RIVERIFICARE | 22/11 | KI-12: corretto il 21/11 (pilota-1.2), l'app passa alla lega del link se se ne fa ancora parte. Ora «Lega eliminata» ha link `/`; sul sito (22/11) apre la home di una lega esistente. Da riprovare nell'app |
+| 8.6 | Tocco su ogni altro tipo di notifica (asta, turno, invito, fantallenatori, operatore) | – | OK | – | OK | OK | 22/11 | MobB OK il 21 e 22/11 (18 tipi, poi 7 con la lega giusta). W1280 22/11. EMU: scambio, lega partita, turno aperto, nuovo invito, «Carica altre» (18/11), blocco formazione (21/11); il 22/11 (M4) asta («Sei stato sorpassato» apre Mercato › Asta › Live), operatore (apre il Profilo) e lega eliminata (8.7) |
+| 8.7 | Notifica di una lega eliminata: apre Scambi senza lega | – | OK | – | OK | OK | 23/11 | KI-12: corretto il 21/11 (pilota-1.2). «Lega eliminata» ha link `/` e apre la Home di una lega esistente senza errori: sito il 22/11, EMU il 22/11 (M4), MobB il 23/11 (corsa 03:03) |
 | 8.8 | Push ed email reali | – | – | – | – | NV | – | l'emulatore non ha Play Store, quindi niente push (confermato il 21/11: `pushCount 0`): da vedere su un telefono vero |
 | 8.9 | **Nuova (21/11, KI-12).** Tocco su una notifica di un'altra lega: l'app passa a quella lega | – | OK | – | OK | OK | 22/11 | EMU 21/11 (M4: con `QA-PREP-PARI` attiva, «Blocco formazione in arrivo «QA-PREP-DISPARI»» apre Formazione e cambia lega); MobB 22/11 (7 tipi); W1280 22/11 (lega giusta nel selettore). Con la push: NV (8.8) |
 
@@ -200,23 +205,23 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 |---|---|---|---|---|---|---|---|---|
 | 9.1 | Pagine principali senza errori in console e senza scorrimento orizzontale | – | OK | OK | – | – | 22/11 |  |
 | 9.2 | Tab Mercato a 390 | – | – | OK | – | – | 22/11 |  |
-| 9.3 | Contrasti del tema chiaro e scuro | – | APERTO | APERTO | – | – | 22/11 | tribuna e ambra «attenzione» corrette (KI-98, KI-99) e riprovate OK il 21-22/11. APERTO: in Formazione i nomi dei titolari «senza voto» sono sotto 4,5:1 (fino a 3,96:1), difetto P3 della corsa 03:03 del 22/11, patch pronta, non ancora in `known_issues.md` |
-| 9.4 | Pagine nuove: "+ Tester" con liste impaginate, "Elimina" lega, "Rimetti nel turno" ("+ Tester" ed "Elimina" sono [OPER]) | – | OK | DA RIVERIFICARE | – | – | 22/11 | «+ Tester» ed «Elimina» OK il 21/11 (impaginazione dei tester NV: solo 3 tester). «Rimetti nel turno» senza calendario diceva «Il ricalcolo non è riuscito»: corretto il 21/11 (KI-101), OK a 1280 il 22/11, da riprovare a 390 |
-| 9.5 | Pagine principali con una lega attiva e rose piene [PREP] | – | APERTO | APERTO | – | – | 22/11 | 16 pagine OK il 21-22/11. APERTO: in Amministrazione di una lega attiva compare ancora «Prima salva la configurazione della lega…» e «Invitati» è disattivata, difetto P4 della corsa 03:03 del 22/11, da decidere (nascondere la sezione o considerare configurata la lega attivata), non ancora in `known_issues.md` |
+| 9.3 | Contrasti del tema chiaro e scuro | – | APERTO | APERTO | – | – | 23/11 | tribuna e ambra «attenzione» (KI-98, KI-99) OK il 21-23/11; nomi dei titolari «senza voto» e «s.v.» delle sfide a 5,38:1 (P3 corretto, KI-120) OK il 23/11 (corse 03:03 e 04:13). APERTO KI-151 (in correzione il 23/11, solo aspetto): sul campo la pastiglia «s.v.» è grigio scuro invece del gradiente viola, e sparisce anche quello di «provvisorio» (contrasto circa 15:1) |
+| 9.4 | Pagine nuove: "+ Tester" con liste impaginate, "Elimina" lega, "Rimetti nel turno" ("+ Tester" ed "Elimina" sono [OPER]) | – | OK | OK | – | – | 23/11 | «+ Tester» ed «Elimina» OK il 21/11 (impaginazione dei tester NV: solo 3 tester). «Rimetti nel turno» senza calendario diceva «Il ricalcolo non è riuscito»: corretto il 21/11 (KI-101), OK a 1280 il 22/11 e a 390 il 23/11 (corsa 03:03: «Escludi» e «Rimetti nel turno» 200 con i loro messaggi) |
+| 9.5 | Pagine principali con una lega attiva e rose piene [PREP] | – | OK | OK | – | – | 23/11 | 16 pagine OK il 21-22/11. P4 del 22/11 (Amministrazione di una lega attiva con «Prima salva la configurazione…» e «Invitati» disattivata) corretto (KI-122) e riprovato OK il 23/11 a 1280 e 390 (corse 03:03 e 04:13, 15 pagine senza errori) |
 
 ## Area 10 – App mobile (browser ed emulatore)
 
 | Cod | Voce | API | W1280 | W390 | MobB | EMU | Ultima | Note |
 |---|---|---|---|---|---|---|---|---|
-| 10.1 | Schermate principali senza errori | – | – | – | OK | OK | 22/11 | MobB 21-22/11 (Fantallenatori NV: serve un admin tra gli account usati); EMU flusso 02 il 21/11 |
-| 10.2 | Schermate principali con contenuti di lega [PREP] | – | – | – | APERTO | OK | 22/11 | EMU 21/11 (M3). APERTO su MobB: nella Home lega la scheda «Campionati» è tagliata («La Liga · Premier Leagu…»), difetto P2 della corsa 03:03 del 22/11, patch pronta, non ancora in `known_issues.md`; probabile anche sull'app vera |
+| 10.1 | Schermate principali senza errori | – | – | – | APERTO | OK | 23/11 | MobB OK il 21-23/11 (Svincolati nascosta per scelta); EMU flusso 02 il 21 e 22/11. APERTO su MobB (KI-149, corsa 03:03 del 23/11, in correzione): un membro che apre Fantallenatori fa 2 richieste di amministrazione che rispondono 403 (2 errori in console, lo schermo «Permessi insufficienti» resta giusto); il codice è lo stesso dell'app Android |
+| 10.2 | Schermate principali con contenuti di lega [PREP] | – | – | – | APERTO | OK | 22/11 | EMU 21/11 (M3). APERTO su MobB: nella Home lega la scheda «Campionati» è tagliata («La Liga · Premier Leagu…»), difetto P2 della corsa 03:03 del 22/11 (KI-123, da fare nella 1.3: serve un APK); probabile anche sull'app vera |
 | 10.3 | Pannello operatore mobile [OPER] | – | – | – | OK | DA FARE | 21/11 | MobB 21/11 con qa-09: navigazione OK, «Elimina» lega da provare (2.8); notifiche operatore NV (nessuna) |
 | 10.4 | Coerenza con il web: etichette, stati scambi, colori ruolo, causali crediti | – | – | – | OK | – | 22/11 | MobB contro W390 il 21 e 22/11; colori di ruolo della stessa tinta ma di tonalità diverse (suggerimento) |
 | 10.5 | Schermata di accesso: tema chiaro, bandiera Premier, tastiera, titolo | – | – | – | – | OK | 18/11 | anche «GIOCA» leggibile |
 | 10.6 | Galleria e fotocamera per l'avatar | – | – | – | – | DA FARE | 18/11 | galleria OK il 18/11 («Avatar aggiornato.»); fotocamera ancora da provare (anche con la fotocamera virtuale dell'emulatore) |
 | 10.7 | Push vere, Google nativo | – | – | – | – | NV | – | serve un telefono vero (l'emulatore non ha Play Store) |
-| 10.8 | **Nuova (21/11, KI-111).** Avviso di nuova versione dell'app | OK | DA RIVERIFICARE | – | – | OK | 22/11 | EMU 21/11 (M5): nessun avviso senza versione impostata; con 1.3.0/4 «È disponibile la versione 1.3 dell'app.» con «Scarica» e «Più tardi» (che non lo ripropone); torna con 1.4.0/5. API: qa-08 riceve 403 su `/admin/app-version`, lettura OK il 22/11. Da vedere la pagina «Versione dell'app Android» del pannello operatore sul sito [OPER]. Su dev il link è di prova (`example.com`) |
-| 10.9 | **Nuova (21/11, KI-114).** «Segnala un problema»: pagina giusta e versione dell'app | OK | DA RIVERIFICARE | – | – | OK | 22/11 | EMU 21/11 (APK `04cc83b`): dalla Rosa `Roster` e `1.2.0 (3)`, da una notifica `Formation`; la strada Home lega › Rosa NV (pulsante assente). API OK il 22/11. Da vedere pagina e versione nella vista operatore del sito [OPER]. Restano su dev segnalazioni di prova da chiudere a mano |
+| 10.8 | **Nuova (21/11, KI-111).** Avviso di nuova versione dell'app | OK | OK | – | – | OK | 23/11 | EMU 21/11 (M5): nessun avviso senza versione impostata; con 1.3.0/4 «È disponibile la versione 1.3 dell'app.» con «Scarica» e «Più tardi» (che non lo ripropone); torna con 1.4.0/5. API: qa-08 riceve 403 su `/admin/app-version`, lettura OK il 22/11. W1280 OK il 23/11 con qa-09 (corsa 03:03: si apre «Versione dell'app Android», nulla salvato). Su dev il link è di prova (`example.com`) |
+| 10.9 | **Nuova (21/11, KI-114).** «Segnala un problema»: pagina giusta e versione dell'app | OK | OK | – | – | OK | 23/11 | EMU 21/11 (APK `04cc83b`): dalla Rosa `Roster` e `1.2.0 (3)`, da una notifica `Formation`; la strada Home lega › Rosa NV (pulsante assente). API OK il 22/11. W1280 OK il 23/11 con qa-09 (corsa 03:03: pagina e versione visibili nelle segnalazioni). Restano su dev segnalazioni di prova da chiudere a mano |
 
 ## Area 11 – Salute e prestazioni
 
@@ -239,22 +244,22 @@ Le aree 1-8 sono state provate quasi sempre via API. Qui ci sono le stesse funzi
 | 12.6 | Creare una lega dall'app (nome, competizioni, regole) | OK | M1 | 21/11 |  |
 | 12.7 | Ingresso con codice; invito nominale ricevuto, accettato e rifiutato | OK | M1 | 21/11 | da fare a parte: «Annulla invito» dall'app dell'admin (KI-68, vedi la scaletta di M1) |
 | 12.8 | Partecipanti, directory fantallenatori, cambio della lega attiva [PREP] | OK | M1 | 21/11 | anche l'email dei fantallenatori visibile solo all'admin (KI-92) |
-| 12.9 | Listone: filtro ruolo, ricerca, "Solo disponibili" [PREP] | DA FARE | M2 | 21/11 | ricerca e filtro ruolo OK il 21/11; manca «Solo disponibili» |
+| 12.9 | Listone: filtro ruolo, ricerca, "Solo disponibili" [PREP] | OK | M2 | 22/11 | ricerca e filtro ruolo OK il 21/11; «Solo disponibili» OK il 22/11 (M3) |
 | 12.10 | Admin dall'app: assegnazione manuale di uno slot, svincolo con rimborso [PREP] | DA FARE | M2 | 21/11 | assegnazione OK il 21/11; manca lo svincolo con rimborso |
 | 12.11 | Scambi dall'app: proponi, accetta, rifiuta, annulla, controproposta [PREP] | DA FARE | M2 | – | il 21/11 non si poteva fare: mercato fermo per il turno 11. Provare anche la conferma «Accetta scambio» (KI-80) e «Nuova proposta» che resta aperta con l'errore (KI-99) |
 | 12.12 | Approvazione admin di uno scambio dall'app [PREP] | DA FARE | M2 | – | mercato fermo il 21/11 |
 | 12.13 | Asta a buste dall'app: offerta, ritiro, esito [PREP] | DA FARE | M2 | – | mercato fermo il 21/11; controllare anche gli orari in ora italiana (KI-78) |
 | 12.14 | Asta live dall'app: rilancio, timer, aggiudicazione (gli altri rilanciano via API) [PREP] | DA FARE | M2 | – | mercato fermo il 21/11 |
 | 12.15 | Movimenti crediti e causali [PREP] | OK | M2 | 21/11 | «Aggiustamento admin», «Assegnazione …», «Acquisto rosa» con data e saldo |
-| 12.16 | Formazione: modulo, titolari, panchina e ordine, bozza, copia della precedente [PREP] | DA FARE | M3 | 21/11 | 21/11 a turno in corso: modulo, titolari, panchina, «Bozza», «Salva» e «Svuota formazione» OK; mancano a turno aperto la copia della precedente, il cambio modulo che tiene i titolari (KI-77), «Sistema la panchina» e l'esubero in tribuna (KI-84) |
+| 12.16 | Formazione: modulo, titolari, panchina e ordine, bozza, copia della precedente [PREP] | OK | M3 | 22/11 | 21/11 a turno in corso: modulo, titolari, panchina, «Bozza», «Salva» e «Svuota formazione» OK; 22/11 (M3): cambio modulo che tiene i titolari (KI-77), copia della precedente, esubero in tribuna (KI-84), «Sistema la panchina», «Svuota» e «Ripristina» OK |
 | 12.17 | Calciatori bloccati o indisponibili visibili ma non selezionabili [PREP] | OK | M3 | 21/11 | lucchetto e niente «Cambia», in campo e in panchina |
-| 12.18 | Turni europei, calendario, scontro diretto, classifica [PREP] | OK | M3 | 21/11 | «In corso» OK; «Turno saltato» non ancora visto nell'app (problema del flusso Maestro) |
-| 12.19 | Centro notifiche: badge, segna letta, segna tutte lette | DA FARE | M4 | 21/11 | badge «9+», non lette e segna letta al tocco OK; l'avviso «Novità» dell'operatore arriva, anche programmato; manca «Segna tutte lette» (provarlo su un account che si può azzerare) |
-| 12.20 | Preferenze notifiche e ore di silenzio rispettate | DA FARE | M4 | – | non provato il 21/11; le ore di silenzio riguardano le push, che sull'emulatore non arrivano (8.8) |
-| 12.21 | Tasto "indietro" di Android su ogni schermata: non esce dall'app per sbaglio e non perde i dati inseriti | DA FARE | M5 | – | non fatto il 21/11 per mancanza di tempo |
-| 12.22 | Accessibilità: testo grande (scala 1,3) e TalkBack sui pulsanti principali | DA FARE | M5 | – |  |
-| 12.23 | Rete assente o lenta (modalità aereo): messaggi d'errore e ripresa | DA FARE | M5 | – |  |
-| 12.24 | Tema chiaro e scuro su tutte le schermate principali | DA FARE | M5 | 21/11 | visto in tema scuro solo il Profilo (21/11) |
+| 12.18 | Turni europei, calendario, scontro diretto, classifica [PREP] | OK | M3 | 22/11 | «In corso» OK il 21/11; «Turno saltato» visto nell'app il 22/11 (M3, KI-102); il motivo del salto non compare ancora (KI-134, nella 1.3) |
+| 12.19 | Centro notifiche: badge, segna letta, segna tutte lette | OK | M4 | 22/11 | badge «9+», non lette e segna letta al tocco OK il 21/11; l'avviso «Novità» dell'operatore arriva, anche programmato; «Segna tutte lette» OK il 22/11 (M4: da 18 a 0) |
+| 12.20 | Preferenze notifiche e ore di silenzio rispettate | OK | M4 | 22/11 | preferenze rispettate il 22/11 (M4). Ore di silenzio NV: valgono solo per email e push, che sull'emulatore non arrivano (8.8) |
+| 12.21 | Tasto "indietro" di Android su ogni schermata: non esce dall'app per sbaglio e non perde i dati inseriti | OK | M5 | 22/11 | tasto indietro OK il 22/11 (M5); non provata la perdita dei dati inseriti in un modulo |
+| 12.22 | Accessibilità: testo grande (scala 1,3) e TalkBack sui pulsanti principali | OK | M5 | 22/11 | testo grande (scala 1,3) OK il 22/11 (M5); TalkBack NV sull'emulatore |
+| 12.23 | Rete assente o lenta (modalità aereo): messaggi d'errore e ripresa | APERTO | M5 | 22/11 | 22/11 (M5), KO parziale (KI-142, da correggere nella 1.3): avviata in modalità aereo l'app mostra l'accesso («Bentornato») senza messaggio di rete e resta lì quando la rete torna; con l'app già aperta «Connessione non disponibile» e «Ricarica» funzionano |
+| 12.24 | Tema chiaro e scuro su tutte le schermate principali | OK | M5 | 22/11 | Profilo in tema scuro il 21/11; tutte le schermate principali leggibili in tema scuro il 22/11 (M5) |
 | 12.25 | Schermo più piccolo: l'AVD `maestro_e2e` (Pixel 5) | OK | M5 | 21/11 | tutte le prove del 21/11 su questo AVD, senza problemi di impaginazione |
 
 ## Scaletta
@@ -269,12 +274,12 @@ Ogni corsa prova, nelle sue aree e nella colonna della sua piattaforma, prima le
 
 | Corsa | Quando | Aree | Voci per le prossime notti |
 |---|---|---|---|
-| 22:23 Mercato | ogni notte | 4, 5 | 4.7 e 5.7 [PREP] appena il turno 11 di `QA-PREP-PARI` è omologato, prima del blocco del 27/11; nota «Assegnazione da asta a rilanci» con un lotto live aggiudicato (KI-85) |
-| 23:33 Gruppo A | giorni dispari | 1, 2 | 1.2 e 1.16 (W1280), 2.3 (W1280, W390); 2.12 dopo la patch P1 |
-| 00:43 Gruppo B | ogni notte | 3, 6 | 3.2 listone dell'operatore (W1280 [OPER]), 3.13 (W390), 3.14 (W1280, W390: serve un ruolo pieno con altri posti liberi), 3.11 dopo la patch D1; 6.7 [VIVO] dopo il blocco del 27/11 |
-| 01:53 Gruppo C | giorni dispari (notti che iniziano in un giorno pari) | 7, 8 | 7.7 (API, W1280) dopo il 23/11; 7.5 dopo il blocco del 27/11: orario, arrivo prima del blocco, nessun avviso a chi riposa |
-| 03:03 Gruppo D | ogni notte | 9, 10, 11 e MobB di tutte le aree | 9.4 (W390), 10.8 e 10.9 (W1280 [OPER]); su MobB 1.2, 1.16, 2.3, 2.8 [OPER], 2.9, 3.13, 3.14, 5.9, 6.5, 7.5, 8.7 e «Nuova proposta» che resta aperta con l'errore, a mercato aperto (KI-99); 9.3, 9.5 e 10.2 dopo la patch o la decisione |
-| 04:13 Verifica | ogni notte | tutte | regressioni: le voci «CORRETTI/Risolto/Fatto» degli ultimi 3 giorni di `known_issues.md` e, appena pubblicate, le patch del 22/11 (D1, P1, P2, P3) |
+| 22:23 Mercato | ogni notte | 4, 5 | 4.7 e 5.7 [PREP] appena il turno 11 di `QA-PREP-PARI` è omologato, prima del blocco del 27/11 |
+| 23:33 Gruppo A | giorni dispari | 1, 2 | 1.2 e 1.16 (W1280), 2.3 (W1280, W390) |
+| 00:43 Gruppo B | ogni notte | 3, 6 | 3.12 a 390 (Rosa › Storico) appena pubblicata la correzione KI-147; 6.7 [VIVO] dopo il blocco del 27/11 |
+| 01:53 Gruppo C | giorni dispari (notti che iniziano in un giorno pari) | 7, 8 | 7.7 (API, W1280) dopo le partite della sera del 23/11 o l'omologazione del turno 11; 7.5 dopo il blocco del 27/11: orario, arrivo prima del blocco, nessun avviso a chi riposa |
+| 03:03 Gruppo D | ogni notte | 9, 10, 11 e MobB di tutte le aree | appena pubblicate le correzioni del 23/11: su MobB 2.7 (KI-148), 10.1 (KI-149) e 5.9 (KI-150), 9.3 a W1280 e W390 (KI-151); su MobB 7.5 dopo il blocco del 27/11; 10.2 dopo l'APK 1.3 (KI-123) |
+| 04:13 Verifica | ogni notte | tutte | regressioni: le voci «CORRETTI/Risolto/Fatto» degli ultimi 3 giorni di `known_issues.md` e, appena pubblicate, le correzioni del 23/11 (KI-147 … KI-151) |
 
 ### Mobile di giorno: emulatore Android sul PC di Rosario
 I blocchi M1-M5 li fa la sessione **«rosario-quirky-marble»** aperta sul PC di Rosario, con l'app sull'emulatore (AVD `maestro_e2e`), Maestro e `adb`, contro l'API di dev. Li avvia da sola con i timer della sessione e scrive il rapporto nella sua chat.
@@ -291,11 +296,11 @@ I blocchi M1-M5 li fa la sessione **«rosario-quirky-marble»** aperta sul PC di
 
 | Blocco | Timer della sessione | Riserva Windows | Voci del registro |
 |---|---|---|---|
-| M1 Accesso, account e leghe | 09:37 | 09:57 | 1.6 (avatar dalla galleria), 12.3; con `qa-09` 2.8 e 10.3 («Elimina» lega, KI-68); «Annulla invito» dall'app dell'admin (KI-68); 10.6 fotocamera |
-| M2 Rosa e mercato | 12:37 | 12:27 | 3.13 («Azzera filtri» riporta anche il ruolo, KI-112), 12.9, 12.10; a mercato aperto 5.10 e 12.11-12.14 |
-| M3 Formazione e turni | 15:25 | 15:27 | 12.16 a turno aperto (copia, cambio modulo KI-77, «Sistema la panchina», esubero KI-84), «Turno saltato» nell'app (KI-102) |
-| M4 Notifiche | 18:37 | 18:27 | 8.6 (asta, lega eliminata e operatore, con un account con poche notifiche), 8.7, 12.19, 12.20 |
-| M5 Sistema e ripasso | 21:37 | 21:27 | 12.21-12.24, poi tutti i flussi Maestro di `apps/mobile/e2e/maestro/flows/dev/` sull'ultimo APK. Il 21/11: 01, 02, 04, 05 e 06 passati; 03 da adattare all'avviso «Nuova versione» in cima all'elenco; 07 solo a mercato aperto; 08 va lanciato con `NOTIF_ID` |
+| M1 Accesso, account e leghe | 09:37 | 09:57 | 1.6 (avatar dalla galleria), 12.3; con `qa-09` 2.8 e 10.3 («Elimina» lega, KI-68); «Annulla invito» dall'app dell'admin (KI-68); 10.6 fotocamera; 2.7 «Elimina lega» da Amministrazione lega dopo la correzione KI-148 |
+| M2 Rosa e mercato | 12:37 | 12:27 | 12.10 (svincolo con rimborso); a mercato aperto 5.10 e 12.11-12.14 |
+| M3 Formazione e turni | 15:25 | 15:27 | nessuna voce DA FARE dal 22/11: solo il ripasso dei flussi Maestro |
+| M4 Notifiche | 18:37 | 18:27 | nessuna voce DA FARE dal 22/11: solo il ripasso dei flussi Maestro |
+| M5 Sistema e ripasso | 21:37 | 21:27 | tutti i flussi Maestro di `apps/mobile/e2e/maestro/flows/dev/` sull'ultimo APK (il 22/11: da 01 a 06 passati; 07 solo a mercato aperto; 08 va lanciato con `NOTIF_ID`); 12.23 dopo la correzione nella 1.3 (KI-142) |
 
 Ogni blocco dura al massimo un'ora circa: le voci che non riesce a fare passano al giorno dopo, finché nel registro non restano voci DA FARE per quel blocco. Quando un blocco non ha più voci DA FARE, fa solo il ripasso dei flussi Maestro.
 

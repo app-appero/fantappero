@@ -19,7 +19,9 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
+import { OFFER_MINIMUM_CREDITS, offerPrefillHint, pricePrefill, suggestedDraft } from "../market/pricePrefill";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
+import { useSuggestedDraft } from "../market/useSuggestedDraft";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -113,7 +115,16 @@ export function WaiverScreen() {
   }
 
   const [bidAthleteId, setBidAthleteId] = useState("");
-  const [bidAmount, setBidAmount] = useState("");
+  const selectedEntry = useMemo(
+    () => (bidAthleteId ? (entries.find((entry) => entry.athleteId === bidAthleteId) ?? null) : null),
+    [bidAthleteId, entries],
+  );
+  // L'offerta parte dal Valore (o dai crediti rimasti, se il Valore li supera); senza Valore
+  // il campo resta vuoto come oggi (Rosario, 21/11).
+  const prefill = selectedEntry
+    ? pricePrefill({ marketValue: selectedEntry.marketValue, remainingCredits: balance, minimum: OFFER_MINIMUM_CREDITS })
+    : null;
+  const [bidAmount, setBidAmount] = useSuggestedDraft(suggestedDraft(prefill, ""));
   const [releaseAthleteId, setReleaseAthleteId] = useState("");
 
   function handleSubmitBid() {
@@ -205,6 +216,8 @@ export function WaiverScreen() {
             notOpenMessage="Le offerte si possono inviare solo mentre la sessione è aperta."
             statusMessage="Offerta valida solo se abbinata a un giocatore da svincolare."
             testIdPrefix="waiver"
+            selectedAthlete={selectedEntry}
+            prefillHint={offerPrefillHint(prefill)}
             extraField={
               <View style={styles.field}>
                 <OptionPicker

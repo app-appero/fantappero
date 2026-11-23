@@ -1,5 +1,6 @@
 /** Market module contracts: auction/waiver sessions, releases, trades, history (EP08-01..08). */
 
+import type { AthleteMarketFields } from "./athleteValue.js";
 import type { FantasyRole } from "./leagues.js";
 
 export type MarketSessionKind = "initial_auction" | "waiver" | "live_auction";
@@ -44,7 +45,8 @@ export interface SubmitMarketBidRequest {
   releaseAthleteId?: string | null;
 }
 
-export interface MarketBid {
+/** Offerta di asta a buste o svincoli; `marketValue` e `seasonAverage` dal 1.3. */
+export interface MarketBid extends AthleteMarketFields {
   id: string;
   sessionId: string;
   fantasyTeamId: string;
@@ -120,7 +122,8 @@ export interface CounterTradeProposalRequest {
   expiresAt: string | null;
 }
 
-export interface TradeAthlete {
+/** Calciatore di una proposta di scambio; `marketValue` e `seasonAverage` dal 1.3. */
+export interface TradeAthlete extends AthleteMarketFields {
   id: string;
   name: string;
 }
@@ -283,7 +286,8 @@ export interface PlaceRaiseRequest {
   amountCredits: number;
 }
 
-export interface LiveLot {
+/** Lotto dell'asta live; `marketValue` (solo mostrato) e `seasonAverage` dal 1.3. */
+export interface LiveLot extends AthleteMarketFields {
   id: string;
   sessionId: string;
   athleteId: string;

@@ -37,6 +37,14 @@ from admin.schemas import (
     PaginatedAdminPendingTransfersResponse,
     PaginatedAdminUsersResponse,
 )
+from admin.season_history_schemas import (
+    AdminMarketValuesRefreshRequest,
+    AdminMarketValuesRefreshResponse,
+    AdminSeasonHistoryImportRequest,
+    AdminSeasonHistoryImportResponse,
+    AdminSeasonHistoryProgressResponse,
+)
+from admin.season_history_service import AdminSeasonHistoryService
 from admin.service import AdminService
 from admin.transfers_service import AdminTransfersService
 from auth.dependencies import get_db_session, get_impersonation_store
@@ -78,6 +86,13 @@ def get_admin_transfers_service(
     return AdminTransfersService(session)
 
 
+def get_admin_season_history_service(
+    session: Session = Depends(get_db_session),
+    settings: ApiSettings = Depends(get_api_settings),
+) -> AdminSeasonHistoryService:
+    return AdminSeasonHistoryService(session, settings)
+
+
 _NOT_FOUND_CODES = frozenset(
     {"admin_user_not_found", "admin_transfer_not_found", "admin_league_not_found"}
 )
@@ -89,7 +104,11 @@ def _error_response(exc: AdminError) -> JSONResponse:
 
 
 def _listone_error_response(exc: ValidationAuthError) -> JSONResponse:
-    status_code = 404 if exc.code == "listone_refresh_job_not_found" else 400
+    status_code = (
+        404
+        if exc.code in ("listone_refresh_job_not_found", "season_history_job_not_found")
+        else 400
+    )
     return JSONResponse(status_code=status_code, content={"message": exc.message, "code": exc.code})
 
 
@@ -417,3 +436,61 @@ def update_listone_roles_from_provider(
         )
     except ValidationAuthError as exc:
         return _listone_error_response(exc)
+
+
+# --- storico stagioni dal fornitore, media stagionale e Valore (1.3) --------------------------
+
+
+@router.post("/listone/storico", response_model=AdminSeasonHistoryImportResponse)
+def import_season_history(
+    body: AdminSeasonHistoryImportRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminSeasonHistoryService = Depends(get_admin_season_history_service),
+) -> AdminSeasonHistoryImportResponse:
+    """«Importa lo storico» delle due stagioni passate dal fornitore (una volta, riprendibile).
+
+    ``dryRun`` (default) dà solo il conto delle chiamate, senza chiamare il fornitore; con
+    ``dryRun: false`` avvia il job (o restituisce quello già in corso). ``seasonYear`` è la
+    stagione in corso del listone: con 2026 si importano la 2025/26 e la 2024/25.
+    """
+    return service.start_import(
+        season_year=body.season_year,
+        dry_run=body.dry_run,
+        max_calls=body.max_calls,
+        actor=operator,
+    )
+
+
+@router.get("/listone/storico", response_model=AdminSeasonHistoryProgressResponse | None)
+def get_active_season_history_import(
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminSeasonHistoryService = Depends(get_admin_season_history_service),
+) -> AdminSeasonHistoryProgressResponse | None:
+    """L'import in corso, visibile a ogni operatore (non solo a chi l'ha avviato)."""
+    return service.get_active_progress()
+
+
+@router.get(
+    "/listone/storico/{job_id}",
+    response_model=AdminSeasonHistoryProgressResponse,
+)
+def get_season_history_import_progress(
+    job_id: str,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminSeasonHistoryService = Depends(get_admin_season_history_service),
+) -> AdminSeasonHistoryProgressResponse | JSONResponse:
+    try:
+        return service.get_progress(job_id=job_id)
+    except ValidationAuthError as exc:
+        return _listone_error_response(exc)
+
+
+@router.post("/listone/valori/ricalcola", response_model=AdminMarketValuesRefreshResponse)
+def refresh_market_values(
+    body: AdminMarketValuesRefreshRequest,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminSeasonHistoryService = Depends(get_admin_season_history_service),
+) -> AdminMarketValuesRefreshResponse:
+    """Ricalcola subito storico della stagione in corso, medie stagionali e Valore del listone
+    (di norma lo fa il job «Medie e Valore di mercato» dopo ogni giornata)."""
+    return service.refresh_market_values(season_year=body.season_year, force=body.force)

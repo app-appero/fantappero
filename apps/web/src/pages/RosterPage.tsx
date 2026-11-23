@@ -43,6 +43,7 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketGate } from "../market/MarketGateContext";
+import { manualPriceMinimum } from "../market/athleteValue";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
@@ -1186,8 +1187,10 @@ export function RosterPage() {
       return;
     }
     const credits = creditsInput;
-    if (!Number.isFinite(credits) || credits < 1) {
-      setAdminError("Inserisci crediti acquisto validi (minimo 1).");
+    // Regole di oggi (backend): il partecipante paga almeno 1 credito, l'admin può anche 0.
+    const minimumCredits = manualPriceMinimum(isAdmin);
+    if (!Number.isFinite(credits) || credits < minimumCredits) {
+      setAdminError(`Inserisci crediti acquisto validi (minimo ${minimumCredits}).`);
       return;
     }
 
@@ -1676,6 +1679,7 @@ export function RosterPage() {
                 ownership={ownership}
                 canReleaseAthlete={canReleaseAthlete}
                 adminBusy={adminBusy || rosterLocked}
+                remainingCredits={credits?.balance ?? null}
                 onReleaseAthlete={onReleaseAthlete}
                 onAssignAthlete={onAssignAthlete}
               />

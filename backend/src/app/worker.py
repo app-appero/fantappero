@@ -71,6 +71,8 @@ _beat_schedule.update(
         fixtures_interval_seconds=_worker_settings.sports_data_fixtures_sync_interval_seconds,
         predicted_lineups_enabled=_worker_settings.predicted_lineups_enabled,
         predicted_lineups_interval_seconds=_worker_settings.predicted_lineups_interval_seconds,
+        market_values_enabled=_worker_settings.market_values_refresh_enabled,
+        market_values_interval_seconds=_worker_settings.market_values_refresh_interval_seconds,
     )
 )
 
@@ -100,11 +102,13 @@ def fail() -> None:
 
 # Register task modules for the worker process (import side effects).
 import admin.listone_tasks  # noqa: E402, F401
+import admin.season_history_tasks  # noqa: E402, F401
 import fantasy_lineups.tasks  # noqa: E402, F401
 import fantasy_ratings.tasks  # noqa: E402, F401
 import fantasy_turns.tasks  # noqa: E402, F401
 import leagues.listone_tasks  # noqa: E402, F401
 import mail.tasks  # noqa: E402, F401
+import market.valuation_tasks  # noqa: E402, F401
 import notifications.tasks  # noqa: E402, F401
 import sports_data.catalog.tasks  # noqa: E402, F401
 import sports_data.fixtures.tasks  # noqa: E402, F401

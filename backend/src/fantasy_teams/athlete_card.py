@@ -20,6 +20,7 @@ from fantasy_teams.schemas import (
     AthleteCardTransferResponse,
 )
 from fantasy_turns.readiness import FINISHED_FIXTURE_STATUSES, LIVE_FIXTURE_STATUSES
+from market.valuation_service import build_career, load_market_info
 from sports_data.catalog.models import Club
 from sports_data.fixtures.models import Fixture, PlayerMatchStat
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
@@ -112,6 +113,17 @@ def get_athlete_card(
         current.sport_season_id if current is not None else None,
         league_access.league.id,
     )
+    market = load_market_info(
+        session,
+        league_id=league_access.league.id,
+        athlete_ids=[athlete.id],
+        league=league_access.league,
+    ).get(athlete.id)
+    career = build_career(
+        session,
+        athlete_provider_id=athlete.provider_id,
+        current_season_year=season_year,
+    )
 
     return AthleteCardResponse(
         athleteId=str(athlete.id),
@@ -153,6 +165,9 @@ def get_athlete_card(
         ],
         seasonStats=season_stats,
         live=live,
+        marketValue=market.market_value if market is not None else None,
+        seasonAverage=market.season_average if market is not None else None,
+        career=career,
         transfers=[
             AthleteCardTransferResponse(
                 transferDate=row.transfer_date.isoformat(),

@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ListoneProviderRolesPreview } from "../admin/ListoneProviderRolesPreview";
 import { useListoneRefresh } from "../admin/ListoneRefreshContext";
 import { ListoneRoleRestoreSection } from "../admin/ListoneRoleRestoreSection";
+import { SeasonHistoryPanel } from "../admin/SeasonHistoryPanel";
 import { fetchAdminListone } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
@@ -474,6 +475,8 @@ export function AdminListonePage() {
           </p>
         ) : null}
       </Modal>
+      {/* 1.3: storico delle stagioni passate dal fornitore, medie e Valore di mercato. */}
+      <SeasonHistoryPanel defaultSeasonYear={CURRENT_YEAR} />
       <ListoneRoleRestoreSection
         seasonYear={Number.isInteger(Number(seasonYear)) ? Number(seasonYear) : null}
         onRestored={() => void load()}

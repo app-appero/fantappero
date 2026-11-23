@@ -56,6 +56,21 @@ class SportsDataSyncSettingsMixin:
         le=604_800,
         description="How often probable lineups are refreshed (default daily).",
     )
+    market_values_refresh_enabled: bool = Field(
+        default=True,
+        validation_alias="MARKET_VALUES_REFRESH_ENABLED",
+        description=(
+            "When true, Celery beat recomputes current-season history, seasonal averages and "
+            "market values of the listone (skips when votes and history did not change)."
+        ),
+    )
+    market_values_refresh_interval_seconds: int = Field(
+        default=3600,
+        validation_alias="MARKET_VALUES_REFRESH_INTERVAL_SECONDS",
+        ge=600,
+        le=86_400,
+        description="How often the market values refresh is enqueued (default hourly).",
+    )
     rapidapi_key: SecretStr | None = Field(
         default=None,
         validation_alias="RAPIDAPI_KEY",
@@ -173,6 +188,7 @@ class SportsDataSyncSettingsMixin:
         "sports_data_catalog_sync_enabled",
         "sports_data_fixtures_sync_enabled",
         "predicted_lineups_enabled",
+        "market_values_refresh_enabled",
         mode="before",
     )
     @classmethod

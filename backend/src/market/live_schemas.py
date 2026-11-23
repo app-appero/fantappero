@@ -6,6 +6,7 @@ from pydantic import Field
 
 from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
+from market.valuation_schemas import AthleteSeasonAverageResponse
 
 # Le colonne dei crediti sono interi a 32 bit: oltre questo valore la richiesta è respinta (422).
 MAX_CREDITS_VALUE = 2**31 - 1
@@ -95,6 +96,11 @@ class LiveLotResponse(ApiModel):
     current_amount_credits: int = Field(alias="currentAmountCredits")
     minimum_next_amount_credits: int = Field(alias="minimumNextAmountCredits")
     closed_at: str | None = Field(default=None, alias="closedAt")
+    #: Valore di mercato in crediti di questa lega (budget della lega, almeno 1); ``None`` se il
+    #: calciatore non è nel listone della stagione. Nell'asta live è solo mostrato (1.3).
+    market_value: int | None = Field(default=None, alias="marketValue")
+    #: Media stagionale (in corso se ha almeno un voto, altrimenti la scorsa, es. «25/26»).
+    season_average: AthleteSeasonAverageResponse | None = Field(default=None, alias="seasonAverage")
 
 
 class LiveRaiseResponse(ApiModel):

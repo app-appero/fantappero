@@ -67,6 +67,7 @@ from market.validators import (
     validate_slot_has_athlete,
     validate_team_eligible_for_session,
 )
+from market.valuation_service import AthleteMarketInfo, load_market_info
 from market.windows import effective_status, is_open_for_bids
 from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_teams
@@ -908,7 +909,12 @@ class MarketService:
         release_athlete = (
             self._session.get(Athlete, release_athlete_id) if release_athlete_id else None
         )
-        return self._to_bid_response(bid, athlete=athlete, release_athlete=release_athlete)
+        market = load_market_info(
+            self._session, league_id=league_access.league.id, athlete_ids=[athlete.id]
+        )
+        return self._to_bid_response(
+            bid, athlete=athlete, release_athlete=release_athlete, market=market.get(athlete.id)
+        )
 
     def withdraw_bid(
         self,
@@ -974,11 +980,21 @@ class MarketService:
             )
             .order_by(MarketBid.submitted_at.desc())
         ).all()
+        market = load_market_info(
+            self._session,
+            league_id=league_access.league.id,
+            athlete_ids=[row.athlete_id for row in rows],
+        )
         return MarketBidListResponse(
             sessionId=str(market_session.id),
             fantasyTeamId=str(team.id),
             bids=[
-                self._to_bid_response(row, athlete=row.athlete, release_athlete=row.release_athlete)
+                self._to_bid_response(
+                    row,
+                    athlete=row.athlete,
+                    release_athlete=row.release_athlete,
+                    market=market.get(row.athlete_id),
+                )
                 for row in rows
             ],
         )
@@ -1263,6 +1279,7 @@ class MarketService:
         *,
         athlete: Athlete,
         release_athlete: Athlete | None = None,
+        market: AthleteMarketInfo | None = None,
     ) -> MarketBidResponse:
         return MarketBidResponse(
             id=str(bid.id),
@@ -1276,4 +1293,6 @@ class MarketService:
             submittedAt=bid.submitted_at.isoformat(),
             releaseAthleteId=str(bid.release_athlete_id) if bid.release_athlete_id else None,
             releaseAthleteName=release_athlete.canonical_name if release_athlete else None,
+            marketValue=market.market_value if market is not None else None,
+            seasonAverage=market.season_average if market is not None else None,
         )

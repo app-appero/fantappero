@@ -42,6 +42,10 @@ vi.mock("./api/admin", () => ({
   fetchActiveAdminListoneRefresh: (...args: unknown[]) =>
     fetchActiveAdminListoneRefreshMock(...args),
   restoreAdminListoneRoles: vi.fn(),
+  fetchActiveAdminSeasonHistory: vi.fn().mockResolvedValue(null),
+  fetchAdminSeasonHistoryProgress: vi.fn(),
+  importAdminSeasonHistory: vi.fn(),
+  refreshAdminMarketValues: vi.fn(),
   promoteOperator: vi.fn(),
   revokeOperator: vi.fn(),
   impersonateUser: vi.fn(),

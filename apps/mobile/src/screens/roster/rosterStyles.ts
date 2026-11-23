@@ -165,6 +165,20 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
   },
+  /** «Solo disponibili» e «Ordina per media» affiancate, a capo su schermi stretti. */
+  listoneToggles: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: spacing.md,
+  },
+  listoneToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: 44,
+  },
   freeBox: {
     width: 18,
     height: 18,
@@ -492,6 +506,14 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.md,
     fontSize: typography.fontSize.sm,
     color: colors.foreground,
+  },
+  /** «Valore 58: hai solo 40 crediti» sotto la riga del listone (1.3). */
+  valueCapNotice: {
+    marginTop: 2,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    fontSize: 12,
+    color: colors.warning,
   },
   heroCard: {
     gap: spacing.sm,

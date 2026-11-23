@@ -10,3 +10,21 @@ def test_every_notification_beat_job_is_in_the_catalog() -> None:
     )
     missing = [key for key in schedule if key not in SYSTEM_JOBS_BY_KEY]
     assert missing == []
+
+
+def test_every_sports_data_beat_job_is_in_the_catalog() -> None:
+    from sports_data.schedule import sports_data_beat_schedule
+
+    schedule = sports_data_beat_schedule(
+        catalog_enabled=True,
+        fixtures_enabled=True,
+        predicted_lineups_enabled=True,
+        market_values_enabled=True,
+    )
+    missing = [key for key in schedule if key not in SYSTEM_JOBS_BY_KEY]
+    assert missing == []
+    # Medie e Valore di mercato (1.3): stesso task nel beat e nel catalogo del pannello.
+    assert (
+        SYSTEM_JOBS_BY_KEY["market-values-refresh"].task
+        == schedule["market-values-refresh"]["task"]
+    )

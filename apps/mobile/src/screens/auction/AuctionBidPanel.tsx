@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
-import type { LeagueListoneEntry } from "@fantappero/contracts";
+import type { AthleteMarketFields, LeagueListoneEntry } from "@fantappero/contracts";
 import { formatRomeDateTime } from "../../utils/romeTime";
+import { AthleteMarketTags } from "../../market/AthleteMarketTags";
 import { AthleteChooser } from "../../components/AthleteChooser";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
@@ -35,6 +36,8 @@ export function AuctionBidPanel({
   marketOpen = true,
   closedMessage = null,
   closedTitle = "Mercato chiuso",
+  selectedAthlete = null,
+  prefillHint = null,
 }: {
   flow: MarketSessionFlow;
   balance: number | null;
@@ -57,6 +60,13 @@ export function AuctionBidPanel({
   closedMessage?: string | null;
   /** Titolo del mercato fermo: «Mercato fermo: turno in corso» a turno in corso (21/11). */
   closedTitle?: string;
+  /** Calciatore scelto: Valore e media accanto all'offerta (1.3). */
+  selectedAthlete?: (AthleteMarketFields & { canonicalName: string }) | null;
+  /**
+   * Perché l'offerta parte da quel prezzo: «Proposta in base al Valore…» o
+   * «Valore 58: hai solo 40 crediti» (Rosario, 21/11).
+   */
+  prefillHint?: string | null;
 }) {
   const sessionOpen = marketOpen && flow.currentSession?.status === "open";
 
@@ -106,6 +116,14 @@ export function AuctionBidPanel({
           )}
           {extraField}
           <Text style={styles.fieldLabel}>Offerta (crediti)</Text>
+          {selectedAthlete ? (
+            <View testID={`${testIdPrefix}-bid-selected`}>
+              <Text style={styles.meta} numberOfLines={1}>
+                {selectedAthlete.canonicalName}
+              </Text>
+              <AthleteMarketTags fields={selectedAthlete} testID={`${testIdPrefix}-bid-selected-tags`} />
+            </View>
+          ) : null}
           <TextInput
             style={styles.input}
             value={bidAmount}
@@ -114,6 +132,11 @@ export function AuctionBidPanel({
             placeholder="Es. 45"
             testID={`${testIdPrefix}-bid-amount`}
           />
+          {prefillHint ? (
+            <Text style={[styles.meta, { color: colors.warning }]} testID={`${testIdPrefix}-bid-prefill-hint`}>
+              {prefillHint}
+            </Text>
+          ) : null}
           <Text style={styles.meta}>{statusMessage}</Text>
           {flow.bidError ? (
             <Text style={styles.error} testID={`${testIdPrefix}-bid-error`}>
@@ -146,9 +169,13 @@ export function AuctionBidPanel({
         <View testID={`${testIdPrefix}-my-bids-table`}>
           {flow.myBids.map((bid) => (
             <View key={bid.id} style={styles.tableRow}>
-              <AthleteName athleteId={bid.athleteId} style={styles.tableCell} numberOfLines={2}>
-                {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
-              </AthleteName>
+              {/* Più largo dei crediti: ci stanno anche Valore e media (1.3). */}
+              <View style={{ flex: 2, minWidth: 0 }}>
+                <AthleteName athleteId={bid.athleteId} style={styles.tableCell} numberOfLines={2}>
+                  {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
+                </AthleteName>
+                <AthleteMarketTags fields={bid} testID={`${testIdPrefix}-my-bid-tags-${bid.athleteId}`} />
+              </View>
               <Text style={styles.tableCell}>{bid.amountCredits} crediti</Text>
               <StatusBadge
                 label={BID_STATUS_LABEL[bid.status]}

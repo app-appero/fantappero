@@ -47,7 +47,9 @@ import {
   LIVE_SESSION_STATUS_LABEL,
   NOMINATION_MODE_SHORT_LABEL,
 } from "../market/liveAuctionLabels";
+import { AthleteMarketTags } from "../market/AthleteMarketTags";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
+import { liveRaiseOptions } from "../market/pricePrefill";
 import { useLiveAuctionPolling } from "../market/useLiveAuctionPolling";
 import { useMarketGate } from "../market/useMarketGate";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -545,6 +547,8 @@ export function AuctionLiveScreen() {
               <AthleteName athleteId={currentLot.athleteId} style={styles.sectionTitle} numberOfLines={2}>
                 {currentLot.athleteName}
               </AthleteName>
+              {/* Valore e media solo mostrati: i rilanci partono dal prezzo del lotto (21/11). */}
+              <AthleteMarketTags fields={currentLot} testID="auction-live-current-lot-tags" />
               <Text style={styles.meta}>
                 Prezzo attuale: {currentLot.currentAmountCredits} crediti
                 {currentLot.currentLeaderTeamName ? ` · in testa: ${currentLot.currentLeaderTeamName}` : " · nessun rilancio"}
@@ -556,8 +560,7 @@ export function AuctionLiveScreen() {
               </View>
               {minimumNextBid !== null ? (
                 <View style={styles.quickRow} testID="auction-live-quick-raises">
-                  {[1, 5, 10].map((step) => {
-                    const amount = Math.max(minimumNextBid, currentLot.currentAmountCredits + step);
+                  {liveRaiseOptions(currentLot, minimumNextBid).quick.map(({ step, amount }) => {
                     return (
                       <Pressable
                         key={step}
@@ -623,6 +626,7 @@ export function AuctionLiveScreen() {
                     : {LIVE_LOT_STATUS_LABEL[lot.status]}
                     {lot.status === "sold" ? ` (${lot.currentLeaderTeamName} · ${lot.currentAmountCredits} crediti)` : ""}
                   </Text>
+                  <AthleteMarketTags fields={lot} style={{ flexBasis: "100%" }} testID={`auction-live-history-tags-${lot.id}`} />
                 </View>
               ))}
             </View>

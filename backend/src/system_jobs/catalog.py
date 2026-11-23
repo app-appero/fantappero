@@ -226,6 +226,21 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         min_interval_seconds=3600,
         max_interval_seconds=604_800,
     ),
+    SystemJobSpec(
+        key="market-values-refresh",
+        task="market.refresh_market_values",
+        title="Medie e Valore di mercato",
+        description=(
+            "Dopo ogni giornata ricalcola le statistiche della stagione in corso, la media "
+            "stagionale e il Valore di tutto il listone. Non chiama il fornitore e non fa "
+            "nulla se voti e storico non sono cambiati."
+        ),
+        enabled_attr="market_values_refresh_enabled",
+        interval_attr="market_values_refresh_interval_seconds",
+        default_interval_seconds=3600,
+        min_interval_seconds=600,
+        max_interval_seconds=86_400,
+    ),
 )
 
 SYSTEM_JOBS_BY_KEY: dict[str, SystemJobSpec] = {spec.key: spec for spec in SYSTEM_JOBS}

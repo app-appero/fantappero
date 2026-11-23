@@ -12,7 +12,9 @@ import {
 } from "../api/market";
 import { useScreenData } from "../hooks/useScreenData";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
+import { OFFER_MINIMUM_CREDITS, offerPrefillHint, pricePrefill, suggestedDraft } from "../market/pricePrefill";
 import { useMarketGate } from "../market/useMarketGate";
+import { useSuggestedDraft } from "../market/useSuggestedDraft";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AuctionAdminPanel } from "./auction/AuctionAdminPanel";
@@ -110,7 +112,16 @@ export function AuctionScreen() {
   }
 
   const [bidAthleteId, setBidAthleteId] = useState("");
-  const [bidAmount, setBidAmount] = useState("");
+  const selectedEntry = useMemo(
+    () => (bidAthleteId ? (entries.find((entry) => entry.athleteId === bidAthleteId) ?? null) : null),
+    [bidAthleteId, entries],
+  );
+  // L'offerta parte dal Valore (o dai crediti rimasti, se il Valore li supera); senza Valore
+  // il campo resta vuoto come oggi (Rosario, 21/11).
+  const prefill = selectedEntry
+    ? pricePrefill({ marketValue: selectedEntry.marketValue, remainingCredits: balance, minimum: OFFER_MINIMUM_CREDITS })
+    : null;
+  const [bidAmount, setBidAmount] = useSuggestedDraft(suggestedDraft(prefill, ""));
 
   function handleSubmitBid() {
     const amount = Number(bidAmount);
@@ -172,6 +183,8 @@ export function AuctionScreen() {
         marketOpen={marketOpen}
         closedMessage={blockedNotice}
         closedTitle={closedTitle}
+        selectedAthlete={selectedEntry}
+        prefillHint={offerPrefillHint(prefill)}
       />
 
       {/* Il listone si vede solo quando l'asta a buste chiuse è stata aperta dall'operatore. */}

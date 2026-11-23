@@ -8,6 +8,7 @@ import {
   playerAvatarUrl,
   roleQuotaBlockReason,
   rosterRoleQuota,
+  sortBySeasonAverageDesc,
 } from "@fantappero/contracts";
 import type {
   FantasyRole,
@@ -36,6 +37,19 @@ import {
 import { SwipeHint, SwipeRow } from "./SwipeRow";
 import { listoneSwipeDecision, roleTabLabel } from "./listoneSwipe";
 import { rosterStyles as styles } from "./rosterStyles";
+import { AthleteMarketTags } from "../../market/AthleteMarketTags";
+import {
+  DEFAULT_LISTONE_VIEW_TOGGLES,
+  SORT_BY_AVERAGE_LABEL,
+  orderListoneRows,
+  resetListoneViewToggles,
+  type ListoneViewToggles,
+} from "../../market/athleteValue";
+import { manualAddMinimum, priceCaption, pricePrefill, suggestedDraft } from "../../market/pricePrefill";
+import { useSuggestedDraft } from "../../market/useSuggestedDraft";
+
+/** Prezzo dell'aggiunta manuale senza Valore: come oggi, 1 credito. */
+const DEFAULT_MANUAL_PRICE = "1";
 
 type AssignAthleteHandler = (
   athleteId: string,
@@ -52,6 +66,8 @@ function ListoneAssignRow({
   onReleaseAthlete,
   onAssignAthlete,
   nudge = false,
+  remainingCredits,
+  minimumPrice,
 }: {
   entry: LeagueListoneEntry;
   owner: AthleteOwnership | undefined;
@@ -64,10 +80,16 @@ function ListoneAssignRow({
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   /** Se restituisce un testo (assegnazione rifiutata), la riga lo mostra sotto di sé. */
   onAssignAthlete: AssignAthleteHandler;
+  /** Crediti rimasti della squadra a cui si assegna (`null` se non ancora noti). */
+  remainingCredits: number | null;
+  /** Partecipante 1, amministratore 0. */
+  minimumPrice: number;
 }) {
-  const [draft, setDraft] = useState("1");
+  // Il prezzo parte dal Valore (o dai crediti rimasti se il Valore li supera); senza Valore da 1.
+  const prefill = pricePrefill({ marketValue: entry.marketValue, remainingCredits, minimum: minimumPrice });
+  const [draft, setDraft] = useSuggestedDraft(suggestedDraft(prefill, DEFAULT_MANUAL_PRICE));
   const parsed = Number.parseInt(draft, 10);
-  const isValid = Number.isFinite(parsed) && parsed >= 1;
+  const isValid = Number.isFinite(parsed) && parsed >= minimumPrice;
   const roleColors = roleBadgeColors(entry.effectiveRole);
   // Motivo di un'assegnazione bloccata o rifiutata, mostrato qui sotto e non solo in cima alla scheda.
   const [rowNotice, setRowNotice] = useState<string | null>(null);
@@ -125,17 +147,24 @@ function ListoneAssignRow({
           <Text style={styles.playerClub} numberOfLines={1}>
             {entry.clubName ?? "—"}
           </Text>
-          <View
-            style={[
-              styles.statusChip,
-              { alignSelf: "flex-start", marginTop: 4, backgroundColor: owner ? "rgba(255,255,255,0.1)" : "rgba(52,211,153,0.2)" },
-            ]}
-            accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
-          >
-            <Text style={[styles.statusChipLabel, { color: owner ? "#B9C3E6" : "#6EE7B7" }]} numberOfLines={1}>
-              {owner ? `In rosa · ${owner.teamName}` : "Libero"}
-            </Text>
-          </View>
+          <AthleteMarketTags
+            fields={entry}
+            style={{ marginTop: 4 }}
+            testID={`roster-admin-listone-tags-${entry.athleteId}`}
+            leading={
+              <View
+                style={[
+                  styles.statusChip,
+                  { maxWidth: "100%", backgroundColor: owner ? "rgba(255,255,255,0.1)" : "rgba(52,211,153,0.2)" },
+                ]}
+                accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
+              >
+                <Text style={[styles.statusChipLabel, { color: owner ? "#B9C3E6" : "#6EE7B7" }]} numberOfLines={1}>
+                  {owner ? `In rosa · ${owner.teamName}` : "Libero"}
+                </Text>
+              </View>
+            }
+          />
         </View>
         {!owner ? (
           <View style={{ alignItems: "center", gap: 2 }}>
@@ -148,11 +177,18 @@ function ListoneAssignRow({
               accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
               testID={`roster-admin-listone-price-${entry.athleteId}`}
             />
-            <Text style={styles.playerPriceLabel}>crediti</Text>
+            <Text style={styles.playerPriceLabel} testID={`roster-admin-listone-price-caption-${entry.athleteId}`}>
+              {priceCaption(draft, prefill)}
+            </Text>
           </View>
         ) : null}
       </View>
     </SwipeRow>
+    {canAssign && prefill?.note ? (
+      <Text style={styles.valueCapNotice} testID={`roster-admin-value-cap-${entry.athleteId}`}>
+        {prefill.note}
+      </Text>
+    ) : null}
     {rowNotice ? (
       <Text
         style={styles.quotaRowNotice}
@@ -178,11 +214,14 @@ function ListoneTable({
   listoneQuery,
   onlyFree,
   placeKey,
+  sortByAverage,
+  remainingCredits,
+  minimumPrice,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
   tabValue: RoleTab;
-  rows: LeagueListoneEntry[];
+  rows: readonly LeagueListoneEntry[];
   ownership: Map<string, AthleteOwnership>;
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   emptySlotsCount: number;
@@ -192,6 +231,10 @@ function ListoneTable({
   onlyFree: boolean;
   /** Campionato e squadra scelti: cambiandoli si torna a pagina 1, come con testo e ruolo. */
   placeKey: string;
+  /** «Ordina per media»: cambiando l'ordine si torna a pagina 1. */
+  sortByAverage: boolean;
+  remainingCredits: number | null;
+  minimumPrice: number;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   /** Se restituisce un testo (assegnazione rifiutata), la riga lo mostra sotto di sé. */
   onAssignAthlete: AssignAthleteHandler;
@@ -200,7 +243,7 @@ function ListoneTable({
   const availabilityKey = listoneQuery.trim() ? "search" : onlyFree ? "free" : "all";
   useEffect(() => {
     setPage(0);
-  }, [listoneQuery, tabValue, availabilityKey, placeKey]);
+  }, [listoneQuery, tabValue, availabilityKey, placeKey, sortByAverage]);
   const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedRows = rows.slice(
@@ -227,6 +270,8 @@ function ListoneTable({
             nudge={index === 0 && safePage === 0}
             onReleaseAthlete={onReleaseAthlete}
             onAssignAthlete={onAssignAthlete}
+            remainingCredits={remainingCredits}
+            minimumPrice={minimumPrice}
           />
         );
       })}
@@ -273,12 +318,18 @@ export function RosterAdminManualCard({
   onSelectTargetTeam,
   adminMessage,
   adminError,
+  remainingCredits = null,
 }: {
   isAdmin: boolean;
   leagueTeams: FantasyTeamSummary[];
   targetTeam: FantasyTeam | null;
   /** Squadra di chi guarda: se l'admin assegna a un'altra, gli avvisi di quota la nominano. */
   ownTeamId?: string | null;
+  /**
+   * Crediti rimasti della squadra a cui si assegna: il prezzo che parte dal Valore non li
+   * supera (Rosario, 21/11). `null` se non ancora noti.
+   */
+  remainingCredits?: number | null;
   emptySlotsCount: number;
   listone: LeagueListoneEntry[];
   listoneQuery: string;
@@ -294,7 +345,10 @@ export function RosterAdminManualCard({
   adminError: string | null;
 }) {
   const [roleTab, setRoleTab] = useState<RoleTab>("all");
-  const [onlyFree, setOnlyFree] = useState(false);
+  // «Solo disponibili» e «Ordina per media» (1.3, accanto).
+  const [toggles, setToggles] = useState<ListoneViewToggles>(DEFAULT_LISTONE_VIEW_TOGGLES);
+  const { onlyFree, sortByAverage } = toggles;
+  const minimumPrice = manualAddMinimum(isAdmin);
   const [chosenPlace, setChosenPlace] = useState<ListonePlaceFilters>(NO_LISTONE_PLACE_FILTERS);
   // Un listone ricaricato può non avere più il campionato o la squadra scelti: si torna a «tutti».
   const place = useMemo(() => normalizeListonePlaceFilters(listone, chosenPlace), [listone, chosenPlace]);
@@ -302,7 +356,7 @@ export function RosterAdminManualCard({
   const placeActive = hasListonePlaceFilters(place);
   const ownedAthleteIds = new Set(ownership.keys());
   // Stessa logica del sito (`@fantappero/contracts`), con la ricerca senza accenti dell'app.
-  const rows = filterListoneEntries(
+  const filteredRows = filterListoneEntries(
     listone,
     {
       role: roleTab,
@@ -313,6 +367,8 @@ export function RosterAdminManualCard({
     },
     { fold: foldSearchText, ownedAthleteIds },
   );
+  // «Ordina per media»: dalla media più alta, chi non l'ha in fondo (contracts, come il sito).
+  const rows = orderListoneRows(filteredRows, sortByAverage, sortBySeasonAverageDesc);
   // Quota per ruolo della squadra a cui si assegna: stessa regola del server (contracts).
   const quota = useMemo(() => rosterRoleQuota(targetTeam), [targetTeam]);
   const quotaContext = {
@@ -411,23 +467,45 @@ export function RosterAdminManualCard({
                 listone={listone}
                 place={place}
                 onChange={setChosenPlace}
-                onResetAll={() => setRoleTab("all")}
+                onResetAll={() => {
+                  // «Azzera filtri»: ruolo su «Tutti» e «Ordina per media» spenta;
+                  // «Solo disponibili» resta com'è (Rosario, 22/11).
+                  setRoleTab("all");
+                  setToggles(resetListoneViewToggles);
+                }}
               />
-              <Pressable
-                style={styles.freeToggle}
-                onPress={() => setOnlyFree((current) => !current)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: onlyFree }}
-                testID="roster-listone-only-free"
-              >
-                <View style={[styles.freeBox, onlyFree && styles.freeBoxOn]}>
-                  {onlyFree ? <Text style={styles.freeMark}>✓</Text> : null}
+              <View style={styles.freeToggle}>
+                <View style={styles.listoneToggles}>
+                  {/* Le due caselle affiancate; il conto va a capo a destra se non c'è posto. */}
+                  <Pressable
+                    style={styles.listoneToggle}
+                    onPress={() => setToggles((current) => ({ ...current, onlyFree: !current.onlyFree }))}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: onlyFree }}
+                    testID="roster-listone-only-free"
+                  >
+                    <View style={[styles.freeBox, onlyFree && styles.freeBoxOn]}>
+                      {onlyFree ? <Text style={styles.freeMark}>✓</Text> : null}
+                    </View>
+                    <Text style={styles.freeLabel}>Solo disponibili</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.listoneToggle}
+                    onPress={() => setToggles((current) => ({ ...current, sortByAverage: !current.sortByAverage }))}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: sortByAverage }}
+                    testID="roster-listone-sort-average"
+                  >
+                    <View style={[styles.freeBox, sortByAverage && styles.freeBoxOn]}>
+                      {sortByAverage ? <Text style={styles.freeMark}>✓</Text> : null}
+                    </View>
+                    <Text style={styles.freeLabel}>{SORT_BY_AVERAGE_LABEL}</Text>
+                  </Pressable>
+                  <Text style={[styles.meta, { marginLeft: "auto" }]} testID="roster-listone-count">
+                    {listonePlayerCountLabel(rows.length)}
+                  </Text>
                 </View>
-                <Text style={styles.freeLabel}>Solo disponibili</Text>
-                <Text style={[styles.meta, { marginLeft: "auto" }]} testID="roster-listone-count">
-                  {listonePlayerCountLabel(rows.length)}
-                </Text>
-              </Pressable>
+              </View>
               <HScroll accessibilityRole="tablist">
                 {ROLE_TABS.map((tab) => {
                   const selected = tab.value === roleTab;
@@ -492,6 +570,9 @@ export function RosterAdminManualCard({
                     listoneQuery={listoneQuery}
                     onlyFree={onlyFree}
                     placeKey={placeKey}
+                    sortByAverage={sortByAverage}
+                    remainingCredits={remainingCredits}
+                    minimumPrice={minimumPrice}
                     onReleaseAthlete={onReleaseAthlete}
                     onAssignAthlete={onAssignAthlete}
                   />

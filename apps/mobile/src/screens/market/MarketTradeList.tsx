@@ -13,6 +13,7 @@ import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { AthleteMarketTags } from "../../market/AthleteMarketTags";
 import { TRADE_STATUS_COLOR, TRADE_STATUS_LABEL } from "../../market/marketLabels";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
@@ -48,9 +49,13 @@ function TradeSide({
       {athletes.length === 0 ? <Text style={styles.meta}>—</Text> : null}
       {athletes.map((athlete) => (
         <View key={athlete.id} style={styles.miniPlayer}>
-          <AthleteName athleteId={athlete.id} style={styles.optionLabel}>
-            {athlete.name}
-          </AthleteName>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AthleteName athleteId={athlete.id} style={styles.optionLabel}>
+              {athlete.name}
+            </AthleteName>
+            {/* Valore e media stagionale del calciatore (1.3). */}
+            <AthleteMarketTags fields={athlete} testID={`market-trade-athlete-tags-${athlete.id}`} />
+          </View>
         </View>
       ))}
       {credits > 0 ? (
