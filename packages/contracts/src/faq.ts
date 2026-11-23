@@ -47,7 +47,10 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
         id: "turno-saltato",
         question: "Perché un turno è «saltato»?",
         answer: [
-          "Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare, con giocatori che giocano davvero, almeno 9 titolari (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»). Succede per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.",
+          "Per uno di questi due motivi:",
+          "1) in quella finestra si giocano troppo poche partite dei campionati della lega: sotto il minimo della lega, 25 con la regola standard (la tua lega può averne scelto un altro, lo trovi in «Regolamento» alla voce «Partite minime per turno»). Nel turno vedi il numero, per esempio «20 partite eleggibili su 25»;",
+          "2) almeno una squadra della lega non avrebbe potuto schierare, con giocatori che giocano davvero, almeno 9 titolari (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»). Succede per esempio durante una sosta di uno dei campionati.",
+          "Per non svantaggiare nessuno, il turno non conta per nessuno.",
         ],
       },
       {
