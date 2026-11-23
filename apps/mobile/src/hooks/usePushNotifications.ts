@@ -4,7 +4,7 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
 import type * as NotificationsModule from "expo-notifications";
 import { useEffect, useRef } from "react";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import { registerPushDevice } from "../api/notifications";
 import { openAdminScreen } from "../navigation/adminEntry";
 import { planNotificationOpen } from "../navigation/notificationDestination";
@@ -149,7 +149,10 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
         session.setActiveLeagueId(plan.switchToLeagueId);
       }
       const { route } = plan;
-      if (route.kind === "matchup") {
+      if (route.kind === "external") {
+        // «È disponibile la versione X dell'app» (1.4): il tocco apre il download.
+        void Linking.openURL(route.url).catch(() => undefined);
+      } else if (route.kind === "matchup") {
         (navigation as unknown as { navigate: (name: string, params: object) => void }).navigate("MatchupDetail", { slotId: route.slotId });
       } else if (route.kind === "stack") {
         (navigation as unknown as { navigate: (name: string, params?: object) => void }).navigate(route.name, route.params);

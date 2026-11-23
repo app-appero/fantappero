@@ -37,3 +37,10 @@ test("giorni", () => {
   assert.equal(notificationDayLabel(new Date(2026, 9, 20, 9, 0).toISOString(), now), "Oggi");
   assert.equal(notificationDayLabel(new Date(2026, 9, 19, 23, 0).toISOString(), now), "Ieri");
 });
+
+test("release 1.4: la nuova versione dell'app sta sotto «Sistema»", () => {
+  assert.deepEqual(
+    notificationKind({ title: "È disponibile la versione 1.4 dell'app", category: "sistema" }),
+    { group: "sistema", glyph: "📲" },
+  );
+});

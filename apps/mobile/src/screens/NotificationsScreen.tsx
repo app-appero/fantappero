@@ -9,7 +9,7 @@ import {
   notificationFilterCountLabel,
   NOTIFICATIONS_PAGE_SIZE,
 } from "../navigation/notificationPages";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -146,7 +146,9 @@ export function NotificationsScreen() {
       setActiveLeagueId(plan.switchToLeagueId);
     }
     const { route } = plan;
-    if (route.kind === "matchup") {
+    if (route.kind === "external") {
+      void Linking.openURL(route.url).catch(() => undefined);
+    } else if (route.kind === "matchup") {
       navigation.navigate("MatchupDetail", { slotId: route.slotId });
     } else if (route.kind === "stack") {
       (navigation as unknown as { navigate: (name: string, params?: object) => void }).navigate(route.name, route.params);

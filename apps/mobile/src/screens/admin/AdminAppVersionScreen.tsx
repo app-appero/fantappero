@@ -1,8 +1,10 @@
 import {
   EMPTY_APP_VERSION_FORM,
   appVersionFormFrom,
+  appVersionSavedMessage,
   appVersionUpdateFrom,
   validateAppVersionForm,
+  type AdminAppUsage,
   type AppVersionFormErrors,
   type AppVersionFormFields,
   type AppVersionInfo,
@@ -11,7 +13,11 @@ import { theme } from "@fantappero/ui/theme";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type KeyboardTypeOptions } from "react-native";
 import { adminUiStyles } from "../../admin/adminUiStyles";
-import { fetchAppVersionConfig, saveAppVersionConfig } from "../../api/appVersion";
+import {
+  fetchAppVersionConfig,
+  fetchAppVersionUsers,
+  saveAppVersionConfig,
+} from "../../api/appVersion";
 import { ApiError } from "../../api/client";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -19,6 +25,7 @@ import { useScreenData } from "../../hooks/useScreenData";
 import { PageContainer } from "../../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 import { lazyStyles } from "../../theme/lazyStyles";
+import { AppUsageList } from "./AppUsageList";
 
 const { colors, spacing, typography } = theme;
 
@@ -41,6 +48,10 @@ const FIELDS: {
  * modulo del sito (versione, versionCode, link di download e messaggio), con la stessa
  * chiamata `PUT /admin/app-version`. Prima nell'app l'operatore non poteva annunciare una
  * versione.
+ *
+ * Decisione di Rosario del 23/11: salvare una versione nuova manda anche la notifica a chi non
+ * ce l'ha (il messaggio dice a quanti) e sotto il modulo c'è «Chi ha quale versione», come sul
+ * sito.
  */
 export function AdminAppVersionScreen() {
   const { accessToken } = useAuthSession();
@@ -52,6 +63,17 @@ export function AdminAppVersionScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<AdminAppUsage | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
+
+  const loadUsage = useCallback(async (token: string) => {
+    try {
+      setUsage(await fetchAppVersionUsers(token));
+      setUsageError(null);
+    } catch (cause) {
+      setUsageError(getApiErrorMessage(cause, "Impossibile leggere chi ha quale versione."));
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,9 +84,11 @@ export function AdminAppVersionScreen() {
       return;
     }
     try {
+      const usageLoad = loadUsage(accessToken);
       const info = await fetchAppVersionConfig(accessToken);
       setCurrent(info);
       setFields(appVersionFormFrom(info));
+      await usageLoad;
     } catch (cause) {
       setLoadError(
         cause instanceof ApiError && cause.status === 403
@@ -74,7 +98,7 @@ export function AdminAppVersionScreen() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, loadUsage]);
 
   const { refreshing, onRefresh } = useScreenData(load);
 
@@ -100,7 +124,8 @@ export function AdminAppVersionScreen() {
       const saved = await saveAppVersionConfig(accessToken, appVersionUpdateFrom(fields));
       setCurrent(saved);
       setFields(appVersionFormFrom(saved));
-      setMessage("Versione salvata: chi ha un'app più vecchia vedrà l'avviso.");
+      setMessage(appVersionSavedMessage(saved));
+      void loadUsage(accessToken);
     } catch (cause) {
       setSaveError(getApiErrorMessage(cause, "Salvataggio non riuscito."));
     } finally {
@@ -136,8 +161,9 @@ export function AdminAppVersionScreen() {
       {!loading && !loadError ? (
         <View style={styles.form} testID="admin-appversion">
           <Text style={adminUiStyles.meta}>
-            Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi ha un&apos;app più
-            vecchia vedrà l&apos;avviso.
+            Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi non ha ancora quella
+            versione riceve una notifica (nell&apos;elenco e push) e, a ogni ingresso nell&apos;app,
+            l&apos;avviso con «Scarica».
           </Text>
           <Text style={styles.current} testID="admin-appversion-current">
             {android
@@ -205,6 +231,15 @@ export function AdminAppVersionScreen() {
             </Text>
           ) : null}
         </View>
+      ) : null}
+      {!loading && !loadError && usage ? <AppUsageList usage={usage} /> : null}
+      {!loading && !loadError && usageError ? (
+        <UiStatePanel
+          state="error"
+          title="Elenco non disponibile"
+          message={usageError}
+          testID="admin-appversion-users-error"
+        />
       ) : null}
     </PageContainer>
   );

@@ -52,6 +52,8 @@ export function notificationKind(item: Pick<NotificationItem, "title" | "categor
   if (title.includes("formazione")) return { group: "formazione", glyph: "⏰" };
   if (title.includes("omologat")) return { group: "turni", glyph: "🏁" };
   if (title.includes("invito")) return { group: "sistema", glyph: "✉" };
+  // Nuova versione dell'app annunciata dall'operatore (release 1.4).
+  if (title.startsWith("è disponibile") && title.includes("dell'app")) return { group: "sistema", glyph: "📲" };
   if (item.category === "risultati") return { group: "turni", glyph: "🏁" };
   if (item.category === "mercato") return { group: "scambi", glyph: "⇄" };
   if (item.category === "formazione") return { group: "formazione", glyph: "⏰" };

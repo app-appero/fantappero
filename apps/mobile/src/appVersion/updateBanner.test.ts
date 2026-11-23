@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 // L'app usa il confronto da `@fantappero/contracts`; il file non ha import e si carica dal sorgente.
 import { isNewerAppVersion } from "../../../../packages/contracts/src/appVersion.ts";
 import {
-  APP_VERSION_REFRESH_MS,
-  parseDismissedVersionCode,
+  APP_VERSION_MIN_INTERVAL_MS,
+  isReturnToForeground,
   shouldRefreshAppVersion,
   updateBannerVersion,
   type UpdateBannerInput,
@@ -50,7 +50,7 @@ describe("avviso nuova versione dell'app (pilota-1.2, Rosario 21/11)", () => {
     assert.equal(decide({ platformOS: "ios" }), null);
   });
 
-  it("«Più tardi» nasconde quella versione, una più nuova lo fa tornare", () => {
+  it("«Più tardi» nasconde quella versione finché l'app resta aperta, una più nuova lo fa tornare", () => {
     assert.equal(decide({ dismissedVersionCode: 4 }), null);
     const newer = { ...LATEST, latestVersionName: "1.4.0", latestVersionCode: 5 };
     assert.deepEqual(decide({ dismissedVersionCode: 4, latest: newer }), newer);
@@ -58,21 +58,24 @@ describe("avviso nuova versione dell'app (pilota-1.2, Rosario 21/11)", () => {
     assert.deepEqual(decide({ dismissedVersionCode: 2 }), LATEST);
   });
 
-  it("la versione si richiede al più ogni 3 ore", () => {
+  it("release 1.4: la versione si chiede a ogni ingresso, al più una volta al minuto", () => {
     const now = 1_000_000_000;
+    assert.equal(APP_VERSION_MIN_INTERVAL_MS, 60_000);
     assert.equal(shouldRefreshAppVersion(null, now), true);
-    assert.equal(shouldRefreshAppVersion(now - 60_000, now), false);
-    assert.equal(shouldRefreshAppVersion(now - APP_VERSION_REFRESH_MS, now), true);
+    assert.equal(shouldRefreshAppVersion(now - 30_000, now), false);
+    assert.equal(shouldRefreshAppVersion(now - APP_VERSION_MIN_INTERVAL_MS, now), true);
+    // Niente più attesa di 3 ore: dopo 5 minuti si richiede.
+    assert.equal(shouldRefreshAppVersion(now - 5 * 60_000, now), true);
     // Orologio spostato indietro: si richiede di nuovo invece di aspettare.
     assert.equal(shouldRefreshAppVersion(now + 60_000, now), true);
   });
 
-  it("il «Più tardi» salvato si rilegge; un valore rovinato vale «mai»", () => {
-    assert.equal(parseDismissedVersionCode("4"), 4);
-    assert.equal(parseDismissedVersionCode(null), null);
-    assert.equal(parseDismissedVersionCode(""), null);
-    assert.equal(parseDismissedVersionCode("abc"), null);
-    assert.equal(parseDismissedVersionCode("0"), null);
-    assert.equal(parseDismissedVersionCode("-2"), null);
+  it("release 1.4: un ritorno in primo piano è un nuovo ingresso nell'app", () => {
+    assert.equal(isReturnToForeground("background", "active"), true);
+    assert.equal(isReturnToForeground("inactive", "active"), true);
+    // Già in primo piano, o mentre va in sfondo: niente.
+    assert.equal(isReturnToForeground("active", "active"), false);
+    assert.equal(isReturnToForeground("active", "background"), false);
+    assert.equal(isReturnToForeground(null, "active"), false);
   });
 });
