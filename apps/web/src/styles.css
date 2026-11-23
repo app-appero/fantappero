@@ -10026,6 +10026,115 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   font-size: var(--fa-text-sm);
 }
 
+/* Pannello operatore, Listone: «Dettaglio del Valore» (1.4). Tabella voce × stagione: a 390px
+   le tre stagioni stanno accanto (testo che va a capo); se non bastasse scorre la tabella, non
+   la pagina. */
+.fa-value-detail__results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-xs);
+  margin: 0 0 var(--fa-space-md);
+  padding: 0;
+  list-style: none;
+}
+
+.fa-value-detail__results .fa-btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+.fa-value-detail__pick {
+  min-width: 0;
+}
+
+.fa-value-detail__club,
+.fa-value-detail__hint,
+.fa-value-detail__note {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-value-detail__hint {
+  margin: 0 0 var(--fa-space-md);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-value-detail__result {
+  display: grid;
+  gap: var(--fa-space-md);
+  min-width: 0;
+}
+
+.fa-value-detail__table th,
+.fa-value-detail__table td {
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  vertical-align: top;
+}
+
+.fa-value-detail__table th[scope="row"] {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fa-text-sm);
+  white-space: nowrap;
+}
+
+.fa-value-detail__table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-value-detail__table thead small {
+  display: block;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.fa-value-detail__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.fa-value-detail__subtitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fa-value-detail__steps {
+  display: grid;
+  gap: var(--fa-space-xs);
+  margin: 0;
+  padding-left: 1.25rem;
+  line-height: 1.5;
+}
+
+.fa-value-detail__excluded {
+  display: block;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-value-detail__note {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .fa-value-detail__table th,
+  .fa-value-detail__table td {
+    padding: var(--fa-space-xs);
+    font-size: var(--fa-text-xs);
+  }
+
+  .fa-value-detail__table th[scope="row"] {
+    white-space: normal;
+  }
+}
+
 /* Riepilogo operatore 1.4 */
 /* ══ Riepilogo del pannello operatore (release 1.4, canvas «Pannello operatore» approvato da
    Rosario il 22/11) ═════════════════════════════════════════════════════════════════════════

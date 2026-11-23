@@ -17,6 +17,7 @@ import type {
   AdminListoneRefreshProgress,
   AdminListoneRoleRestoreRequest,
   AdminListoneRoleRestoreResult,
+  AdminMarketValueDetail,
   AdminMarketValuesRefreshRequest,
   AdminMarketValuesRefreshResult,
   AdminOverview,
@@ -236,6 +237,22 @@ export function refreshAdminMarketValues(
     method: "POST",
     body,
   });
+}
+
+/** «Dettaglio del Valore» (1.4): ogni passaggio del Valore di un calciatore, dall'ultimo ricalcolo. */
+export function fetchAdminMarketValueDetail(
+  accessToken: string,
+  athleteId: string,
+  options: { seasonYear: number; leagueId?: string | null },
+): Promise<AdminMarketValueDetail> {
+  const params = new URLSearchParams({ seasonYear: String(options.seasonYear) });
+  if (options.leagueId) {
+    params.set("leagueId", options.leagueId);
+  }
+  return apiRequest<AdminMarketValueDetail>(
+    `/admin/listone/valori/${encodeURIComponent(athleteId)}?${params}`,
+    { accessToken },
+  );
 }
 
 // --- Pannello operatore: turni, calendario, formazioni IA (EP-turni-automazione) ---
