@@ -6,7 +6,14 @@
  * Solo import di tipi: i test `node:test` dell'app caricano questo file dal sorgente.
  */
 
-import type { AdminListoneUpdate, AdminWatch, AdminWatchJobFailure } from "./admin.js";
+import type {
+  AdminAppUsageGroup,
+  AdminAppUsageSummary,
+  AdminAppUsageUser,
+  AdminListoneUpdate,
+  AdminWatch,
+  AdminWatchJobFailure,
+} from "./admin.js";
 
 /** Pallino della riga: verde (tutto a posto), ambra (da guardare), rosso (errore), grigio. */
 export type OperatorWatchTone = "ok" | "warn" | "bad" | "idle";
@@ -349,13 +356,70 @@ function appVersionItem(watch: AdminWatch): OperatorWatchItem {
       "admin-app-version",
     );
   }
+  const usage = watch.androidAppUsage;
   return item(
     "app-version",
     "ok",
     `App Android annunciata: ${android.latestVersionName}`,
-    ["Chi ha una versione più vecchia vede l'avviso"],
+    [usage ? appUsageSummaryLine(usage) : "Chi ha una versione più vecchia vede l'avviso"],
     "admin-app-version",
   );
+}
+
+// --- «Chi ha quale versione» della pagina «Versione app» (release 1.4, Rosario 23/11) --------
+
+/** «4 utenti aggiornati su 12 che usano l'app». */
+export function appUsageSummaryLine(usage: AdminAppUsageSummary): string {
+  const up = usage.upToDateUsers;
+  const all = usage.appUsers;
+  return `${up} ${plural(up, "utente aggiornato", "utenti aggiornati")} su ${all} che ${plural(all, "usa", "usano")} l'app`;
+}
+
+/** Nome del gruppo: «1.4.0 (5)», «Versione non nota (app 1.2 o 1.3)», «App mai usata / solo sito». */
+export function appUsageGroupLabel(group: AdminAppUsageGroup): string {
+  switch (group.kind) {
+    case "version": {
+      const name = group.versionName?.trim();
+      const base = name ? `${name} (${group.versionCode ?? "?"})` : `versionCode ${group.versionCode ?? "?"}`;
+      return group.platform && group.platform !== "android" ? `${base} · ${group.platform === "ios" ? "iOS" : group.platform}` : base;
+    }
+    case "unknown_recent":
+      return "Versione non nota (app 1.2 o 1.3)";
+    case "unknown":
+      return "Versione non nota (app 1.1 o precedente)";
+    default:
+      return "App mai usata / solo sito";
+  }
+}
+
+/** Titolo del gruppo con il conteggio: «1.4.0 (5): 7 utenti». */
+export function appUsageGroupTitle(group: AdminAppUsageGroup): string {
+  const count = group.users.length;
+  return `${appUsageGroupLabel(group)}: ${count} ${plural(count, "utente", "utenti")}`;
+}
+
+/** Riga di spiegazione sotto i gruppi che non hanno una versione esatta; vuota per le altre. */
+export function appUsageGroupHint(group: AdminAppUsageGroup): string {
+  switch (group.kind) {
+    case "unknown_recent":
+      return "Controllano gli aggiornamenti ma non dicono la versione: si vedrà dalla 1.4 in poi.";
+    case "unknown":
+      return "Usano l'app ma non controllano gli aggiornamenti.";
+    case "never":
+      return "Nessun accesso dall'app da quando il server registra le versioni.";
+    default:
+      return "";
+  }
+}
+
+/** «Bomber (Mario Rossi)»: il soprannome e, se diverso, il nome. */
+export function appUsageUserName(user: AdminAppUsageUser): string {
+  return user.name ? `${user.displayName} (${user.name})` : user.displayName;
+}
+
+/** «visto nell'app oggi alle 15:00»; vuoto per chi non è mai stato visto. */
+export function appUsageUserSeen(user: AdminAppUsageUser, now: Date = new Date()): string {
+  return user.lastSeenAt ? `visto nell'app ${formatRomeWhen(user.lastSeenAt, now)}` : "";
 }
 
 /** Le sei righe di «Da guardare», nell'ordine del canvas approvato. */

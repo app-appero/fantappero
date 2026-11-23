@@ -25,6 +25,33 @@ export interface AppVersionInfo {
   android: AndroidAppVersion | null;
 }
 
+/**
+ * Risposta di `PUT /admin/app-version` (release 1.4): la versione salvata e quante notifiche
+ * «È disponibile la versione X» sono partite con questo salvataggio.
+ */
+export interface AppVersionSaveResult extends AppVersionInfo {
+  /**
+   * Notifiche nuove (0 se si risalva lo stesso versionCode); `null` se l'invio non è riuscito
+   * (la versione resta salvata); assente dai server più vecchi.
+   */
+  notifiedUsers?: number | null;
+}
+
+/** Testo dopo «Salva» nel modulo «Versione app» (sito e app). */
+export function appVersionSavedMessage(result: AppVersionSaveResult): string {
+  const notified = result.notifiedUsers;
+  if (notified === undefined) {
+    return "Versione salvata: chi ha un'app più vecchia vedrà l'avviso.";
+  }
+  if (notified === null) {
+    return "Versione salvata, ma la notifica non è partita. Salva di nuovo più tardi per riprovare.";
+  }
+  if (notified === 0) {
+    return "Versione salvata. Nessuna notifica nuova: chi non ha questa versione era già stato avvisato.";
+  }
+  return `Versione salvata: notifica inviata a ${notified} ${notified === 1 ? "utente" : "utenti"} che non ${notified === 1 ? "ha" : "hanno"} ancora questa versione.`;
+}
+
 /** Corpo di `PUT /admin/app-version`. */
 export interface AndroidAppVersionUpdate {
   latestVersionName: string;

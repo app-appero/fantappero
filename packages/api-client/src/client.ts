@@ -17,6 +17,8 @@
  *    accepts.
  *  - the `*Message` hooks let each platform keep its own user-facing copy
  *    for network/parsing failures.
+ *  - `extraHeaders`: headers added to every request (the mobile app sends its
+ *    installed version, `X-App-Version` / `X-App-Version-Code`, release 1.4).
  */
 
 export class ApiError extends Error {
@@ -94,6 +96,11 @@ export type ApiClientConfig<TFile = unknown> = {
   notFoundMessage?: (status: number) => string;
   /** Fallback message when the error body carries neither `message` nor `detail`. */
   defaultErrorMessage?: (status: number) => string;
+  /**
+   * Headers added to every request (JSON and uploads). Must not throw; a failure is ignored and
+   * the request goes out without them. They never replace `Authorization` or `Content-Type`.
+   */
+  extraHeaders?: () => Record<string, string>;
 };
 
 type ResolvedMessages = {
@@ -159,6 +166,19 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
       config.defaultErrorMessage ??
       ((_status: number) => "Si è verificato un errore. Riprova tra poco."),
   };
+
+  function withExtraHeaders(headers: Record<string, string>): Record<string, string> {
+    if (!config.extraHeaders) {
+      return headers;
+    }
+    let extra: Record<string, string> = {};
+    try {
+      extra = config.extraHeaders() ?? {};
+    } catch {
+      extra = {};
+    }
+    return { ...extra, ...headers };
+  }
 
   async function performFetch(url: string, baseUrl: string, init: RequestInit): Promise<Response> {
     try {
@@ -252,7 +272,7 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
 
     const response = await performFetch(url, baseUrl, {
       method: options.method ?? (options.body !== undefined ? "POST" : "GET"),
-      headers,
+      headers: withExtraHeaders(headers),
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
 
@@ -285,10 +305,10 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
 
     const response = await performFetch(url, baseUrl, {
       method: "POST",
-      headers: {
+      headers: withExtraHeaders({
         Accept: "application/json",
         Authorization: `Bearer ${options.accessToken}`,
-      },
+      }),
       body: formData,
     });
 
@@ -326,10 +346,10 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
     // Niente Content-Type: lo imposta fetch con il boundary del multipart.
     const response = await performFetch(url, baseUrl, {
       method: "POST",
-      headers: {
+      headers: withExtraHeaders({
         Accept: "application/json",
         Authorization: `Bearer ${options.accessToken}`,
-      },
+      }),
       body: formData,
     });
 

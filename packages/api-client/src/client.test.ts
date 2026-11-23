@@ -52,6 +52,52 @@ describe("createApiClient", () => {
     }
   });
 
+  it("adds extraHeaders to every request without overriding auth or content type", async () => {
+    const stub = installFetchStub(() => jsonResponse(200, { ok: true }));
+    try {
+      const { apiRequest, apiUpload, apiUploadForm } = createApiClient({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file: string) => file,
+        extraHeaders: () => ({
+          "X-App-Version": "1.4.0",
+          "X-App-Version-Code": "5",
+          Authorization: "Bearer intruso",
+        }),
+      });
+      await apiRequest("/ping", { accessToken: "tok123", body: { a: 1 } });
+      await apiUpload("/upload", { accessToken: "tok123", file: "f" });
+      await apiUploadForm("/form", { accessToken: "tok123", fields: {}, files: ["f"] });
+      assert.equal(stub.calls.length, 3);
+      for (const call of stub.calls) {
+        const headers = call.init?.headers as Record<string, string>;
+        assert.equal(headers["X-App-Version"], "1.4.0");
+        assert.equal(headers["X-App-Version-Code"], "5");
+        assert.equal(headers.Authorization, "Bearer tok123");
+      }
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it("still sends the request when extraHeaders throws", async () => {
+    const stub = installFetchStub(() => jsonResponse(200, { ok: true }));
+    try {
+      const { apiRequest } = createApiClient({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file: string) => file,
+        extraHeaders: () => {
+          throw new Error("versione illeggibile");
+        },
+      });
+      assert.deepEqual(await apiRequest("/ping"), { ok: true });
+      const headers = stub.calls[0]?.init?.headers as Record<string, string>;
+      assert.equal(headers["X-App-Version"], undefined);
+      assert.equal(headers.Accept, "application/json");
+    } finally {
+      stub.restore();
+    }
+  });
+
   it("returns undefined for 204 responses without parsing a body", async () => {
     const stub = installFetchStub(() => new Response(null, { status: 204 }));
     try {

@@ -92,6 +92,61 @@ export interface AdminWatch {
   currentRounds: AdminCurrentRounds;
   nextLineupLock: AdminNextLineupLock | null;
   androidAppVersion: AndroidAppVersion | null;
+  /** Release 1.4: aggiornati su chi usa l'app. Assente dai server più vecchi o senza annuncio. */
+  androidAppUsage?: AdminAppUsageSummary | null;
+}
+
+/** Riga «App Android annunciata» del Riepilogo: quanti hanno la versione annunciata. */
+export interface AdminAppUsageSummary {
+  /** Utenti con la versione annunciata o una più nuova (versione esatta, app 1.4+). */
+  upToDateUsers: number;
+  /** Utenti visti almeno una volta nell'app, qualsiasi versione. */
+  appUsers: number;
+}
+
+/**
+ * Gruppo dell'elenco «chi ha quale versione» (release 1.4, Rosario 23/11):
+ * - `version`: versione esatta, mandata dall'app 1.4 o successive;
+ * - `unknown_recent`: app 1.2 o 1.3 (controllano gli aggiornamenti ma non dicono la versione);
+ * - `unknown`: app che non dice nulla (1.1 o precedente);
+ * - `never`: mai visto nell'app (solo sito o mai entrato).
+ */
+export type AdminAppUsageGroupKind = "version" | "unknown_recent" | "unknown" | "never";
+
+export interface AdminAppUsageUser {
+  userId: string;
+  /** Soprannome se scelto, altrimenti nome. */
+  displayName: string;
+  /** Nome del profilo, solo se diverso da `displayName`. */
+  name: string | null;
+  email: string;
+  firstSeenAt: string | null;
+  /** Ultima volta visto nell'app; `null` nel gruppo `never`. */
+  lastSeenAt: string | null;
+}
+
+export interface AdminAppUsageGroup {
+  kind: AdminAppUsageGroupKind;
+  /** `android` (o `ios`); `null` nel gruppo `never`. */
+  platform: string | null;
+  versionName: string | null;
+  versionCode: number | null;
+  /** Ha la versione annunciata o una più nuova. */
+  upToDate: boolean;
+  /** Il più recente prima (gruppo `never`: in ordine di nome). */
+  users: AdminAppUsageUser[];
+}
+
+/** `GET /admin/app-version/users`: chi ha quale versione dell'app, versione per versione. */
+export interface AdminAppUsage {
+  generatedAt: string;
+  announced: AndroidAppVersion | null;
+  /** Utenti attivi (account non eliminati). */
+  totalUsers: number;
+  appUsers: number;
+  upToDateUsers: number;
+  /** Versioni esatte (la più nuova prima), poi versioni non note, poi «app mai usata». */
+  groups: AdminAppUsageGroup[];
 }
 
 export interface AdminUser {
