@@ -27,8 +27,9 @@ import {
   orderBenchForActiveRoles,
   orderedBenchFromRoster,
   preserveLockedStarters,
-  labelFantasyTurnStatus,
+  TURN_DISPLAY_LABEL,
   resolveDefaultEuropeanTurn,
+  resolveTurnDisplayStates,
   slotsFromLineupIds,
   starterTemplate,
   lineupSignature,
@@ -79,6 +80,7 @@ import { OptionPicker } from "../components/OptionPicker";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
+import { formationTurnOptionLabel } from "../matchday/turnLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
@@ -1376,6 +1378,8 @@ export function FormationScreen() {
           })
       : [];
   const toolDisabled = busy || !editable;
+  // «Cambia turno»: stesso stato mostrato in Turni, non lo stato interno «Programmato» (M3, 22/11).
+  const turnDisplayStates = resolveTurnDisplayStates(turns, lockNow);
   const benchToneStyle = (row: (typeof roster)[number] | undefined) => {
     const tone = row ? probableTone(row) : null;
     if (!tone || tone === "starter") {
@@ -1930,9 +1934,9 @@ export function FormationScreen() {
               <Text style={styles.toolTitle}>Cambia turno</Text>
               <OptionPicker
                 label="Turno"
-                options={turns.map((turn) => ({
+                options={turns.map((turn, index) => ({
                   value: turn.id,
-                  label: `Turno ${turn.number} (${labelFantasyTurnStatus(turn.effectiveStatus)})`,
+                  label: formationTurnOptionLabel(turn, turnDisplayStates[index] ?? "upcoming", TURN_DISPLAY_LABEL),
                 }))}
                 value={selectedRoundId}
                 onChange={(roundId) => {
