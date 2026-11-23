@@ -46,6 +46,7 @@ import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
 import { useLockCountdown } from "../matchday/useLockCountdown";
+import { europeanTurnOptionLabel, turnSkipReason } from "../matchday/turnLabels";
 import type { RootStackParamList } from "../navigation/types";
 import { MatchdayH2HPanel } from "./matchday/MatchdayH2HPanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -130,6 +131,7 @@ export function MatchdayScreen() {
     const index = turns.findIndex((turn) => turn.id === selected?.id);
     return index >= 0 ? (turnDisplayStates[index] ?? "upcoming") : "upcoming";
   }, [turns, turnDisplayStates, selected?.id]);
+  const selectedSkipReason = selected ? turnSkipReason(selected, selectedDisplayState) : null;
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -360,7 +362,8 @@ export function MatchdayScreen() {
               value={selected?.id ?? ""}
               options={turns.map((turn, index) => ({
                 value: turn.id,
-                label: `Turno ${turn.number} — ${TURN_DISPLAY_LABEL[turnDisplayStates[index] ?? "upcoming"]}`,
+                // Turno saltato: con il motivo, come sul sito (corsa M3, 22/11).
+                label: europeanTurnOptionLabel(turn, turnDisplayStates[index] ?? "upcoming", TURN_DISPLAY_LABEL),
               }))}
               onChange={(turnId) => {
                 if (!accessToken || !activeLeagueId) {
@@ -384,6 +387,11 @@ export function MatchdayScreen() {
           <View style={styles.section} testID="matchday-turn-detail">
             <Text style={styles.heading}>Turno {selected.number}</Text>
             <Text style={styles.body}>Stato: {TURN_DISPLAY_LABEL[selectedDisplayState]}</Text>
+            {selectedSkipReason ? (
+              <Text style={styles.skipReason} testID="matchday-turn-skip-reason">
+                {selectedSkipReason}
+              </Text>
+            ) : null}
             <Text style={styles.body}>Cutoff: {formatDateTime(selected.cutoffAt)}</Text>
             {countdown && countdown.roundId === selected.id ? (
               <LockCountdown
@@ -643,6 +651,18 @@ const styles = lazyStyles(() => StyleSheet.create({
   hint: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
+  },
+  // Come `.fa-matchday-skip-reason` del sito: il motivo del turno saltato in un riquadro.
+  skipReason: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   chip: {
     flexDirection: "row",
