@@ -39,7 +39,14 @@ export function notificationKind(item: Pick<NotificationItem, "title" | "categor
   if (title.includes("sorpassato")) return { group: "asta", glyph: "🔨" };
   // Esiti del mercato svincolati (offerte a buste chiuse come l'asta).
   if (title.includes("svincolat")) return { group: "asta", glyph: "🔨" };
-  if (title.includes("busta") || title.includes("lotto") || title.includes("asta") || title.includes("rosa al completo")) {
+  // «Spareggio aperto» e «Spareggio annullato» vengono dalle buste dell'asta (QA 22→23/11).
+  if (
+    title.includes("busta") ||
+    title.includes("lotto") ||
+    title.includes("asta") ||
+    title.includes("rosa al completo") ||
+    title.includes("spareggio")
+  ) {
     return { group: "asta", glyph: "🔨" };
   }
   if (title.includes("formazione")) return { group: "formazione", glyph: "⏰" };

@@ -25,6 +25,13 @@ test("gli esiti degli svincolati stanno con l'asta, non con gli scambi", () => {
   }
 });
 
+test("gli spareggi dell'asta a buste stanno con l'asta, non con gli scambi (QA 22→23/11)", () => {
+  // Titoli di mercato.esito_busta (backend/src/notifications/templates.py), categoria «mercato».
+  for (const title of ["Spareggio aperto", "Spareggio annullato"]) {
+    assert.deepEqual(notificationKind({ title, category: "mercato" }), { group: "asta", glyph: "🔨" }, title);
+  }
+});
+
 test("giorni", () => {
   const now = new Date(2026, 9, 20, 12, 0);
   assert.equal(notificationDayLabel(new Date(2026, 9, 20, 9, 0).toISOString(), now), "Oggi");
