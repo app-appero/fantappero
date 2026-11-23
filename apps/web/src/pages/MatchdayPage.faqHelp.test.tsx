@@ -106,7 +106,7 @@ describe("Turni › Turni europei: il «?» accanto a «Turno saltato» (FAQ 1.4
     window.history.replaceState(null, "", "/");
   });
 
-  it("il «?» sta accanto a «Turno saltato» nel dettaglio e accanto al menù dei turni", async () => {
+  it("il «?» sta solo accanto a «Stato: Turno saltato», non accanto al menù dei turni (Rosario, 23/11)", async () => {
     await renderTurni();
     expect(q<HTMLSelectElement>("matchday-turn-select")?.value).toBe("turn-11");
 
@@ -118,10 +118,11 @@ describe("Turni › Turni europei: il «?» accanto a «Turno saltato» (FAQ 1.4
     // Subito dopo la scritta, sulla stessa riga.
     expect(lede.querySelector("strong")?.nextElementSibling).toBe(detailHelp);
 
+    // Un solo «?» in pagina: il menù dei turni dice «Turno saltato» ma non ha il suo.
     const toolbar = q("matchday-turn-list")!.querySelector(".fa-matchday-toolbar")!;
-    expect(toolbar.classList.contains("fa-matchday-toolbar--help")).toBe(true);
-    const menuHelp = q<HTMLButtonElement>("matchday-turn-select-help", toolbar);
-    expect(menuHelp?.getAttribute("aria-label")).toBe("Perché un turno è saltato?");
+    expect(toolbar.querySelector(".fa-faq-help")).toBeNull();
+    expect(q("matchday-turn-select-help")).toBeNull();
+    expect(container.querySelectorAll(".fa-faq-help")).toHaveLength(1);
     const selectedOption = q<HTMLSelectElement>("matchday-turn-select")!.selectedOptions[0];
     expect(selectedOption?.textContent).toBe("Turno 11 — Turno saltato");
   });
@@ -147,11 +148,11 @@ describe("Turni › Turni europei: il «?» accanto a «Turno saltato» (FAQ 1.4
     expect(dialog()).toBeNull();
   });
 
-  it("anche il «?» del menù apre la stessa risposta; «Ho capito» la chiude", async () => {
+  it("«Ho capito» chiude la risposta", async () => {
     await renderTurni();
-    await act(async () => q<HTMLButtonElement>("matchday-turn-select-help")!.click());
+    await act(async () => q<HTMLButtonElement>("matchday-turn-skipped-help")!.click());
     expect(dialog()?.textContent).toContain("Perché un turno è «saltato»?");
-    await act(async () => q<HTMLButtonElement>("matchday-turn-select-help-close", dialog()!)!.click());
+    await act(async () => q<HTMLButtonElement>("matchday-turn-skipped-help-close", dialog()!)!.click());
     expect(dialog()).toBeNull();
   });
 
@@ -164,7 +165,6 @@ describe("Turni › Turni europei: il «?» accanto a «Turno saltato» (FAQ 1.4
     });
     expect(q("matchday-turn-detail")?.querySelector("h2")?.textContent).toBe("Turno 12");
     expect(q("matchday-turn-skipped-help")).toBeNull();
-    expect(q("matchday-turn-select-help")).toBeNull();
-    expect(q("matchday-turn-list")!.querySelector(".fa-matchday-toolbar--help")).toBeNull();
+    expect(container.querySelector(".fa-faq-help")).toBeNull();
   });
 });
