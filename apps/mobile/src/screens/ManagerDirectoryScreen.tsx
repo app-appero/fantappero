@@ -8,6 +8,7 @@ import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { useAuthSession } from "../session/DemoSessionContext";
+import { directoryCountsRequest } from "./managerDirectoryCounts";
 
 const { spacing } = theme;
 
@@ -21,15 +22,18 @@ export function ManagerDirectoryScreen() {
   // Inviti nominativi in attesa accanto ai posti (Rosario, 20/11), dallo stato del mercato.
   const [pendingInviteCount, setPendingInviteCount] = useState(0);
   const [invitesReload, setInvitesReload] = useState(0);
+  // Il permesso si guarda prima di caricare: a un semplice partecipante non serve nulla.
+  const isAdmin = can(["league:admin"]);
 
   useEffect(() => {
-    if (!accessToken || !activeLeagueId) {
+    const request = directoryCountsRequest({ isAdmin, accessToken, leagueId: activeLeagueId });
+    if (!request) {
       return;
     }
     let cancelled = false;
     void Promise.all([
-      fetchLeagueAdminPanel(accessToken, activeLeagueId),
-      fetchLeagueMembers(accessToken, activeLeagueId),
+      fetchLeagueAdminPanel(request.accessToken, request.leagueId),
+      fetchLeagueMembers(request.accessToken, request.leagueId),
     ])
       .then(([panel, members]) => {
         if (cancelled) {
@@ -47,14 +51,15 @@ export function ManagerDirectoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, activeLeagueId, reloadToken]);
+  }, [isAdmin, accessToken, activeLeagueId, reloadToken]);
 
   useEffect(() => {
-    if (!accessToken || !activeLeagueId) {
+    const request = directoryCountsRequest({ isAdmin, accessToken, leagueId: activeLeagueId });
+    if (!request) {
       return;
     }
     let cancelled = false;
-    void fetchMarketGate(accessToken, activeLeagueId)
+    void fetchMarketGate(request.accessToken, request.leagueId)
       .then((gate) => {
         if (!cancelled) {
           setPendingInviteCount(gate.pendingInviteCount ?? 0);
@@ -66,7 +71,7 @@ export function ManagerDirectoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, activeLeagueId, reloadToken, invitesReload]);
+  }, [isAdmin, accessToken, activeLeagueId, reloadToken, invitesReload]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -77,7 +82,7 @@ export function ManagerDirectoryScreen() {
     setRefreshing(false);
   }, []);
 
-  if (!can(["league:admin"])) {
+  if (!isAdmin) {
     return (
       <PageContainer title="Fantallenatori" testID="screen-manager-directory">
         <UiStatePanel
