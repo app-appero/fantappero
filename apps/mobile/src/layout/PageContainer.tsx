@@ -2,11 +2,13 @@ import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { DISPLAY_FONT } from "../theme/fonts";
 import { requestLeagueListRefresh } from "../session/leagueListRefresh";
+import type { Ref } from "react";
 import {
   RefreshControl,
   ScrollView,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollViewInstance,
   StyleSheet,
   Text,
   View,
@@ -28,6 +30,9 @@ export type PageContainerProps = ViewProps & {
   contentInsetHorizontal?: number;
   /** Scorrimento del contenuto (es. per far seguire la pagina a una barra fissa). */
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /** Lo ScrollView della pagina, per riportarla a un punto (es. il Profilo dopo il cambio tema). */
+  scrollRef?: Ref<ScrollViewInstance>;
+  onContentSizeChange?: (width: number, height: number) => void;
 };
 
 /** Scrollable page body with title — mobile equivalent of web PageContainer. */
@@ -40,10 +45,14 @@ export function PageContainer({
   refreshing = false,
   contentInsetHorizontal = spacing.lg,
   onScroll,
+  scrollRef,
+  onContentSizeChange,
   ...rest
 }: PageContainerProps) {
   return (
     <ScrollView
+      ref={scrollRef}
+      onContentSizeChange={onContentSizeChange}
       style={[styles.scroll, style]}
       contentContainerStyle={[styles.content, { paddingHorizontal: contentInsetHorizontal }]}
       testID={testID}
