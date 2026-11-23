@@ -88,7 +88,8 @@ Viewport desktop 1280 e mobile 390: ogni pagina principale carica senza errori i
 ### 10. App mobile (nel browser, a misura di telefono) e coerenza web/mobile
 L'app mobile si prova nella sua versione web (react-native-web), con Playwright e un telefono emulato. Preparazione, dalla cartella del repository:
 ```
-cd apps/mobile && npm ci   # solo se node_modules manca
+pnpm install --frozen-lockfile --filter @fantappero/mobile...   # solo se node_modules manca (il repository usa pnpm)
+cd apps/mobile
 EXPO_PUBLIC_API_BASE_URL=https://fantappero-api-dev.up.railway.app npx expo export --platform web --output-dir /tmp/mobweb
 python3 -m http.server 8765 --directory /tmp/mobweb   # in background; per i percorsi diretti apri sempre "/"
 ```
