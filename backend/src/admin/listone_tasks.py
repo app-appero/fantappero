@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy.orm import Session
+
 import database.models  # noqa: F401 — register ORM mappers
 from admin.listone_service import PLATFORM_JOB_SCOPE, refresh_platform_listone
 from app.worker import celery_app
@@ -15,9 +17,10 @@ from leagues.listone_refresh_progress import ListoneRefreshProgress, save_progre
 from sports_data.listone.update_log import record_listone_update
 
 
-def _actor(session: object, actor_id: str) -> User | None:
+def _actor(session: Session, actor_id: str) -> User | None:
+    """L'operatore che ha avviato l'aggiornamento (None se l'id non è valido)."""
     try:
-        return session.get(User, UUID(actor_id))  # type: ignore[attr-defined]
+        return session.get(User, UUID(actor_id))
     except (TypeError, ValueError):
         return None
 
