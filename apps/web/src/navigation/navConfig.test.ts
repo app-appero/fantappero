@@ -92,6 +92,33 @@ describe("filterNavItems", () => {
   });
 });
 
+describe("Domande frequenti 1.4 nel menù", () => {
+  it("mette «Domande frequenti» subito dopo «Segnala un problema» e prima di «Profilo»", () => {
+    const labels = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/turni").map(
+      (item) => item.label,
+    );
+    const feedback = labels.indexOf("Segnala un problema");
+    expect(feedback).toBeGreaterThan(-1);
+    expect(labels.slice(feedback, feedback + 3)).toEqual([
+      "Segnala un problema",
+      "Domande frequenti",
+      "Profilo",
+    ]);
+  });
+
+  it("apre /domande-frequenti e la evidenzia anche con un link diretto a una domanda", () => {
+    const items = filterNavItems(
+      APP_NAV_ITEMS,
+      canFactory(memberContext),
+      "/domande-frequenti",
+    );
+    const faq = items.find((item) => item.id === "faq");
+    expect(faq?.path).toBe("/domande-frequenti");
+    expect(faq?.active).toBe(true);
+    expect(items.filter((item) => item.active).map((item) => item.id)).toEqual(["faq"]);
+  });
+});
+
 describe("hub a tab: Lega e Movimento giocatori (EP13-P01)", () => {
   it("non usa più gruppi collassabili nella sidebar: le destinazioni correlate sono tab in pagina", () => {
     expect(APP_NAV_GROUPS).toEqual([]);

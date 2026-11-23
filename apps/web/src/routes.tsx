@@ -33,6 +33,7 @@ import {
   StandingsPage,
 } from "./pages/AppPages";
 import { DevShowcasePage } from "./pages/DevShowcasePage";
+import { FaqPage } from "./pages/FaqPage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { WireframesHubPage } from "./pages/WireframesHubPage";
@@ -230,6 +231,16 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["profile:view"]}>
           <FeedbackPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/domande-frequenti") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["profile:view"]}>
+          <FaqPage />
         </RequirePermissions>
       </AppSection>
     );

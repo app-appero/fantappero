@@ -23,6 +23,7 @@ import {
 } from "../navigation/navConfig";
 import {
   IconCart,
+  IconHelp,
   IconLayout,
   IconMenu,
   IconMessage,
@@ -46,6 +47,7 @@ const APP_ICONS: Record<string, ReactNode> = {
   "market-hub": <IconCart />,
   formation: <IconLayout />,
   feedback: <IconMessage />,
+  faq: <IconHelp />,
   profile: <IconUser />,
 };
 
