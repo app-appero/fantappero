@@ -6,7 +6,11 @@ import { useOptionalAuth } from "../auth/AuthContext";
 import { notifyReceivedInvitesChanged } from "../layout/receivedInviteEvents";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
-import { notificationLeagueToActivate, resolveNotificationDestination } from "./notificationDestination";
+import {
+  notificationLeagueToActivate,
+  resolveNotificationDestination,
+  resolveNotificationExternalLink,
+} from "./notificationDestination";
 import { useNotificationCenter } from "./useNotificationCenter";
 
 const CATEGORY_LABELS: Record<NotificationItem["category"], string> = {
@@ -202,6 +206,7 @@ export function NotificationCenter() {
             <ul className="fa-notification-center__list">
               {items.map((item) => {
                 const destination = resolveNotificationDestination(item);
+                const external = resolveNotificationExternalLink(item);
                 const className = `fa-notification-center__item${item.read ? "" : " fa-notification-center__item--unread"}`;
                 const content = (
                   <>
@@ -210,6 +215,11 @@ export function NotificationCenter() {
                     </span>
                     <span className="fa-notification-center__item-title">{item.title}</span>
                     <span className="fa-notification-center__item-body">{item.body}</span>
+                    {external ? (
+                      <span className="fa-notification-center__item-link">
+                        Scarica l'aggiornamento ↗
+                      </span>
+                    ) : null}
                     <span className="fa-notification-center__item-time">
                       {formatTimestamp(item.createdAt)}
                     </span>
@@ -217,7 +227,23 @@ export function NotificationCenter() {
                 );
                 return (
                   <li key={item.id}>
-                    {destination ? (
+                    {external ? (
+                      // Nuova versione dell'app (1.4): il link di download, in una nuova scheda.
+                      <a
+                        href={external}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={className}
+                        onClick={() => {
+                          if (!item.read) {
+                            void markRead(item.id);
+                          }
+                        }}
+                        data-testid={`notification-item-${item.id}`}
+                      >
+                        {content}
+                      </a>
+                    ) : destination ? (
                       <a
                         href={destination}
                         className={className}

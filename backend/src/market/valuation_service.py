@@ -52,8 +52,8 @@ from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 from sports_data.season_stats.competition_types import (
     COMPETITION_TYPE_CUP,
+    COMPETITION_TYPE_LEAGUE,
     competition_kind,
-    is_championship,
     load_competition_types,
 )
 from sports_data.season_stats.current_season import materialize_current_season
@@ -67,9 +67,12 @@ from sports_data.season_stats.seasons import (
 
 logger = get_logger(__name__)
 
-#: Cambia quando cambia la formula: forza il ricalcolo anche a dati fermi.
+#: Cambia quando cambia la formula o la struttura di ``components_json``: forza il ricalcolo
+#: anche a dati fermi, così il ricalcolo successivo riscrive tutte le righe.
 #: 1.3.1: solo le righe di campionato delle stagioni passate (coppe escluse, 22/11).
-VALUATION_VERSION = "1.3.1"
+#: 1.4.0: ``components_json`` con il dettaglio di ogni passaggio («Dettaglio del Valore»,
+#: pannello operatore); la formula non cambia.
+VALUATION_VERSION = "1.4.0"
 FINGERPRINT_FLAG_PREFIX = "market_values:"
 #: Oltre questo numero di calciatori si legge la stagione intera (listone) invece di un IN.
 _BULK_READ_THRESHOLD = 400
@@ -180,6 +183,186 @@ def _backfill_athlete_ids(session: Session) -> None:
     )
 
 
+#: Riga dello storico che non conta perché senza media (fornitore ``rating`` vuoto, o nessun
+#: voto FantApperò): non è un tipo di competizione, serve al dettaglio dell'operatore.
+ROW_KIND_NO_RATING = "no_rating"
+
+
+@dataclass(frozen=True)
+class SeasonRowDetail:
+    """Una riga dello storico letta per il Valore: contata o esclusa, e perché."""
+
+    competition: str
+    club: str | None
+    #: Peso nella media: presenze (fornitore) o partite con voto (FantApperò); una riga con
+    #: media ma senza presenze conta 1, come in ``combine_rows``.
+    appearances: int
+    average: float | None
+    #: ``league`` (contata), ``cup`` / ``unknown`` (escluse: non campionato) o ``no_rating``.
+    kind: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "competition": self.competition,
+            "club": self.club,
+            "appearances": self.appearances,
+            "average": round(self.average, 4) if self.average is not None else None,
+            "kind": self.kind,
+        }
+
+
+@dataclass(frozen=True)
+class SeasonSampleDetail:
+    """Media di una stagione di un calciatore e le righe da cui viene."""
+
+    #: Fonte delle righe usate (``provider`` o ``fantappero``).
+    source: str
+    sample: SeasonSample
+    counted: tuple[SeasonRowDetail, ...] = ()
+    excluded: tuple[SeasonRowDetail, ...] = ()
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "source": self.source,
+            "rows": [row.as_dict() for row in self.counted],
+            "excluded": [row.as_dict() for row in self.excluded],
+        }
+
+
+@dataclass(frozen=True)
+class _StoredRow:
+    competition: str
+    club: str | None
+    rating: float | None
+    weight: int | None
+    kind: str
+
+
+def _competition_label(name: str | None, provider_id: int) -> str:
+    if name:
+        return name
+    return f"Competizione {provider_id}" if provider_id else "Competizione sconosciuta"
+
+
+def _row_detail(row: _StoredRow) -> SeasonRowDetail:
+    kind = row.kind
+    if kind == COMPETITION_TYPE_LEAGUE and row.rating is None:
+        kind = ROW_KIND_NO_RATING
+    if row.rating is not None:
+        appearances = row.weight if row.weight is not None and row.weight > 0 else 1
+    else:
+        appearances = max(0, row.weight or 0)
+    return SeasonRowDetail(
+        competition=row.competition,
+        club=row.club,
+        appearances=appearances,
+        average=row.rating,
+        kind=kind,
+    )
+
+
+def _by_weight(rows: Iterable[SeasonRowDetail]) -> tuple[SeasonRowDetail, ...]:
+    return tuple(sorted(rows, key=lambda row: (-row.appearances, row.competition)))
+
+
+def season_sample_details(
+    session: Session,
+    *,
+    current_season_year: int,
+    provider_ids: Iterable[int] | None = None,
+) -> dict[tuple[int, int], SeasonSampleDetail]:
+    """Come ``season_samples``, con le righe contate ed escluse di ogni stagione (anche delle
+    stagioni senza dati, es. sole coppe), per spiegare il Valore all'operatore."""
+    seasons = career_seasons(current_season_year)
+    stmt = select(
+        AthleteSeasonStat.athlete_provider_id,
+        AthleteSeasonStat.season_year,
+        AthleteSeasonStat.source,
+        AthleteSeasonStat.competition_provider_id,
+        AthleteSeasonStat.competition_name,
+        AthleteSeasonStat.club_name,
+        AthleteSeasonStat.rating,
+        AthleteSeasonStat.appearances,
+        AthleteSeasonStat.votes,
+    ).where(AthleteSeasonStat.season_year.in_(seasons))
+    if provider_ids is not None:
+        ids = sorted(set(provider_ids))
+        if not ids:
+            return {}
+        stmt = stmt.where(AthleteSeasonStat.athlete_provider_id.in_(ids))
+    types = load_competition_types(session)
+    excluded_cups = 0
+    excluded_unknown: dict[int, int] = defaultdict(int)
+    by_key: dict[tuple[int, int], dict[str, list[_StoredRow]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for (
+        pid,
+        year,
+        source,
+        competition,
+        competition_name,
+        club_name,
+        rating,
+        appearances,
+        votes,
+    ) in session.execute(stmt).tuples():
+        # Le righe nostre vengono dalle partite del catalogo (solo i 5 campionati).
+        kind = (
+            COMPETITION_TYPE_LEAGUE
+            if source == SOURCE_FANTAPPERO
+            else competition_kind(int(competition), types)
+        )
+        if kind == COMPETITION_TYPE_CUP:
+            excluded_cups += 1
+        elif kind != COMPETITION_TYPE_LEAGUE:
+            excluded_unknown[int(competition)] += 1
+        by_key[(int(pid), int(year))][source].append(
+            _StoredRow(
+                competition=_competition_label(competition_name, int(competition)),
+                club=club_name,
+                rating=float(rating) if rating is not None else None,
+                weight=votes if source == SOURCE_FANTAPPERO else appearances,
+                kind=kind,
+            )
+        )
+    if excluded_cups or excluded_unknown:
+        logger.info(
+            "season_samples_rows_excluded",
+            extra={
+                "current_season_year": current_season_year,
+                "cup_rows": excluded_cups,
+                "unknown_type_rows": sum(excluded_unknown.values()),
+                # Le competizioni di tipo sconosciuto più frequenti (id del fornitore).
+                "unknown_competitions": sorted(
+                    excluded_unknown, key=lambda cid: (-excluded_unknown[cid], cid)
+                )[:20],
+                "competition_types_known": len(types),
+            },
+        )
+    result: dict[tuple[int, int], SeasonSampleDetail] = {}
+    for (pid, year), sources in by_key.items():
+        # Stagione in corso: solo i nostri dati. Passate: i nostri se c'erano, poi il fornitore.
+        if sources.get(SOURCE_FANTAPPERO):
+            source = SOURCE_FANTAPPERO
+        elif year != current_season_year and sources.get(SOURCE_PROVIDER):
+            source = SOURCE_PROVIDER
+        else:
+            continue
+        rows = sources[source]
+        sample = combine_rows(
+            (row.rating, row.weight) for row in rows if row.kind == COMPETITION_TYPE_LEAGUE
+        )
+        details = [_row_detail(row) for row in rows]
+        result[(pid, year)] = SeasonSampleDetail(
+            source=source,
+            sample=sample,
+            counted=_by_weight(row for row in details if row.kind == COMPETITION_TYPE_LEAGUE),
+            excluded=_by_weight(row for row in details if row.kind != COMPETITION_TYPE_LEAGUE),
+        )
+    return result
+
+
 def season_samples(
     session: Session,
     *,
@@ -197,62 +380,37 @@ def season_samples(
     una stagione senza dati. Le righe nostre vengono dalle partite del catalogo, che ha solo i
     5 campionati: si prendono tutte.
     """
-    seasons = career_seasons(current_season_year)
-    stmt = select(
-        AthleteSeasonStat.athlete_provider_id,
-        AthleteSeasonStat.season_year,
-        AthleteSeasonStat.source,
-        AthleteSeasonStat.competition_provider_id,
-        AthleteSeasonStat.rating,
-        AthleteSeasonStat.appearances,
-        AthleteSeasonStat.votes,
-    ).where(AthleteSeasonStat.season_year.in_(seasons))
-    if provider_ids is not None:
-        ids = sorted(set(provider_ids))
-        if not ids:
-            return {}
-        stmt = stmt.where(AthleteSeasonStat.athlete_provider_id.in_(ids))
-    types = load_competition_types(session)
-    excluded_cups = 0
-    excluded_unknown: dict[int, int] = defaultdict(int)
-    by_key: dict[tuple[int, int], dict[str, list[tuple[float | None, int | None]]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
-    for pid, year, source, competition, rating, appearances, votes in session.execute(
-        stmt
-    ).tuples():
-        if source == SOURCE_PROVIDER and not is_championship(int(competition), types):
-            if competition_kind(int(competition), types) == COMPETITION_TYPE_CUP:
-                excluded_cups += 1
-            else:
-                excluded_unknown[int(competition)] += 1
-            continue
-        weight = votes if source == SOURCE_FANTAPPERO else appearances
-        by_key[(int(pid), int(year))][source].append((rating, weight))
-    if excluded_cups or excluded_unknown:
-        logger.info(
-            "season_samples_rows_excluded",
-            extra={
-                "current_season_year": current_season_year,
-                "cup_rows": excluded_cups,
-                "unknown_type_rows": sum(excluded_unknown.values()),
-                # Le competizioni di tipo sconosciuto più frequenti (id del fornitore).
-                "unknown_competitions": sorted(
-                    excluded_unknown, key=lambda cid: (-excluded_unknown[cid], cid)
-                )[:20],
-                "competition_types_known": len(types),
-            },
+    return {
+        key: detail.sample
+        for key, detail in season_sample_details(
+            session, current_season_year=current_season_year, provider_ids=provider_ids
+        ).items()
+        if detail.sample.usable
+    }
+
+
+#: Stagione di ogni voce di ``components_json["seasons"]``: anni prima di quella in corso.
+SLOT_SEASON_OFFSETS = {"current": 0, "previous": 1, "twoSeasonsAgo": 2}
+
+
+def valuation_components(
+    valued: valuation.Valuation,
+    *,
+    season_year: int,
+    details: dict[str, SeasonSampleDetail | None],
+) -> dict[str, Any]:
+    """``components_json``: ogni passaggio della formula, con le righe di ogni stagione."""
+    components = valued.components()
+    components["version"] = VALUATION_VERSION
+    for slot, season in components["seasons"].items():
+        year = season_year - SLOT_SEASON_OFFSETS[slot]
+        detail = details.get(slot)
+        season["seasonYear"] = year
+        season["seasonLabel"] = season_label(year)
+        season.update(
+            detail.as_dict() if detail is not None else {"source": None, "rows": [], "excluded": []}
         )
-    result: dict[tuple[int, int], SeasonSample] = {}
-    for (pid, year), sources in by_key.items():
-        if year == current_season_year:
-            rows = sources.get(SOURCE_FANTAPPERO, [])
-        else:
-            rows = sources.get(SOURCE_FANTAPPERO) or sources.get(SOURCE_PROVIDER, [])
-        sample = combine_rows(rows)
-        if sample.usable:
-            result[(pid, year)] = sample
-    return result
+    return components
 
 
 def refresh_market_values(
@@ -275,7 +433,8 @@ def refresh_market_values(
         .join(Athlete, Athlete.id == RoleAssignment.athlete_id)
         .where(RoleAssignment.season_year == season_year)
     ).all()
-    samples = season_samples(session, current_season_year=season_year)
+    details = season_sample_details(session, current_season_year=season_year)
+    samples = {key: detail.sample for key, detail in details.items() if detail.sample.usable}
     inputs = [
         ValuationInput(
             key=athlete_id,
@@ -299,6 +458,7 @@ def refresh_market_values(
     provider_by_athlete = {athlete_id: int(pid) for athlete_id, _, pid in listone}
     for item in inputs:
         valued = valuations[item.key]
+        provider_id = provider_by_athlete[item.key]  # type: ignore[index]
         average = select_season_average(
             current_season_year=season_year,
             current=item.current,
@@ -313,7 +473,7 @@ def refresh_market_values(
         rows.append(
             {
                 "athlete_id": item.key,
-                "athlete_provider_id": provider_by_athlete[item.key],  # type: ignore[index]
+                "athlete_provider_id": provider_id,
                 "season_year": season_year,
                 "role": item.role,
                 "value_index": valued.value_index,
@@ -322,7 +482,14 @@ def refresh_market_values(
                 "season_average_year": average.season_year if average is not None else None,
                 "season_average_is_current": bool(average is not None and average.is_current),
                 "current_votes": item.current.appearances if item.current is not None else 0,
-                "components_json": valued.components(),
+                "components_json": valuation_components(
+                    valued,
+                    season_year=season_year,
+                    details={
+                        slot: details.get((provider_id, season_year - offset))
+                        for slot, offset in SLOT_SEASON_OFFSETS.items()
+                    },
+                ),
             }
         )
     session.execute(delete(AthleteMarketValue).where(AthleteMarketValue.season_year == season_year))

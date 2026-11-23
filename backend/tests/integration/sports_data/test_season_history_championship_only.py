@@ -10,6 +10,7 @@ calciatore mostra tutte le righe come prima.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from sqlalchemy import delete, select
@@ -156,6 +157,16 @@ def _average(value: AthleteMarketValue) -> tuple[float | None, int | None]:
     return value.season_average, value.season_average_year
 
 
+def _without_excluded(components: dict[str, Any]) -> dict[str, Any]:
+    """``components_json`` senza gli elenchi delle righe escluse (gli unici che le coppe
+    cambiano)."""
+    seasons = {
+        slot: {key: value for key, value in season.items() if key != "excluded"}
+        for slot, season in components["seasons"].items()
+    }
+    return {**components, "seasons": seasons}
+
+
 def test_cups_are_excluded_from_average_and_value(
     session: Session, athletes: dict[int, Athlete]
 ) -> None:
@@ -170,7 +181,19 @@ def test_cups_are_excluded_from_average_and_value(
     assert with_cups.season_average_is_current is False
     assert with_cups.value_index == pytest.approx(league_only.value_index)
     assert with_cups.reference_value == pytest.approx(league_only.reference_value)
-    assert with_cups.components_json == league_only.components_json
+    # Stessi numeri in ogni passaggio; cambia solo l'elenco delle righe escluse (1.4).
+    assert _without_excluded(with_cups.components_json) == _without_excluded(
+        league_only.components_json
+    )
+    previous = with_cups.components_json["seasons"]["previous"]
+    assert previous["source"] == "provider"
+    assert [(row["competition"], row["appearances"]) for row in previous["rows"]] == [
+        ("Serie A", 20)
+    ]
+    assert [(row["competition"], row["kind"]) for row in previous["excluded"]] == [
+        ("UEFA Champions League", "cup"),
+        ("Coppa Italia", "cup"),
+    ]
 
     samples = season_samples(session, current_season_year=SEASON)
     assert samples[(LEAGUE_AND_CUPS, 2025)].appearances == 20  # solo le presenze di campionato
@@ -203,6 +226,14 @@ def test_unknown_type_outside_the_five_is_excluded(
     assert unknown.value_index == pytest.approx(MISSING_SEASON_INDEX)
     assert unknown.reference_value == pytest.approx(values[NO_HISTORY].reference_value)
     assert unknown.reference_value == pytest.approx(base_reference_value("A"))
+    # Il dettaglio dice perché: la riga c'è ma la competizione è di tipo sconosciuto.
+    previous = unknown.components_json["seasons"]["previous"]
+    assert previous["hasData"] is False
+    assert previous["indexUsed"] == pytest.approx(MISSING_SEASON_INDEX)
+    assert previous["rows"] == []
+    assert [
+        (row["competition"], row["kind"], row["appearances"]) for row in previous["excluded"]
+    ] == [("Coppa Sconosciuta", "unknown", 30)]
 
 
 def test_only_cups_season_counts_as_no_data(session: Session, athletes: dict[int, Athlete]) -> None:
@@ -217,6 +248,14 @@ def test_only_cups_season_counts_as_no_data(session: Session, athletes: dict[int
     assert percentiles["previous"] is None
     assert percentiles["twoSeasonsAgo"] is not None
     assert (ONLY_CUPS, 2025) not in season_samples(session, current_season_year=SEASON)
+    seasons = only_cups.components_json["seasons"]
+    assert seasons["previous"]["seasonLabel"] == "25/26"
+    assert seasons["previous"]["source"] == "provider"
+    assert [row["kind"] for row in seasons["previous"]["excluded"]] == ["cup", "cup"]
+    assert seasons["twoSeasonsAgo"]["seasonLabel"] == "24/25"
+    assert seasons["twoSeasonsAgo"]["rows"][0]["competition"] == "Serie A"
+    assert seasons["twoSeasonsAgo"]["poolSize"] == 1  # l'unico attaccante con dati nella 2024/25
+    assert seasons["twoSeasonsAgo"]["rank"] == 1
 
 
 def test_without_competition_types_only_the_five_count(

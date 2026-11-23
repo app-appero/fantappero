@@ -373,7 +373,8 @@ export function RosterAdminManualCard({
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
   const [onlyFree, setOnlyFree] = useState(false);
-  // «Ordina per media» (Rosario, 22/11): dalla media più alta, chi non ha media in fondo.
+  // «Ordina per media» (Rosario, 22-23/11): prima le medie della stagione in corso, poi quelle
+  // della scorsa, ognuna dalla più alta; chi non ha media in fondo (contracts).
   const [sortByAverage, setSortByAverage] = useState(false);
   const showMarket = useMemo(() => hasMarketData(listone), [listone]);
   const priceMinimum = manualPriceMinimum(isAdmin);

@@ -1,4 +1,6 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
+import { appVersionHeaders } from "./versionHeaders";
 import { appVersionLabel } from "./versionLabel";
 
 /**
@@ -16,4 +18,21 @@ export function installedAndroidVersionCode(): number | null {
  */
 export function installedAppVersionLabel(): string | undefined {
   return appVersionLabel(Constants.expoConfig?.version, installedAndroidVersionCode());
+}
+
+let cachedHeaders: Record<string, string> | null = null;
+
+/**
+ * Intestazioni con la versione installata per ogni richiesta al server (release 1.4): non
+ * cambiano mentre l'app è aperta, si leggono una volta sola.
+ */
+export function installedAppVersionHeaders(): Record<string, string> {
+  if (cachedHeaders === null) {
+    cachedHeaders = appVersionHeaders(
+      Platform.OS,
+      Constants.expoConfig?.version,
+      installedAndroidVersionCode(),
+    );
+  }
+  return cachedHeaders;
 }

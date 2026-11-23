@@ -60,6 +60,7 @@ import type {
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
+import { installedAppVersionHeaders } from "../appVersion/installedVersion";
 import { loadMobileEnv } from "../config/env";
 import { ApiError, apiRequest, apiUpload } from "./client";
 
@@ -557,6 +558,7 @@ async function downloadLeagueFile(accessToken: string, path: string): Promise<Ar
   const baseUrl = loadMobileEnv().expoPublicApiBaseUrl;
   const response = await fetch(`${baseUrl}${path}`, {
     headers: {
+      ...installedAppVersionHeaders(),
       Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*",
       Authorization: `Bearer ${accessToken}`,
     },

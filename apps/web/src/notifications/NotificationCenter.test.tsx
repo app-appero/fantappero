@@ -222,6 +222,41 @@ describe("NotificationCenter (EP09-01)", () => {
     expect(container.querySelector('[data-testid="notification-unread-badge"]')).toBeNull();
   });
 
+  it("release 1.4: la notifica della nuova versione apre il download in una nuova scheda", async () => {
+    const update: NotificationItem = {
+      ...ITEM,
+      id: "notif-app",
+      title: "È disponibile la versione 1.4 dell'app",
+      body: "Apri la notifica per scaricare l'aggiornamento.",
+      deepLink: "https://drive.google.com/drive/folders/fantappero-1-4",
+    };
+    fetchNotificationsMock.mockResolvedValue(listWith([update]));
+    markNotificationReadMock.mockResolvedValue({ ...update, read: true });
+    await renderCenter();
+
+    const trigger = container.querySelector('[data-testid="notification-bell"]') as HTMLElement;
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushAsync();
+
+    const link = document.querySelector(
+      '[data-testid="notification-item-notif-app"]',
+    ) as HTMLAnchorElement;
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("https://drive.google.com/drive/folders/fantappero-1-4");
+    expect(link.target).toBe("_blank");
+    expect(link.rel).toContain("noopener");
+    expect(link.textContent).toContain("Scarica l'aggiornamento");
+    await act(async () => {
+      // Il clic vero aprirebbe una scheda: qui si guarda solo che la segni come letta.
+      link.addEventListener("click", (event) => event.preventDefault(), { once: true });
+      link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+    expect(markNotificationReadMock).toHaveBeenCalledWith("token-123", "notif-app");
+  });
+
   it("mark-all-read clears the unread badge", async () => {
     fetchNotificationsMock.mockResolvedValue(listWith([ITEM]));
     markAllNotificationsReadMock.mockResolvedValue({ markedCount: 1 });

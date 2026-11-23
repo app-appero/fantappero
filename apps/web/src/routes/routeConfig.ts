@@ -71,6 +71,7 @@ export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
   },
   { id: "profile", path: "/profilo", layout: "app", requiredPermissions: ["profile:view"] },
   { id: "feedback", path: "/feedback", layout: "app", requiredPermissions: ["profile:view"] },
+  { id: "faq", path: "/domande-frequenti", layout: "app", requiredPermissions: ["profile:view"] },
   { id: "dev-design-system", path: "/dev/design-system", layout: "app" },
   { id: "dev-wireframes", path: "/dev/wireframes", layout: "app" },
   {

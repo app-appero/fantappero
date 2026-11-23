@@ -146,7 +146,17 @@ def allow_periodic(key: str, env_default: bool) -> bool:
 
     Se il database non risponde, resta il valore d'ambiente: un guasto di
     lettura non deve spegnere (né accendere a vuoto) i giri già configurati.
+    Un giro saltato (job spento) non lascia un esito in ``system_job_runs``.
     """
+    allowed = _allow_periodic(key, env_default)
+    if not allowed:
+        from system_jobs.run_recorder import mark_current_run_skipped
+
+        mark_current_run_skipped()
+    return allowed
+
+
+def _allow_periodic(key: str, env_default: bool) -> bool:
     enabled = env_default
     try:
         settings = get_api_settings()

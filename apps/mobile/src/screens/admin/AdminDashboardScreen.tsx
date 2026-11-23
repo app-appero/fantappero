@@ -1,18 +1,45 @@
-import type { AdminOverview } from "@fantappero/contracts";
+import {
+  buildOperatorWatchItems,
+  formatLeaguesByState,
+  type AdminOverview,
+  type OperatorWatchTone,
+} from "@fantappero/contracts";
+import { theme } from "@fantappero/ui/theme";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchAdminOverview } from "../../api/admin";
 import { ApiError } from "../../api/client";
-import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { useScreenData } from "../../hooks/useScreenData";
 import { PageContainer } from "../../layout/PageContainer";
+import { adminScreenForWatchTarget } from "../../navigation/adminScreens";
 import type { AdminStackParamList } from "../../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
+import { DISPLAY_FONT } from "../../theme/fonts";
+import { lazyStyles } from "../../theme/lazyStyles";
 
-/** Panoramica operatore — mobile port of `apps/web/src/pages/AdminDashboardPage.tsx` (EP11-04a). */
+const { colors, spacing, typography, radius } = theme;
+
+function toneColor(tone: OperatorWatchTone): string {
+  switch (tone) {
+    case "ok":
+      return colors.success;
+    case "warn":
+      return colors.warning;
+    case "bad":
+      return colors.danger;
+    default:
+      return colors.foregroundSubtle;
+  }
+}
+
+/**
+ * «Riepilogo» del pannello operatore (release 1.4, canvas «Pannello operatore» approvato da
+ * Rosario il 22/11), come sul sito: chi sei e l'ambiente, i numeri, le leghe per stato e
+ * «Da guardare». Le sezioni si aprono dal menù in alto a sinistra: niente schede doppie.
+ */
 export function AdminDashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AdminStackParamList>>();
   const { accessToken } = useAuthSession();
@@ -46,14 +73,17 @@ export function AdminDashboardScreen() {
 
   const { refreshing, onRefresh } = useScreenData(load);
 
+  const leagueStates = overview ? formatLeaguesByState(overview.leaguesByState) : "";
+  const watchItems = overview?.watch ? buildOperatorWatchItems(overview.watch, new Date()) : null;
+
   return (
     <PageContainer
-      title="Pannello operatore"
+      title="Riepilogo"
       testID="screen-admin-dashboard"
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
-      {loading ? (
+      {loading && !overview ? (
         <UiStatePanel
           state="loading"
           title="Caricamento"
@@ -69,19 +99,78 @@ export function AdminDashboardScreen() {
           testID="admin-dashboard-error"
         />
       ) : null}
-      {!loading && !error && overview ? (
-        <View style={styles.section} testID="admin-dashboard-success">
-          <Text style={styles.sectionTitle}>Identità operatore</Text>
-          <Text style={styles.name} testID="admin-overview-name">
-            {overview.operatorDisplayName}
+      {!error && overview ? (
+        <View style={styles.page} testID="admin-dashboard-success">
+          <View style={styles.idLine}>
+            <Text style={styles.idName} testID="admin-overview-name">
+              {overview.operatorDisplayName}
+            </Text>
+            <Text style={styles.idRole}>operatore</Text>
+            <View style={styles.envChip}>
+              <Text style={styles.envLabel} testID="admin-overview-environment">
+                {overview.environment}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.kpis}>
+            <View style={styles.kpi}>
+              <Text style={styles.kpiValue}>{overview.usersCount}</Text>
+              <Text style={styles.kpiLabel}>Utenti</Text>
+            </View>
+            <View style={styles.kpi}>
+              <Text style={styles.kpiValue}>{overview.operatorsCount}</Text>
+              <Text style={styles.kpiLabel}>Operatori</Text>
+            </View>
+            <View style={styles.kpi}>
+              <Text style={styles.kpiValue}>{overview.leaguesCount}</Text>
+              <Text style={styles.kpiLabel}>Leghe</Text>
+            </View>
+          </View>
+          {leagueStates ? (
+            <Text style={styles.states} testID="admin-overview-league-states">
+              Leghe: {leagueStates}
+            </Text>
+          ) : null}
+
+          <Text style={styles.sectionLabel} accessibilityRole="header">
+            Da guardare
           </Text>
-          <Text style={styles.meta}>
-            Ambiente: <Text testID="admin-overview-environment">{overview.environment}</Text>
-          </Text>
-          <Text style={styles.sectionTitle}>Conteggi piattaforma</Text>
-          <Text style={styles.meta}>Utenti registrati: {overview.usersCount}</Text>
-          <Text style={styles.meta}>Operatori: {overview.operatorsCount}</Text>
-          <Text style={styles.meta}>Leghe: {overview.leaguesCount}</Text>
+          {watchItems ? (
+            <View style={styles.watch} testID="admin-watch">
+              {watchItems.map((row, index) => (
+                <Pressable
+                  key={row.id}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${row.title}. ${row.details.join(". ")}`}
+                  accessibilityHint={`Apre ${row.targetLabel}`}
+                  onPress={() => navigation.navigate(adminScreenForWatchTarget(row.target))}
+                  style={({ pressed }) => [
+                    styles.row,
+                    index > 0 && styles.rowDivider,
+                    pressed && styles.rowPressed,
+                  ]}
+                  testID={`admin-watch-${row.id}`}
+                >
+                  <View style={[styles.dot, { backgroundColor: toneColor(row.tone) }]} />
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowTitle}>{row.title}</Text>
+                    {row.details.map((detail) => (
+                      <Text key={detail} style={styles.rowDetail}>
+                        {detail}
+                      </Text>
+                    ))}
+                    <Text style={styles.rowGo}>{row.targetLabel} ›</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.states} testID="admin-watch-unavailable">
+              Le cose da guardare non sono disponibili in questo momento. Le sezioni restano nel
+              menù.
+            </Text>
+          )}
         </View>
       ) : null}
       {!loading && !error && !overview ? (
@@ -92,74 +181,124 @@ export function AdminDashboardScreen() {
           testID="admin-dashboard-empty"
         />
       ) : null}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sezioni</Text>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminLeagues")}
-          testID="admin-dashboard-link-leagues"
-        >
-          <Text style={styles.linkCardTitle}>Leghe globali</Text>
-          <Text style={styles.linkCardHint}>Consulta tutte le leghe della piattaforma.</Text>
-        </Pressable>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminUsers")}
-          testID="admin-dashboard-link-users"
-        >
-          <Text style={styles.linkCardTitle}>Utenti</Text>
-          <Text style={styles.linkCardHint}>Cerca utenti, promuovi o revoca operatori.</Text>
-        </Pressable>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminListone")}
-          testID="admin-dashboard-link-listone"
-        >
-          <Text style={styles.linkCardTitle}>Listone</Text>
-          <Text style={styles.linkCardHint}>
-            Consulta e aggiorna il listone ufficiale dal provider.
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminJobs")}
-          testID="admin-dashboard-link-jobs"
-        >
-          <Text style={styles.linkCardTitle}>Job automatici</Text>
-          <Text style={styles.linkCardHint}>
-            Accendi, spegni e cambia la frequenza dei giri che partono da soli.
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminEmail")}
-          testID="admin-dashboard-link-email"
-        >
-          <Text style={styles.linkCardTitle}>Email</Text>
-          <Text style={styles.linkCardHint}>Scrivi e invia email agli utenti dal portale.</Text>
-        </Pressable>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminNotifications")}
-          testID="admin-dashboard-link-notifications"
-        >
-          <Text style={styles.linkCardTitle}>Notifiche</Text>
-          <Text style={styles.linkCardHint}>
-            Invia avvisi, novità e notifiche di prova agli utenti.
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.linkCard}
-          onPress={() => navigation.navigate("AdminTurni")}
-          testID="admin-dashboard-link-turni"
-        >
-          <Text style={styles.linkCardTitle}>Turni</Text>
-          <Text style={styles.linkCardHint}>
-            Sincronizza turni e calendario, calcola la giornata, genera formazioni IA.
-          </Text>
-        </Pressable>
-      </View>
     </PageContainer>
   );
 }
+
+const styles = lazyStyles(() =>
+  StyleSheet.create({
+    page: {
+      gap: spacing.md,
+    },
+    idLine: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    idName: {
+      color: colors.foreground,
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    idRole: {
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.sm,
+    },
+    envChip: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.warning,
+    },
+    envLabel: {
+      color: colors.warning,
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    kpis: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    kpi: {
+      flex: 1,
+      minWidth: 0,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundElevated,
+    },
+    kpiValue: {
+      color: colors.foreground,
+      fontFamily: DISPLAY_FONT,
+      fontSize: typography.fontSize.xl,
+    },
+    kpiLabel: {
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.sm,
+    },
+    states: {
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.sm,
+    },
+    sectionLabel: {
+      marginTop: spacing.xs,
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+    },
+    watch: {
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundElevated,
+      overflow: "hidden",
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: spacing.sm,
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    rowDivider: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    rowPressed: {
+      backgroundColor: colors.background,
+    },
+    dot: {
+      width: 10,
+      height: 10,
+      marginTop: 6,
+      borderRadius: 5,
+    },
+    rowText: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    rowTitle: {
+      color: colors.foreground,
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    rowDetail: {
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.sm,
+    },
+    rowGo: {
+      alignSelf: "flex-end",
+      color: colors.accentMuted,
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.semibold,
+    },
+  }),
+);

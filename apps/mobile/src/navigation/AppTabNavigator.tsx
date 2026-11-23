@@ -56,6 +56,7 @@ const STACK_ROUTE_MAP: Partial<Record<string, keyof RootStackParamList>> = {
   "received-invites": "ReceivedInvites",
   "manager-directory": "ManagerDirectory",
   feedback: "Feedback",
+  faq: "Faq",
 };
 
 const TAB_SCREEN_NAMES: (keyof AppTabParamList)[] = [
@@ -95,6 +96,7 @@ const NAV_ID_BY_ROUTE: Record<string, string> = {
   ReceivedInvites: "received-invites",
   ManagerDirectory: "manager-directory",
   Feedback: "feedback",
+  Faq: "faq",
 };
 
 function AppTabShell({

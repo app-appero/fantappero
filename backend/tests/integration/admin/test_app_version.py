@@ -86,7 +86,9 @@ def test_operatore_imposta_e_utente_legge(client: TestClient, db_session: Sessio
 
     saved = client.put("/admin/app-version", headers=operator, json=VALID)
     assert saved.status_code == 200, saved.text
-    assert saved.json() == {"android": VALID}
+    # Dalla 1.4 la risposta dice anche quante notifiche della nuova versione sono partite.
+    assert saved.json()["android"] == VALID
+    assert isinstance(saved.json()["notifiedUsers"], int)
 
     read = client.get("/app/version", headers=member)
     assert read.status_code == 200

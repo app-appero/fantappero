@@ -9,10 +9,20 @@ import {
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { AvatarWithFallback } from "../components/AvatarWithFallback";
 import { deleteAccount } from "../api/privacy";
@@ -28,10 +38,19 @@ import { NotificationEventSettings } from "../components/NotificationEventSettin
 import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
+import { PROFILE_TABS } from "../layout/notificationLabels";
 import { PageContainer } from "../layout/PageContainer";
+import { deleteAccountAndForget } from "../session/accountDeletion";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { clearLastUser } from "../session/lastUser";
 import { useAppTheme } from "../theme/AppTheme";
 import { THEME_OPTIONS } from "../theme/themePreference";
+import {
+  clearThemeScroll,
+  pendingThemeScroll,
+  rememberScrollBeforeThemeChange,
+  themeScrollTarget,
+} from "../theme/themeScrollRestore";
 import { resolveAvatarUrl } from "../utils/avatar";
 
 const { colors, spacing, typography, radius } = theme;
@@ -51,12 +70,7 @@ function parseQuietHour(value: string): number | null | undefined {
   return parsed;
 }
 
-const PROFILE_TABS = [
-  { id: "utente", label: "Utente" },
-  { id: "notifiche", label: "Notifiche" },
-] as const;
-
-function ThemePreferenceSection() {
+function ThemePreferenceSection({ onBeforeChange }: { onBeforeChange?: () => void } = {}) {
   const { preference, setPreference, resolvedColors } = useAppTheme();
   // Stili calcolati qui con useMemo, legati a resolvedColors (a sua volta
   // legato a `scheme` in AppTheme.tsx), invece di leggerli dall'oggetto
@@ -122,7 +136,12 @@ function ThemePreferenceSection() {
             key={option.value}
             accessibilityRole="button"
             accessibilityState={{ selected: preference === option.value }}
-            onPress={() => setPreference(option.value)}
+            onPress={() => {
+              if (option.value !== preference) {
+                onBeforeChange?.();
+              }
+              setPreference(option.value);
+            }}
             style={[own.option, preference === option.value && own.optionSelected]}
             testID={`profile-theme-${option.value}`}
           >
@@ -192,6 +211,41 @@ export function ProfileScreen() {
   );
 
   const { refreshing, onRefresh } = useScreenData(loadProfile);
+
+  // Cambio tema: la navigazione si rimonta (App.tsx) e la pagina ripartiva dall'alto (QA
+  // 22/11). Prima del cambio si segna dove si era; la copia rimontata ci torna appena la
+  // pagina è di nuovo completa (vedi theme/themeScrollRestore.ts).
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollYRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const restoreYRef = useRef<number | null | undefined>(undefined);
+  if (restoreYRef.current === undefined) {
+    restoreYRef.current = pendingThemeScroll();
+  }
+  const rememberScroll = useCallback(() => {
+    rememberScrollBeforeThemeChange(scrollYRef.current);
+  }, []);
+  const restoreScroll = useCallback((_width: number, contentHeight: number) => {
+    const y = restoreYRef.current;
+    if (y == null) {
+      return;
+    }
+    restoreYRef.current = null;
+    clearThemeScroll();
+    scrollRef.current?.scrollTo({
+      y: themeScrollTarget(y, contentHeight, viewportHeightRef.current),
+      animated: false,
+    });
+  }, []);
+  const pageScroll = {
+    scrollRef,
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollYRef.current = event.nativeEvent.contentOffset.y;
+    },
+    onLayout: (event: LayoutChangeEvent) => {
+      viewportHeightRef.current = event.nativeEvent.layout.height;
+    },
+  };
 
   async function handleSave() {
     setFormError(null);
@@ -330,11 +384,16 @@ export function ProfileScreen() {
     }
     setSaving(true);
     try {
-      await deleteAccount(accessToken, {
-        confirmPhrase: deletePhrase,
-        ...(deletePassword ? { password: deletePassword } : {}),
+      // Account eliminato: si dimentica anche l'ultimo accesso, niente «Bentornato» (M1, 22/11).
+      await deleteAccountAndForget({
+        deleteAccount: () =>
+          deleteAccount(accessToken, {
+            confirmPhrase: deletePhrase,
+            ...(deletePassword ? { password: deletePassword } : {}),
+          }),
+        forgetLastUser: clearLastUser,
+        logout,
       });
-      await logout();
     } catch (error) {
       setFormError(getApiErrorMessage(error, "Eliminazione non riuscita."));
       setSaving(false);
@@ -348,6 +407,7 @@ export function ProfileScreen() {
         testID="screen-profile"
         refreshing={refreshing}
         onRefresh={onRefresh}
+        {...pageScroll}
       >
         <UiStatePanel
           state="loading"
@@ -366,6 +426,7 @@ export function ProfileScreen() {
         testID="screen-profile"
         refreshing={refreshing}
         onRefresh={onRefresh}
+        {...pageScroll}
       >
         <UiStatePanel
           state="error"
@@ -387,6 +448,8 @@ export function ProfileScreen() {
       testID="screen-profile"
       refreshing={refreshing}
       onRefresh={onRefresh}
+      {...pageScroll}
+      onContentSizeChange={restoreScroll}
     >
       {successMessage ? (
         <UiStatePanel
@@ -506,7 +569,7 @@ export function ProfileScreen() {
         </Pressable>
       </View>
 
-      <ThemePreferenceSection />
+      <ThemePreferenceSection onBeforeChange={rememberScroll} />
 
       <View style={styles.section} testID="profile-directory-availability-section">
         <Text style={styles.sectionTitle}>Directory fantallenatori</Text>

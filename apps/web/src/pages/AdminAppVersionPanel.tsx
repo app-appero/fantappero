@@ -1,56 +1,48 @@
-import { isHttpsDownloadUrl, type AppVersionInfo } from "@fantappero/contracts";
-import { Button, Input } from "@fantappero/ui";
+import {
+  EMPTY_APP_VERSION_FORM,
+  appVersionFormFrom,
+  appVersionSaveConfirmation,
+  appVersionSavedMessage,
+  appVersionUpdateFrom,
+  validateAppVersionForm,
+  type AndroidAppVersionUpdate,
+  type AppVersionFormErrors,
+  type AppVersionFormFields,
+  type AppVersionInfo,
+} from "@fantappero/contracts";
+import { Button, Input, Modal } from "@fantappero/ui";
 import { useEffect, useState } from "react";
 import { fetchAppVersionConfig, saveAppVersionConfig } from "../api/admin";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 
-const VERSION_NAME_PATTERN = /^[0-9]+(\.[0-9]+){0,3}$/;
-const MAX_VERSION_CODE = 2_100_000_000;
+// Controlli e testi dei campi in comune con l'app (`@fantappero/contracts`, release 1.4).
+type Fields = AppVersionFormFields;
+type FieldErrors = AppVersionFormErrors;
 
-type Fields = { name: string; code: string; url: string; message: string };
-type FieldErrors = Partial<Record<keyof Fields, string>>;
-
-const EMPTY: Fields = { name: "", code: "", url: "", message: "" };
-
-function fieldsFrom(info: AppVersionInfo): Fields {
-  const android = info.android;
-  return android
-    ? {
-        name: android.latestVersionName,
-        code: String(android.latestVersionCode),
-        url: android.downloadUrl,
-        message: android.message ?? "",
-      }
-    : EMPTY;
-}
-
-function validate(fields: Fields): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!VERSION_NAME_PATTERN.test(fields.name.trim())) {
-    errors.name = "Scrivi la versione con numeri e punti, per esempio 1.3.0.";
-  }
-  const code = Number(fields.code.trim());
-  if (!/^\d+$/.test(fields.code.trim()) || code < 1 || code > MAX_VERSION_CODE) {
-    errors.code = "Il versionCode è un numero intero maggiore di zero.";
-  }
-  if (!isHttpsDownloadUrl(fields.url)) {
-    errors.url = "Il link deve iniziare con https://";
-  }
-  if (fields.message.trim().length > 200) {
-    errors.message = "Il messaggio può avere al massimo 200 caratteri.";
-  }
-  return errors;
-}
-
-/** Pannello operatore: ultima versione dell'APK Android, annunciata a chi ha un'app più vecchia. */
-export function AdminAppVersionPanel() {
+/**
+ * Pannello operatore: ultima versione dell'APK Android, annunciata a chi ha un'app più vecchia.
+ * Dalla 1.4 sta nella pagina «Versione app» (`AdminAppVersionPage`), che ha già il suo titolo:
+ * lì il titolo della sezione resta solo per i lettori di schermo (`hideTitle`).
+ *
+ * Decisione di Rosario del 23/11: salvare una versione nuova manda anche la notifica a chi non
+ * ce l'ha; il messaggio dopo «Salva» dice a quanti. `onSaved` avvisa la pagina (rilegge
+ * l'elenco «Chi ha quale versione»). Prima di salvare si chiede conferma in un dialogo
+ * («Annunciare la versione 1.4.0 (versionCode 5)?», «Annulla» / «Annuncia»), lo stesso `Modal`
+ * di «Svuota formazione»; stessi testi dell'app (`appVersionSaveConfirmation`).
+ */
+export function AdminAppVersionPanel({
+  hideTitle = false,
+  onSaved,
+}: { hideTitle?: boolean; onSaved?: () => void } = {}) {
   const [current, setCurrent] = useState<AppVersionInfo | null>(null);
-  const [fields, setFields] = useState<Fields>(EMPTY);
+  const [fields, setFields] = useState<Fields>(EMPTY_APP_VERSION_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Versione in attesa di conferma: il dialogo «Sei sicuro?» è aperto. */
+  const [pending, setPending] = useState<AndroidAppVersionUpdate | null>(null);
 
   useEffect(() => {
     const session = loadStoredSession();
@@ -62,7 +54,7 @@ export function AdminAppVersionPanel() {
       .then((info) => {
         if (active) {
           setCurrent(info);
-          setFields(fieldsFrom(info));
+          setFields(appVersionFormFrom(info));
         }
       })
       .catch((cause) => {
@@ -80,14 +72,19 @@ export function AdminAppVersionPanel() {
     setErrors((previous) => ({ ...previous, [key]: undefined }));
   }
 
-  async function save() {
+  /** «Salva»: controlla i campi e chiede conferma; si salva solo con «Annuncia». */
+  function requestSave() {
     setMessage(null);
     setError(null);
-    const found = validate(fields);
+    const found = validateAppVersionForm(fields);
     setErrors(found);
     if (Object.keys(found).length > 0) {
       return;
     }
+    setPending(appVersionUpdateFrom(fields));
+  }
+
+  async function save(update: AndroidAppVersionUpdate) {
     const session = loadStoredSession();
     if (!session?.accessToken) {
       setError("Sessione non disponibile. Accedi di nuovo.");
@@ -95,15 +92,11 @@ export function AdminAppVersionPanel() {
     }
     setBusy(true);
     try {
-      const saved = await saveAppVersionConfig(session.accessToken, {
-        latestVersionName: fields.name.trim(),
-        latestVersionCode: Number(fields.code.trim()),
-        downloadUrl: fields.url.trim(),
-        message: fields.message.trim() || null,
-      });
+      const saved = await saveAppVersionConfig(session.accessToken, update);
       setCurrent(saved);
-      setFields(fieldsFrom(saved));
-      setMessage("Versione salvata: chi ha un'app più vecchia vedrà l'avviso.");
+      setFields(appVersionFormFrom(saved));
+      setMessage(appVersionSavedMessage(saved));
+      onSaved?.();
     } catch (cause) {
       setError(getApiErrorMessage(cause, "Salvataggio non riuscito."));
     } finally {
@@ -112,6 +105,7 @@ export function AdminAppVersionPanel() {
   }
 
   const android = current?.android ?? null;
+  const confirmation = pending ? appVersionSaveConfirmation(pending, android) : null;
 
   return (
     <section
@@ -119,10 +113,13 @@ export function AdminAppVersionPanel() {
       aria-labelledby="admin-appversion-title"
       data-testid="admin-appversion"
     >
-      <h2 id="admin-appversion-title">Versione dell'app Android</h2>
+      <h2 id="admin-appversion-title" className={hideTitle ? "fa-sr-only" : undefined}>
+        Versione dell'app Android
+      </h2>
       <p className="fa-admin-appversion__hint">
-        Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi ha un'app più vecchia
-        vedrà l'avviso.
+        Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi usa l'app Android o il sito
+        da Android e non ha ancora quella versione riceve una notifica (nell'elenco e push) e, a ogni
+        ingresso nell'app, l'avviso con «Scarica».
       </p>
       {current ? (
         <p data-testid="admin-appversion-current">
@@ -136,7 +133,7 @@ export function AdminAppVersionPanel() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void save();
+          requestSave();
         }}
       >
         <Input
@@ -182,6 +179,41 @@ export function AdminAppVersionPanel() {
           </Button>
         </div>
       </form>
+      <Modal
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        title={confirmation?.title ?? ""}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setPending(null)}
+              data-testid="admin-appversion-confirm-cancel"
+            >
+              {confirmation?.cancelLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                const update = pending;
+                setPending(null);
+                if (update) {
+                  void save(update);
+                }
+              }}
+              data-testid="admin-appversion-confirm"
+            >
+              {confirmation?.confirmLabel}
+            </Button>
+          </>
+        }
+      >
+        <p className="fa-field__hint" data-testid="admin-appversion-confirm-message">
+          {confirmation?.message}
+        </p>
+      </Modal>
       {message ? <p role="status">{message}</p> : null}
       {error ? (
         <p role="alert" className="fa-field__error">

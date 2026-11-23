@@ -20,6 +20,7 @@ export { MarketPage } from "./MarketPage";
 export { MatchdayPage } from "./MatchdayPage";
 export { MatchupDetailPage } from "./MatchupDetailPage";
 export { AdminDashboardPage } from "./AdminDashboardPage";
+export { AdminAppVersionPage } from "./AdminAppVersionPage";
 export { AdminLeaguesPage } from "./AdminLeaguesPage";
 export { AdminListonePage } from "./AdminListonePage";
 export { AdminTurniPage } from "./AdminTurniPage";

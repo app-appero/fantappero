@@ -50,6 +50,13 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["profile:view"],
     surface: "app",
   },
+  // Subito dopo «Segnala un problema» (canvas «Domande frequenti», Rosario 22/11).
+  {
+    id: "faq",
+    path: "/domande-frequenti",
+    requiredPermissions: ["profile:view"],
+    surface: "app",
+  },
   {
     id: "profile",
     path: "/profilo",
@@ -113,6 +120,13 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    // Riepilogo 1.4: il modulo della versione dell'app lascia la prima pagina del pannello.
+    id: "admin-app-version",
+    path: "/admin/versione-app",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -133,8 +147,9 @@ export const NAV_LABELS: Record<string, string> = {
   "market-hub": "Mercato",
   formation: "Formazione",
   feedback: "Segnala un problema",
+  faq: "Domande frequenti",
   profile: "Profilo",
-  "admin-home": "Pannello",
+  "admin-home": "Riepilogo",
   "admin-leagues": "Leghe globali",
   "admin-users": "Utenti",
   "admin-listone": "Listone",
@@ -143,6 +158,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-notifications": "Notifiche",
   "admin-email": "Email",
   "admin-feedback": "Segnalazioni",
+  "admin-app-version": "Versione app",
 };
 
 export type ResolvedNavItem = NavItemDefinition & {
@@ -186,7 +202,7 @@ function isNavItemActive(item: NavItemDefinition, pathname: string): boolean {
   if (item.id === "admin-home") {
     // "/admin" è anche il prefisso di ogni altra pagina del pannello
     // operatore (/admin/utenti, /admin/leghe, ...): con il match a prefisso
-    // "Pannello" restava sempre acceso insieme alla voce davvero attiva.
+    // "Riepilogo" (prima "Pannello") restava sempre acceso insieme alla voce davvero attiva.
     return pathname === item.path;
   }
   return pathname === item.path || pathname.startsWith(`${item.path}/`);

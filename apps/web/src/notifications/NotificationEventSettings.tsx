@@ -23,6 +23,7 @@ const EVENT_GLYPH: Record<string, string> = {
   "sistema.formazione": "⏰",
   "sistema.turno_omologato": "🏁",
   "sistema.avvisi_operatori": "📣",
+  "sistema.versione_app": "📲",
 };
 
 /** Centro notifiche personale: ogni evento, canali in-app e push separati. */

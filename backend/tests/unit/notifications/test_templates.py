@@ -408,9 +408,11 @@ def test_render_formazione_blocco_imminente_v2_counts_roster_players() -> None:
 
 
 # Notifiche che non riguardano una lega dell'utente: avvisi generici e degli operatori,
-# segnalazioni, invito non ancora accettato (il destinatario non è nella lega) e lega eliminata.
+# segnalazioni, invito non ancora accettato (il destinatario non è nella lega), lega eliminata
+# e nuova versione dell'app (release 1.4).
 _NOT_LEAGUE_SCOPED = {
     "sistema.generico",
+    "sistema.versione_app",
     "sistema.invito_lega",
     "sistema.richiesta_tester",
     "sistema.feedback_utente",
@@ -460,3 +462,28 @@ def test_every_test_sample_renders() -> None:
         content = render_notification(sample.template_key, sample.template_version, sample.params)
         assert content.title
         assert content.body
+
+
+def test_nuova_versione_dell_app_con_il_link_di_download() -> None:
+    """Release 1.4 (Rosario 23/11): titolo come l'avviso nell'app, link https dell'APK."""
+    content = render_notification(
+        "sistema.versione_app",
+        1,
+        {
+            "version_name": "1.4.0",
+            "version_code": 5,
+            "download_url": "https://drive.google.com/drive/folders/x",
+            "message": "  Formazione più veloce.  ",
+        },
+    )
+    assert content.title == "È disponibile la versione 1.4 dell'app"
+    assert content.body == "Formazione più veloce. Apri la notifica per scaricare l'aggiornamento."
+    assert content.deep_link == "https://drive.google.com/drive/folders/x"
+
+    plain = render_notification(
+        "sistema.versione_app",
+        1,
+        {"version_name": "1.4.1", "download_url": "https://x.example/apk", "message": None},
+    )
+    assert plain.title == "È disponibile la versione 1.4.1 dell'app"
+    assert plain.body == "Apri la notifica per scaricare l'aggiornamento."

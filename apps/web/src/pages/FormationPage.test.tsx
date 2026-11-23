@@ -107,6 +107,15 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain("04:10:00");
   });
 
+  it("accanto all'orario del blocco c'è il «?» che apre «Quando si blocca la formazione?» (FAQ 1.4)", () => {
+    const html = renderRoute("/formazione?persona=member&stato=success");
+    const cutoff = /<p data-testid="formation-cutoff">([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "";
+    expect(cutoff).toContain("ogni giocatore si blocca 15 min prima della sua partita");
+    expect(cutoff).toContain('data-testid="formation-lock-help"');
+    expect(cutoff).toContain('aria-label="Quando si blocca la formazione?"');
+    expect(cutoff).toContain('aria-haspopup="dialog"');
+  });
+
   it("shows empty state", () => {
     const html = renderRoute("/formazione?persona=member&stato=empty");
     expect(html).toContain('data-testid="formation-empty"');

@@ -678,6 +678,8 @@ class LeagueListoneRefreshCounters(ApiModel):
     listone_skipped_unmapped: int = Field(alias="listoneSkippedUnmapped")
     #: Ruoli che il fornitore cambierebbe ma che restano quelli del listone (congelati).
     role_changes_skipped: int = Field(default=0, alias="roleChangesSkipped")
+    #: Calciatori tolti dal listone (non più in una rosa del fornitore), release 1.4.
+    listone_removed: int = Field(default=0, alias="listoneRemoved")
     catalog_synced: bool = Field(alias="catalogSynced")
 
 

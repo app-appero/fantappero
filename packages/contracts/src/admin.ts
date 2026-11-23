@@ -1,5 +1,6 @@
 /** Admin panel contracts — platform operator only (EP11-04a / EP11-04b). */
 
+import type { AndroidAppVersion } from "./appVersion.js";
 import type { SessionUser } from "./auth.js";
 import type { FantasyRole } from "./leagues.js";
 
@@ -19,6 +20,135 @@ export interface AdminOverview {
   usersCount: number;
   operatorsCount: number;
   leaguesCount: number;
+  /** Riepilogo 1.4: leghe per stato (`active`, `auction`, …). Assente dai server più vecchi. */
+  leaguesByState?: Record<string, number>;
+  /** Riepilogo 1.4: «Da guardare». Assente dai server più vecchi o se il calcolo non riesce. */
+  watch?: AdminWatch | null;
+}
+
+/** Un job periodico spento dal pannello. */
+export interface AdminWatchJob {
+  key: string;
+  title: string;
+}
+
+/** Un job con giri finiti con errore nel periodo guardato (l'errore più recente). */
+export interface AdminWatchJobFailure {
+  jobKey: string;
+  title: string;
+  failedAt: string;
+  /** Motivo in breve (messaggio e tipo tecnico tra parentesi). */
+  reason: string | null;
+  /** Quanti giri finiti con errore nel periodo. */
+  failures: number;
+  /** Esito dell'ultimo giro, anche dopo l'errore: `ok` = il job è già ripreso. */
+  lastOutcome: "ok" | "failed";
+  lastFinishedAt: string;
+}
+
+export type AdminListoneUpdateKind = "refresh" | "roles_from_provider" | "roles_restored";
+
+/** Ultimo aggiornamento del listone, salvato per sempre (release 1.4). */
+export interface AdminListoneUpdate {
+  updatedAt: string;
+  seasonYear: number;
+  kind: AdminListoneUpdateKind;
+  /** `operator` dal pannello operatore, `league` dalla pagina di una lega. */
+  source: "operator" | "league";
+  authorDisplayName: string | null;
+  leagueName: string | null;
+  added: number;
+  removed: number;
+  changed: number;
+}
+
+/** Giornate in corso (turno aperto, o bloccato con la finestra aperta) nelle leghe attive. */
+export interface AdminCurrentRounds {
+  activeLeagues: number;
+  leaguesInProgress: number;
+  roundNumbers: number[];
+}
+
+/** Il prossimo blocco delle formazioni fra tutte le leghe attive. */
+export interface AdminNextLineupLock {
+  lockAt: string;
+  leagueId: string;
+  leagueName: string;
+  roundNumber: number;
+}
+
+/** «Da guardare» del Riepilogo operatore (decisioni di Rosario del 22/11). */
+export interface AdminWatch {
+  generatedAt: string;
+  testerRequestsPending: number;
+  oldestTesterRequestAt: string | null;
+  feedbackNew: number;
+  latestFeedbackAt: string | null;
+  jobsDisabled: AdminWatchJob[];
+  /** Da quando si guardano gli errori dei job (oggi: le ultime 24 ore). */
+  jobFailuresSince: string;
+  jobFailures: AdminWatchJobFailure[];
+  listoneLastUpdate: AdminListoneUpdate | null;
+  currentRounds: AdminCurrentRounds;
+  nextLineupLock: AdminNextLineupLock | null;
+  androidAppVersion: AndroidAppVersion | null;
+  /** Release 1.4: aggiornati su chi usa l'app. Assente dai server più vecchi o senza annuncio. */
+  androidAppUsage?: AdminAppUsageSummary | null;
+}
+
+/** Riga «App Android annunciata» del Riepilogo: quanti hanno la versione annunciata. */
+export interface AdminAppUsageSummary {
+  /** Utenti con la versione annunciata o una più nuova (versione esatta, app 1.4+). */
+  upToDateUsers: number;
+  /** Utenti visti almeno una volta nell'app, qualsiasi versione (il sito da Android non conta). */
+  appUsers: number;
+}
+
+/**
+ * Gruppo dell'elenco «chi ha quale versione» (release 1.4, Rosario 23/11):
+ * - `version`: versione esatta, mandata dall'app 1.4 o successive;
+ * - `unknown_recent`: app 1.2 o 1.3 (controllano gli aggiornamenti ma non dicono la versione);
+ * - `unknown`: app che non dice nulla (1.1 o precedente);
+ * - `web_android`: mai visto nell'app ma visto sul sito da un telefono Android (riceve anche lui
+ *   la notifica della nuova versione); assente dai server più vecchi;
+ * - `never`: mai visto nell'app né sul sito da Android (sito da computer o iPhone, o mai entrato).
+ */
+export type AdminAppUsageGroupKind = "version" | "unknown_recent" | "unknown" | "web_android" | "never";
+
+export interface AdminAppUsageUser {
+  userId: string;
+  /** Soprannome se scelto, altrimenti nome. */
+  displayName: string;
+  /** Nome del profilo, solo se diverso da `displayName`. */
+  name: string | null;
+  email: string;
+  firstSeenAt: string | null;
+  /** Ultima volta visto nell'app (nel gruppo `web_android`: sul sito da Android); `null` nel gruppo `never`. */
+  lastSeenAt: string | null;
+}
+
+export interface AdminAppUsageGroup {
+  kind: AdminAppUsageGroupKind;
+  /** `android` (o `ios`); `web-android` nel gruppo `web_android`; `null` nel gruppo `never`. */
+  platform: string | null;
+  versionName: string | null;
+  versionCode: number | null;
+  /** Ha la versione annunciata o una più nuova. */
+  upToDate: boolean;
+  /** Il più recente prima (gruppo `never`: in ordine di nome). */
+  users: AdminAppUsageUser[];
+}
+
+/** `GET /admin/app-version/users`: chi ha quale versione dell'app, versione per versione. */
+export interface AdminAppUsage {
+  generatedAt: string;
+  announced: AndroidAppVersion | null;
+  /** Utenti attivi (account non eliminati). */
+  totalUsers: number;
+  appUsers: number;
+  upToDateUsers: number;
+  /** Versioni esatte (la più nuova prima), poi versioni non note, sito da Android, «app mai usata». */
+  groups: AdminAppUsageGroup[];
 }
 
 export interface AdminUser {
@@ -112,6 +242,8 @@ export interface AdminListoneRefreshCounters {
   listoneSkippedUnmapped: number;
   /** Ruoli che il fornitore cambierebbe ma che restano quelli del listone (congelati). */
   roleChangesSkipped: number;
+  /** Calciatori tolti dal listone (release 1.4; assente dai server più vecchi). */
+  listoneRemoved?: number;
   catalogSynced: boolean;
 }
 

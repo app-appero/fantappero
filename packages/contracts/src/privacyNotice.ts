@@ -3,7 +3,7 @@
  * Allinea sempre `docs/operations/pilot_privacy_notice.md` e, quando il testo cambia,
  * incrementa `PROFILE_POLICY_VERSION` (backend) così a tutti viene richiesto un nuovo consenso.
  */
-export const PRIVACY_NOTICE_VERSION = "2026-11c";
+export const PRIVACY_NOTICE_VERSION = "2026-11d";
 export const PRIVACY_CONTACT_EMAIL = "info@fantappero.it";
 
 export type PrivacyNoticeSection = {
@@ -37,6 +37,7 @@ export const PRIVACY_NOTICE_SECTIONS: readonly PrivacyNoticeSection[] = [
       "Dati di gioco: leghe a cui partecipi, rosa, formazioni, risultati, scambi di mercato.",
       "Segnalazioni: se usi «Segnala un problema», il testo che scrivi, le immagini o i video che alleghi, la schermata da cui scrivi e informazioni tecniche (tipo di dispositivo, sistema, versione dell'app). Gli allegati sono visibili solo a chi gestisce il progetto.",
       "Notifiche: se le attivi nell'app Android, un identificativo del dispositivo per inviarti le notifiche e le tue preferenze di notifica.",
+      "Uso dell'app: la versione dell'app che usi, quando l'hai aperta l'ultima volta e, se usi il sito da un telefono Android, che lo usi da Android: per avvisarti quando c'è un aggiornamento dell'app e sapere chi deve ancora aggiornare.",
     ],
   },
   {

@@ -107,6 +107,7 @@ class PrivacyService:
         self._invalidate_all_tokens(loaded.id)
         self._delete_avatar_files(loaded.id)
         self._delete_feedback(loaded.id)
+        self._delete_app_usage(loaded.id)
 
         self._record_audit_event(
             user_id=loaded.id,
@@ -180,6 +181,10 @@ class PrivacyService:
                 for membership in user.league_memberships
             ],
             "pushDevices": self._export_push_devices(user.id),
+            # Versione dell'app vista dal server (release 1.4): piattaforma, versione, quando;
+            # piattaforma «web-android» per il sito usato da un telefono Android (informativa
+            # 2026-11d).
+            "appUsage": self._export_app_usage(user.id),
             "notificationPreferences": self._export_notification_preferences(user.id),
             "teams": self._export_teams(user.id),
             # Segnalazioni scritte dall'utente (testo e metadati; gli allegati sono solo contati).
@@ -239,6 +244,22 @@ class PrivacyService:
             }
             for device in self._session.scalars(
                 select(PushDevice).where(PushDevice.user_id == user_id)
+            ).all()
+        ]
+
+    def _export_app_usage(self, user_id: UUID) -> list[dict[str, Any]]:
+        from app_usage.models import UserAppUsage
+
+        return [
+            {
+                "platform": row.platform,
+                "versionName": row.version_name,
+                "versionCode": row.version_code,
+                "firstSeenAt": row.first_seen_at.isoformat(),
+                "lastSeenAt": row.last_seen_at.isoformat(),
+            }
+            for row in self._session.scalars(
+                select(UserAppUsage).where(UserAppUsage.user_id == user_id)
             ).all()
         ]
 
@@ -441,6 +462,13 @@ class PrivacyService:
         for stored_name in stored_names:
             (storage_dir / stored_name).unlink(missing_ok=True)
         self._session.execute(delete(FeedbackReport).where(FeedbackReport.user_id == user_id))
+
+    def _delete_app_usage(self, user_id: UUID) -> None:
+        """Toglie la versione dell'app (e l'uso del sito da Android) vista dal server
+        (eliminazione «soft», niente cascata)."""
+        from app_usage.models import UserAppUsage
+
+        self._session.execute(delete(UserAppUsage).where(UserAppUsage.user_id == user_id))
 
     def _delete_avatar_files(self, user_id: UUID) -> None:
         storage_dir = Path(self._settings.avatar_storage_path)

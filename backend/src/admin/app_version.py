@@ -4,11 +4,16 @@ L'APK si distribuisce a mano (cartella Drive, gruppo WhatsApp): l'operatore scri
 l'ultima versione pubblicata (nome, versionCode, link di download, messaggio facoltativo) e l'app
 la confronta con quella installata. Sta in `system_flags` (chiave ``android_app_version``, valore
 JSON) come la modalità test: si cambia senza deploy e senza migrazioni.
+
+Release 1.4 (Rosario 23/11): all'annuncio parte anche una notifica (nell'elenco e push) per chi
+usa l'app Android o il sito da Android e non risulta già su quella versione, e l'operatore vede
+chi ha quale versione (``GET /admin/app-version/users``, da ``app_usage``).
 """
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -16,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from admin.schemas import (
     AdminAndroidAppVersionUpdateRequest,
+    AdminAppUsageResponse,
+    AdminAppVersionSaveResponse,
     AndroidAppVersionResponse,
     AppVersionResponse,
 )
@@ -103,12 +110,14 @@ def get_admin_app_version(
     return AppVersionStore(session).get()
 
 
-@admin_router.put("/app-version", response_model=AppVersionResponse)
+@admin_router.put("/app-version", response_model=AdminAppVersionSaveResponse)
 def set_admin_app_version(
     body: AdminAndroidAppVersionUpdateRequest,
     operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     session: Session = Depends(get_db_session),
-) -> AppVersionResponse:
+) -> AdminAppVersionSaveResponse:
+    from app_usage.service import notify_new_app_version
+
     result = AppVersionStore(session).set_android(body)
     _logger.info(
         "admin_app_version_changed",
@@ -118,5 +127,29 @@ def set_admin_app_version(
             "version_code": body.latest_version_code,
         },
     )
+    # La notifica a chi non ha ancora la versione: un guasto qui non toglie il salvataggio.
+    notified: int | None = None
+    if result.android is not None:
+        try:
+            with session.begin_nested():
+                notified = notify_new_app_version(session, result.android)
+        except Exception:
+            _logger.exception(
+                "admin_app_version_notify_failed",
+                extra={"version_code": body.latest_version_code},
+            )
     session.commit()
-    return result
+    return AdminAppVersionSaveResponse(android=result.android, notifiedUsers=notified)
+
+
+@admin_router.get("/app-version/users", response_model=AdminAppUsageResponse)
+def get_admin_app_version_users(
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> AdminAppUsageResponse:
+    """Chi ha quale versione dell'app, versione per versione (release 1.4, Rosario 23/11)."""
+    from app_usage.service import build_app_usage_report
+
+    return build_app_usage_report(
+        session, announced=AppVersionStore(session).get().android, now=datetime.now(UTC)
+    )

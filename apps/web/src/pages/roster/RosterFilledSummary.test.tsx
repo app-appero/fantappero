@@ -68,6 +68,16 @@ describe("Rosa: nome e badge «In attesa» in colonna stretta (QA 20-21/11, WEB-
     expect(text?.[1]).toContain("In attesa");
   });
 
+  it("accanto a «In attesa» c'è il «?» che apre la risposta sull'esubero (FAQ 1.4)", () => {
+    const html = renderSummary();
+    const pending = /<span class="fa-faq-help-inline">([\s\S]*?)<\/button><\/span>/.exec(html)?.[1] ?? "";
+    expect(pending).toContain("In attesa");
+    expect(pending).toContain('data-testid="roster-pending-help-valou"');
+    expect(pending).toContain('aria-label="Ho un giocatore in esubero: cosa faccio?"');
+    // Solo chi è in esubero ha il «?».
+    expect(html.match(/class="fa-faq-help"/g)).toHaveLength(1);
+  });
+
   it("il blocco va a capo e il badge non schiaccia il nome", () => {
     expect(stylesCss).toMatch(/\.fa-auction-player__text \{[^}]*flex-wrap: wrap;[^}]*min-width: 0;/);
     expect(stylesCss).toMatch(/\.fa-auction-player__badge \{[^}]*flex-shrink: 0;[^}]*max-width: 100%;/);

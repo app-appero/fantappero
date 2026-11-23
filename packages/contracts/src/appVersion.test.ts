@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  EMPTY_APP_VERSION_FORM,
   appUpdateBannerText,
+  appVersionFormFrom,
+  appVersionUpdateFrom,
   displayAppVersionName,
   isHttpsDownloadUrl,
   isNewerAppVersion,
+  validateAppVersionForm,
 } from "./appVersion.ts";
 
 describe("versione dell'app Android (pilota-1.2, Rosario 21/11)", () => {
@@ -43,5 +47,62 @@ describe("versione dell'app Android (pilota-1.2, Rosario 21/11)", () => {
     assert.equal(isHttpsDownloadUrl("https://"), false);
     assert.equal(isHttpsDownloadUrl("https://example.com/a b"), false);
     assert.equal(isHttpsDownloadUrl("example.com/app.apk"), false);
+  });
+});
+
+describe("modulo «Versione app» del pannello operatore (sito e app, 1.4)", () => {
+  it("precompila i campi con la versione annunciata", () => {
+    assert.deepEqual(appVersionFormFrom({ android: null }), EMPTY_APP_VERSION_FORM);
+    assert.deepEqual(
+      appVersionFormFrom({
+        android: {
+          latestVersionName: "1.3.0",
+          latestVersionCode: 4,
+          downloadUrl: "https://example.com/app.apk",
+          message: null,
+        },
+      }),
+      { name: "1.3.0", code: "4", url: "https://example.com/app.apk", message: "" },
+    );
+  });
+
+  it("controlla i campi con gli stessi testi del sito", () => {
+    assert.deepEqual(
+      validateAppVersionForm({
+        name: "1.3.0",
+        code: "4",
+        url: "https://example.com/a.apk",
+        message: "",
+      }),
+      {},
+    );
+    const errors = validateAppVersionForm({
+      name: "uno",
+      code: "0",
+      url: "http://example.com",
+      message: "x".repeat(201),
+    });
+    assert.equal(errors.name, "Scrivi la versione con numeri e punti, per esempio 1.3.0.");
+    assert.equal(errors.code, "Il versionCode è un numero intero maggiore di zero.");
+    assert.equal(errors.url, "Il link deve iniziare con https://");
+    assert.equal(errors.message, "Il messaggio può avere al massimo 200 caratteri.");
+    assert.ok(validateAppVersionForm({ ...EMPTY_APP_VERSION_FORM, code: "4.5" }).code);
+  });
+
+  it("prepara il corpo della richiesta", () => {
+    assert.deepEqual(
+      appVersionUpdateFrom({
+        name: " 1.4.0 ",
+        code: " 5 ",
+        url: " https://e.com/a.apk ",
+        message: "  ",
+      }),
+      {
+        latestVersionName: "1.4.0",
+        latestVersionCode: 5,
+        downloadUrl: "https://e.com/a.apk",
+        message: null,
+      },
+    );
   });
 });

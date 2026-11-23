@@ -95,6 +95,16 @@ applica, ricalcola le rose (`resync_team_compositions`) e scrive l'audit di piat
 `admin_listone_roles_restored`). Idempotente. Dal web: sezione «Ripristina i ruoli cambiati da
 un aggiornamento» in `/admin/listone`.
 
+**Registro degli aggiornamenti (1.4):** ogni aggiornamento riuscito del listone lascia una riga
+per sempre in `listone_updates` (stessa transazione delle modifiche): data, autore (nome copiato
+al momento), da dove (`operator` dal pannello, `league` dalla pagina di una lega, con il nome
+della lega), stagione e quanti calciatori `added` / `removed` / `changed`. La scrivono i task
+`admin.refresh_platform_listone_from_provider` e `leagues.refresh_listone_from_provider`
+(`kind = refresh`) e la conferma dei ruoli dal fornitore o il ripristino dei ruoli
+(`roles_from_provider`, `roles_restored`). Un aggiornamento fallito non scrive nulla. L'ultima
+riga è nel «Riepilogo» del pannello operatore («Listone aggiornato il …»). I contatori del
+risultato dell'aggiornamento hanno anche `listoneRemoved` (calciatori tolti).
+
 **Filtro per campionato lega**: la vista listone di ciascuna lega (`GET /leagues/{id}/listone`,
 consumata da Rosa/Asta/CSV import) è filtrata sui soli campionati scelti in creazione lega
 (`league.competitions`). Un atleta il cui `RoleAssignment.club_id` è noto e non milita in

@@ -265,3 +265,32 @@ test("senza meta o con un link esterno non cambia nulla, nemmeno la lega", () =>
   assert.equal(planNotificationOpen({ title: "x", deepLink: "https://evil.example/?lega=league-a" }, IN_A_AND_B), null);
   assert.equal(planNotificationOpen({ title: "x", deepLink: null }, IN_A_AND_B), null);
 });
+
+test("release 1.4: «È disponibile la versione X dell'app» apre il link di download", () => {
+  const item = {
+    title: "È disponibile la versione 1.4 dell'app",
+    deepLink: "https://drive.google.com/drive/folders/fantappero-1-4",
+  };
+  assert.deepEqual(resolveNotificationRoute(item), {
+    kind: "external",
+    url: "https://drive.google.com/drive/folders/fantappero-1-4",
+  });
+  // Nessun cambio di lega: è un link esterno.
+  assert.deepEqual(planNotificationOpen(item, { activeLeagueId: "a", leagues: [{ id: "a" }] }), {
+    route: { kind: "external", url: "https://drive.google.com/drive/folders/fantappero-1-4" },
+    switchToLeagueId: null,
+  });
+});
+
+test("solo la notifica della nuova versione apre un link esterno, e solo https", () => {
+  const title = "È disponibile la versione 1.4 dell'app";
+  for (const deepLink of ["http://example.com/app.apk", "javascript:alert(1)", "https://", "https://a b"]) {
+    assert.equal(resolveNotificationRoute({ title, deepLink }), null, deepLink);
+  }
+  // Un'altra notifica con un link esterno resta senza meta.
+  assert.equal(resolveNotificationRoute({ title: "Avviso", deepLink: "https://drive.google.com/x" }), null);
+  assert.deepEqual(
+    resolveNotificationRoute({ title: "È disponibile una nuova versione dell'app", deepLink: "https://x.example/a" }),
+    { kind: "external", url: "https://x.example/a" },
+  );
+});

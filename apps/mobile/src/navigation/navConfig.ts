@@ -54,6 +54,13 @@ export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["profile:view"],
     surface: "app",
   },
+  // Subito dopo «Segnala un problema» (canvas «Domande frequenti», Rosario 22/11).
+  {
+    id: "faq",
+    path: "/domande-frequenti",
+    requiredPermissions: ["profile:view"],
+    surface: "app",
+  },
   {
     id: "profile",
     path: "/profilo",
@@ -121,6 +128,13 @@ export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    // Riepilogo 1.4: come sul sito, la versione dell'app ha la sua voce (prima nell'app non c'era).
+    id: "admin-app-version",
+    path: "/admin/versione-app",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -140,8 +154,9 @@ export const NAV_LABELS: Record<string, string> = {
   "market-hub": "Mercato",
   formation: "Formazione",
   feedback: "Segnala un problema",
+  faq: "Domande frequenti",
   profile: "Profilo",
-  "admin-home": "Pannello",
+  "admin-home": "Riepilogo",
   "admin-leagues": "Leghe globali",
   "admin-users": "Utenti",
   "admin-listone": "Listone",
@@ -150,6 +165,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-notifications": "Notifiche",
   "admin-email": "Email",
   "admin-feedback": "Segnalazioni",
+  "admin-app-version": "Versione app",
   auth: "Accedi",
 };
 

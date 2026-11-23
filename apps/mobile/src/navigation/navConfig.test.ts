@@ -54,12 +54,51 @@ describe("mobile navigation", () => {
       MOBILE_ADMIN_NAV_ITEMS,
       (required) => hasPermissions(operatorContext, required),
     );
-    assert.equal(operatorVisible.length, 9);
+    // Riepilogo 1.4: «Versione app» è la decima voce, dopo «Segnalazioni».
+    assert.equal(operatorVisible.length, 10);
+    assert.deepEqual(
+      operatorVisible.map((item) => item.label),
+      [
+        "Riepilogo",
+        "Leghe globali",
+        "Utenti",
+        "Listone",
+        "Turni",
+        "Job automatici",
+        "Notifiche",
+        "Email",
+        "Segnalazioni",
+        "Versione app",
+      ],
+    );
     const memberVisible = filterMobileNavItems(
       MOBILE_ADMIN_NAV_ITEMS,
       (required) => hasPermissions(memberContext, required),
     );
     assert.equal(memberVisible.length, 0);
+  });
+});
+
+describe("Domande frequenti 1.4 nel drawer", () => {
+  it("mette «Domande frequenti» subito dopo «Segnala un problema» e prima di «Profilo»", () => {
+    const labels = filterMobileNavItems(MOBILE_DRAWER_NAV_ITEMS, (required) =>
+      hasPermissions(memberContext, required),
+    ).map((item) => item.label);
+    const feedback = labels.indexOf("Segnala un problema");
+    assert.ok(feedback > -1);
+    assert.deepEqual(labels.slice(feedback, feedback + 3), [
+      "Segnala un problema",
+      "Domande frequenti",
+      "Profilo",
+    ]);
+  });
+
+  it("è la stessa voce del sito: stesso path e stesso permesso di «Segnala un problema»", () => {
+    const faq = MOBILE_DRAWER_NAV_ITEMS.find((item) => item.id === "faq");
+    const feedback = MOBILE_DRAWER_NAV_ITEMS.find((item) => item.id === "feedback");
+    assert.equal(faq?.path, "/domande-frequenti");
+    assert.deepEqual(faq?.requiredPermissions, feedback?.requiredPermissions);
+    assert.equal(NAV_LABELS.faq, "Domande frequenti");
   });
 });
 

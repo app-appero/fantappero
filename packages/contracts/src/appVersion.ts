@@ -25,6 +25,33 @@ export interface AppVersionInfo {
   android: AndroidAppVersion | null;
 }
 
+/**
+ * Risposta di `PUT /admin/app-version` (release 1.4): la versione salvata e quante notifiche
+ * «È disponibile la versione X» sono partite con questo salvataggio.
+ */
+export interface AppVersionSaveResult extends AppVersionInfo {
+  /**
+   * Notifiche nuove (0 se si risalva lo stesso versionCode); `null` se l'invio non è riuscito
+   * (la versione resta salvata); assente dai server più vecchi.
+   */
+  notifiedUsers?: number | null;
+}
+
+/** Testo dopo «Salva» nel modulo «Versione app» (sito e app). */
+export function appVersionSavedMessage(result: AppVersionSaveResult): string {
+  const notified = result.notifiedUsers;
+  if (notified === undefined) {
+    return "Versione salvata: chi ha un'app più vecchia vedrà l'avviso.";
+  }
+  if (notified === null) {
+    return "Versione salvata, ma la notifica non è partita. Salva di nuovo più tardi per riprovare.";
+  }
+  if (notified === 0) {
+    return "Versione salvata. Nessuna notifica nuova: chi non ha questa versione era già stato avvisato.";
+  }
+  return `Versione salvata: notifica inviata a ${notified} ${notified === 1 ? "utente" : "utenti"} che non ${notified === 1 ? "ha" : "hanno"} ancora questa versione.`;
+}
+
 /** Corpo di `PUT /admin/app-version`. */
 export interface AndroidAppVersionUpdate {
   latestVersionName: string;
@@ -69,4 +96,107 @@ export function appUpdateBannerText(versionName: string): string {
 /** Link di download accettato: solo https, con un dominio e senza spazi (come il server). */
 export function isHttpsDownloadUrl(url: string): boolean {
   return /^https:\/\/[^\s/?#:@]+(:\d+)?([/?#]\S*)?$/.test(url.trim());
+}
+
+// --- modulo «Versione app» del pannello operatore (sito e app, release 1.4) -------------------
+
+/** I quattro campi del modulo, come li scrive l'operatore. */
+export interface AppVersionFormFields {
+  name: string;
+  code: string;
+  url: string;
+  message: string;
+}
+
+export type AppVersionFormErrors = Partial<Record<keyof AppVersionFormFields, string>>;
+
+export const EMPTY_APP_VERSION_FORM: AppVersionFormFields = { name: "", code: "", url: "", message: "" };
+
+const VERSION_NAME_PATTERN = /^[0-9]+(\.[0-9]+){0,3}$/;
+/** Come il server (`ANDROID_MAX_VERSION_CODE`). */
+const MAX_VERSION_CODE = 2_100_000_000;
+const MAX_MESSAGE_LENGTH = 200;
+
+/** Campi precompilati con la versione annunciata (vuoti se non c'è). */
+export function appVersionFormFrom(info: AppVersionInfo | null | undefined): AppVersionFormFields {
+  const android = info?.android;
+  return android
+    ? {
+        name: android.latestVersionName,
+        code: String(android.latestVersionCode),
+        url: android.downloadUrl,
+        message: android.message ?? "",
+      }
+    : { ...EMPTY_APP_VERSION_FORM };
+}
+
+/** Errori dei campi, con i testi mostrati sotto ciascun campo. Vuoto = si può salvare. */
+export function validateAppVersionForm(fields: AppVersionFormFields): AppVersionFormErrors {
+  const errors: AppVersionFormErrors = {};
+  if (!VERSION_NAME_PATTERN.test(fields.name.trim())) {
+    errors.name = "Scrivi la versione con numeri e punti, per esempio 1.3.0.";
+  }
+  const code = Number(fields.code.trim());
+  if (!/^\d+$/.test(fields.code.trim()) || code < 1 || code > MAX_VERSION_CODE) {
+    errors.code = "Il versionCode è un numero intero maggiore di zero.";
+  }
+  if (!isHttpsDownloadUrl(fields.url)) {
+    errors.url = "Il link deve iniziare con https://";
+  }
+  if (fields.message.trim().length > MAX_MESSAGE_LENGTH) {
+    errors.message = "Il messaggio può avere al massimo 200 caratteri.";
+  }
+  return errors;
+}
+
+/** Corpo di `PUT /admin/app-version` dai campi già validati. */
+export function appVersionUpdateFrom(fields: AppVersionFormFields): AndroidAppVersionUpdate {
+  return {
+    latestVersionName: fields.name.trim(),
+    latestVersionCode: Number(fields.code.trim()),
+    downloadUrl: fields.url.trim(),
+    message: fields.message.trim() || null,
+  };
+}
+
+// --- «Sei sicuro?» prima di salvare (sito e app, decisione di Rosario del 23/11) -------------
+
+/** Testi della conferma prima di «Salva»: dialogo sul sito, `Alert.alert` nell'app. */
+export interface AppVersionSaveConfirmation {
+  title: string;
+  message: string;
+  /** Tasto che salva davvero: «Annuncia» (versione nuova) o «Salva» (stessa versione). */
+  confirmLabel: string;
+  cancelLabel: string;
+}
+
+export const APP_VERSION_CONFIRM_CANCEL_LABEL = "Annulla";
+
+/**
+ * Conferma prima di salvare la versione: salvare un versionCode nuovo manda la notifica e fa
+ * comparire l'avviso nell'app, quindi si chiede «Annunciare la versione 1.4.0 (versionCode 5)?».
+ * Se il versionCode è quello già annunciato (per esempio per correggere link o messaggio) la
+ * notifica non riparte e la conferma lo dice.
+ */
+export function appVersionSaveConfirmation(
+  update: AndroidAppVersionUpdate,
+  current: AndroidAppVersion | null | undefined,
+): AppVersionSaveConfirmation {
+  const label = `${update.latestVersionName} (versionCode ${update.latestVersionCode})`;
+  if (current && current.latestVersionCode === update.latestVersionCode) {
+    return {
+      title: `Salvare le modifiche alla versione ${label}?`,
+      message:
+        "È la versione già annunciata: la notifica non parte di nuovo. L'avviso nell'app userà il link e il messaggio nuovi.",
+      confirmLabel: "Salva",
+      cancelLabel: APP_VERSION_CONFIRM_CANCEL_LABEL,
+    };
+  }
+  return {
+    title: `Annunciare la versione ${label}?`,
+    message:
+      "Tutti gli utenti che usano l'app Android (o il sito da un telefono Android) e non hanno ancora questa versione riceveranno una notifica; nell'app vedranno anche l'avviso di aggiornamento.",
+    confirmLabel: "Annuncia",
+    cancelLabel: APP_VERSION_CONFIRM_CANCEL_LABEL,
+  };
 }

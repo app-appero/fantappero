@@ -15,6 +15,7 @@ import { AthleteName } from "../../athletes/AthleteCard";
 import { PageContainer } from "../../layout/PageContainer";
 import { foldSearchText } from "../roster/listoneFilter";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
+import { AdminMarketValueDetailCard } from "./AdminMarketValueDetailCard";
 import { AdminSeasonHistoryCard } from "./AdminSeasonHistoryCard";
 
 const { colors } = theme;
@@ -186,6 +187,13 @@ export function AdminListoneScreen() {
       onRefresh={onRefresh}
     >
       <AdminSeasonHistoryCard />
+      {/* 1.4: come si arriva al Valore di un calciatore (cerca nel listone caricato qui sotto). */}
+      <AdminMarketValueDetailCard
+        entries={entries}
+        seasonYear={
+          Number.isInteger(Number(seasonYear)) && Number(seasonYear) >= 2000 ? Number(seasonYear) : null
+        }
+      />
       <View style={styles.section} testID="admin-listone-card">
         <View style={seasonStyles.row}>
           <View style={seasonStyles.field}>

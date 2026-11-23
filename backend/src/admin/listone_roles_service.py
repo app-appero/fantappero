@@ -51,6 +51,7 @@ from sports_data.listone.generate import compute_provider_role_changes
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete
 from sports_data.listone.reconstruct import reconstruct_roles_before
+from sports_data.listone.update_log import record_listone_update
 from sports_data.roster.models import Athlete
 
 _logger = get_logger(__name__)
@@ -319,6 +320,14 @@ class AdminListoneRolesService:
                 athlete_ids=[row.athlete_id for row, _ in applied],
                 season_year=season_year,
             )
+            record_listone_update(
+                self._session,
+                season_year=season_year,
+                kind="roles_restored",
+                source="operator",
+                actor=actor,
+                changed=restored,
+            )
             self._audit(
                 actor=actor,
                 operation="listone_roles_restored",
@@ -425,6 +434,14 @@ class AdminListoneRolesService:
                 self._session,
                 athlete_ids=[change.assignment.athlete_id for change in applied],
                 season_year=season_year,
+            )
+            record_listone_update(
+                self._session,
+                season_year=season_year,
+                kind="roles_from_provider",
+                source="operator",
+                actor=actor,
+                changed=len(applied),
             )
             if actor is not None:
                 self._audit(

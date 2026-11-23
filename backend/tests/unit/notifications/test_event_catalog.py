@@ -30,6 +30,7 @@ _EXPECTED_SISTEMA_EVENTS = {
     "sistema.lega",
     "sistema.turno_aperto",
     "sistema.avvisi_operatori",
+    "sistema.versione_app",
 }
 
 

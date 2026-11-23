@@ -15,6 +15,7 @@ import type {
   AdminListoneEntry,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
+  AdminMarketValueDetail,
   AdminMarketValuesRefreshResult,
   AdminOverview,
   AdminResultRecoveryJob,
@@ -204,6 +205,18 @@ export function refreshMarketValues(
     method: "POST",
     body: { seasonYear },
   });
+}
+
+/** «Dettaglio del Valore» (1.4): ogni passaggio del Valore di un calciatore, dall'ultimo ricalcolo. */
+export function fetchMarketValueDetail(
+  accessToken: string,
+  athleteId: string,
+  seasonYear: number,
+): Promise<AdminMarketValueDetail> {
+  return apiRequest<AdminMarketValueDetail>(
+    `/admin/listone/valori/${encodeURIComponent(athleteId)}?seasonYear=${seasonYear}`,
+    { accessToken },
+  );
 }
 
 // --- Pannello operatore: turni, calendario, formazioni IA (EP-turni-automazione/calcolo) ---

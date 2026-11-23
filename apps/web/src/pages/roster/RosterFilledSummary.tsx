@@ -1,4 +1,4 @@
-import { playerAvatarUrl } from "@fantappero/contracts";
+import { FAQ_HELP, playerAvatarUrl } from "@fantappero/contracts";
 import type { FantasyRole, FantasyTeam } from "@fantappero/contracts";
 import {
   Badge,
@@ -15,6 +15,7 @@ import {
 } from "@fantappero/ui";
 import { useEffect, useState } from "react";
 import { AthleteName } from "../../athletes/AthleteCard";
+import { FaqHelpButton } from "../../components/FaqHelpButton";
 import { RosterActionButton, RosterColLabel } from "./RosterActionButton";
 import {
   compositionStatusLabel,
@@ -167,14 +168,21 @@ function RosterRoleTable({
                           {slot.athleteName ?? "Calciatore"}
                         </AthleteName>
                         {slot.exceedsRoleQuota ? (
-                          <Badge
-                            variant="warning"
-                            className="fa-auction-player__badge"
-                            data-testid={`roster-pending-badge-${slot.athleteId ?? slot.slotIndex}`}
-                            title="Scambio accettato con la rosa già al completo (per ruolo o nel totale): svincola qualcuno per schierarlo."
-                          >
-                            In attesa
-                          </Badge>
+                          // Il «?» apre «Ho un giocatore in esubero: cosa faccio?» (FAQ 1.4).
+                          <span className="fa-faq-help-inline">
+                            <Badge
+                              variant="warning"
+                              className="fa-auction-player__badge"
+                              data-testid={`roster-pending-badge-${slot.athleteId ?? slot.slotIndex}`}
+                              title="Scambio accettato con la rosa già al completo (per ruolo o nel totale): svincola qualcuno per schierarlo."
+                            >
+                              In attesa
+                            </Badge>
+                            <FaqHelpButton
+                              faqId={FAQ_HELP.surplus}
+                              data-testid={`roster-pending-help-${slot.athleteId ?? slot.slotIndex}`}
+                            />
+                          </span>
                         ) : null}
                       </span>
                     </span>

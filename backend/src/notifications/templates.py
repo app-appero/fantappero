@@ -759,3 +759,31 @@ def _render_sistema_feedback_stato(params: NotificationParams) -> NotificationCo
         body=f"«{excerpt}»" if excerpt else "",
         deep_link="/feedback",
     )
+
+
+def _display_version_name(version_name: str) -> str:
+    """Come l'avviso nell'app (``displayAppVersionName``): «1.4.0» → «1.4», «1.4.1» resta."""
+    parts = version_name.strip().split(".")
+    while len(parts) > 2 and parts[-1] == "0":
+        parts.pop()
+    return ".".join(parts)
+
+
+@register_template("sistema.versione_app", 1)
+def _render_sistema_versione_app(params: NotificationParams) -> NotificationContent:
+    """Nuova versione dell'app annunciata dall'operatore (release 1.4, Rosario 23/11).
+
+    Il link è quello di download dell'APK (https): l'app 1.4 lo apre al tocco, il sito lo
+    mostra nell'elenco.
+    """
+    name = _display_version_name(str(params.get("version_name") or ""))
+    message = str(params.get("message") or "").strip()
+    hint = "Apri la notifica per scaricare l'aggiornamento."
+    link = params.get("download_url")
+    return NotificationContent(
+        title=f"È disponibile la versione {name} dell'app"
+        if name
+        else "È disponibile una nuova versione dell'app",
+        body=f"{message} {hint}" if message else hint,
+        deep_link=str(link) if link else None,
+    )

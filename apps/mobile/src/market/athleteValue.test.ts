@@ -75,6 +75,7 @@ describe("Ordina per media", () => {
     entry("senza-media", null, 3),
     entry("scorsa-612", previous, 12),
     entry("in-corso-645", current, 24),
+    entry("scorsa-720", { ...previous, value: 7.2 }, 40),
     entry("in-corso-701", { ...current, value: 7.01 }, 58),
     entry("assente", undefined),
   ];
@@ -82,14 +83,14 @@ describe("Ordina per media", () => {
   it("spenta: resta l'ordine del listone", () => {
     assert.deepEqual(
       orderListoneRows(rows, false, sortBySeasonAverageDesc).map((row) => row.athleteId),
-      ["senza-media", "scorsa-612", "in-corso-645", "in-corso-701", "assente"],
+      ["senza-media", "scorsa-612", "in-corso-645", "scorsa-720", "in-corso-701", "assente"],
     );
   });
 
-  it("accesa: dalla media più alta, chi non l'ha in fondo nell'ordine dato", () => {
+  it("accesa: prima la stagione in corso, poi la scorsa, chi non ha media in fondo (Rosario 23/11)", () => {
     assert.deepEqual(
       orderListoneRows(rows, true, sortBySeasonAverageDesc).map((row) => row.athleteId),
-      ["in-corso-701", "in-corso-645", "scorsa-612", "senza-media", "assente"],
+      ["in-corso-701", "in-corso-645", "scorsa-720", "scorsa-612", "senza-media", "assente"],
     );
   });
 

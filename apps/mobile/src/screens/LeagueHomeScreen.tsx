@@ -21,6 +21,7 @@ import { TeamAvatar } from "../components/TeamAvatar";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { leagueHomeCompetitionsHint, leagueHomeStatHintLines } from "../leagues/leagueHomeStats";
 import { LEAGUE_STATE_LABELS } from "../leagues/leagueLabels";
 import { leagueNextStepRoute } from "../leagues/leagueNextStep";
 import { pendingInvitesLabel } from "../market/marketGateNotice";
@@ -216,7 +217,8 @@ export function LeagueHomeScreen() {
                 ["Partecipanti", `${members.length}/${league.rules.participantCount}`, `${league.rules.participantMin}–${league.rules.participantMax} consentiti`, (league.pendingInviteCount ?? 0) > 0 ? pendingInvitesLabel(league.pendingInviteCount ?? 0) : null],
                 ["Crediti", `${league.rules.totalCredits}`, "per squadra", null],
                 ["Rosa", `${league.rules.roster.rosterSize}`, `${league.rules.roster.goalkeepers}P·${league.rules.roster.defenders}D·${league.rules.roster.midfielders}C·${league.rules.roster.forwards}A`, null],
-                ["Campionati", `${league.competitions.length}`, league.competitions.map((row) => row.name).join(" · ") || "—", null],
+                // Un campionato per riga, senza taglio (QA notte 21→22/11: «La Liga · Premier Leagu…»).
+                ["Campionati", `${league.competitions.length}`, leagueHomeCompetitionsHint(league.competitions), null],
               ].map(([label, value, hint, extra]) => (
                 <View key={label} style={styles.stat}>
                   <Text style={styles.statLabel}>{label}</Text>
@@ -226,7 +228,13 @@ export function LeagueHomeScreen() {
                       {extra}
                     </Text>
                   ) : null}
-                  <Text style={styles.statHint} numberOfLines={1}>{hint}</Text>
+                  <Text
+                    style={styles.statHint}
+                    numberOfLines={leagueHomeStatHintLines(label ?? "")}
+                    testID={label === "Campionati" ? "league-home-competitions" : undefined}
+                  >
+                    {hint}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -265,6 +273,10 @@ export function LeagueHomeScreen() {
                 ["Soglia minuti per il voto", `${league.rules.minutesThreshold} min`],
                 ["Lock formazione", `${league.rules.lineupLockMarginMinutes} min`],
                 ["Titolari minimi per il turno", `${Math.round(league.rules.turnCoverageThreshold * 100)}%`],
+                // Le «Domande frequenti» (1.4) rimandano qui per il numero di cambi della lega.
+                ...(league.rules.maxAutomaticSubstitutions != null
+                  ? [["Cambi automatici (max)", `${league.rules.maxAutomaticSubstitutions}`]]
+                  : []),
                 ["Scambi", league.rules.options.allowTrades ? "Attivi" : "Disattivati"],
                 ["Inviti manuali", league.rules.options.allowManualInvites ? "Attivi" : "Disattivati"],
                 ["Approvazione scambi", league.rules.options.requireTradeApproval ? "Richiesta" : "Non richiesta"],

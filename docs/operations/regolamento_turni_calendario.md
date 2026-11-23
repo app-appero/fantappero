@@ -61,14 +61,23 @@ Le regole qui sotto descrivono il comportamento del codice; dove il codice cambi
 
 ## 5. Domande frequenti (testo per i fantallenatori)
 
+Dalla 1.4 queste risposte sono sul sito e nell'app, nella voce di menù «Domande frequenti» subito dopo «Segnala un problema», con in più «Cos'è la regola del 75%?» (dal punto 2): il testo mostrato sta in `packages/contracts/src/faq.ts` e va aggiornato insieme a questo capitolo.
+
+**Regola standard (Rosario, 23/11).** Ogni lega può cambiare la soglia dei titolari (da 50% a 100%), il numero di cambi automatici (da 0 a 5) e i minuti del blocco (da 0 a 60). Dove una risposta cita 9 titolari, 5 cambi o 15 minuti, dice che è la regola standard e rimanda a «Regolamento» nella home della lega, dove dalla 1.4 compare anche «Cambi automatici (max)».
+
+**Il «?» accanto alle scritte (1.4).** Un piccolo «?» apre la risposta giusta dal basso (sul sito dal computer, in una finestra al centro), con il link «Tutte le domande frequenti» alla pagina con quella risposta aperta:
+- accanto a «Turno saltato» in Turni › Turni europei, sia vicino al menù dei turni sia in «Stato: Turno saltato» → «Perché un turno è «saltato»?»;
+- accanto a «In attesa» (sito) / «In attesa (fuori rosa)» (app) in Rosa, cioè il giocatore in esubero → «Ho un giocatore «in esubero»: cosa faccio?»;
+- accanto all'orario del blocco in Formazione → «Quando si blocca la formazione?».
+
 **Perché un turno è «saltato»?**
-Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare almeno 9 titolari con giocatori che giocano davvero, per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.
+Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare, con giocatori che giocano davvero, almeno 9 titolari (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»). Succede per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.
 
 **Se un mio titolare non gioca, prendo 0?**
-No: entra un giocatore della tua panchina, nell'ordine che hai scelto e rispettando il modulo, fino a 5 cambi. È il normale funzionamento del fantacalcio.
+No: entra un giocatore della tua panchina, nell'ordine che hai scelto e rispettando il modulo, fino a 5 cambi (è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»). È il normale funzionamento del fantacalcio.
 
 **Ho tanti giocatori di campionati diversi: rischio?**
-Se in un turno gioca solo un campionato e tu non hai almeno 9 titolari possibili in quel campionato, il turno salta per tutti. Non prendi 0 da solo. Più la rosa è distribuita sui campionati della lega, meno turni saltano.
+Se in un turno gioca solo un campionato e tu non hai almeno 9 titolari possibili in quel campionato (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»), il turno salta per tutti. Non prendi 0 da solo. Più la rosa è distribuita sui campionati della lega, meno turni saltano.
 
 **Il calendario cambierà?**
 Solo le giornate future che diventano non giocabili, per partite rinviate o per cambi di rosa, si spostano. Le giornate con risultati non cambiano mai.
@@ -80,4 +89,4 @@ Non dovrebbe più succedere: dal 22/11 i ruoli del listone sono fissi per la sta
 Hai più giocatori di quelli ammessi in quel ruolo. Puoi svincolarne uno o scambiarlo. Finché la rosa non torna in regola, quel giocatore non si può schierare.
 
 **Quando si blocca la formazione?**
-Ogni giocatore si blocca poco prima della sua partita, di solito 15 minuti. Gli altri si possono ancora cambiare fino alla loro partita.
+Ogni giocatore si blocca poco prima della sua partita, di solito 15 minuti (è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»). Gli altri giocatori si possono ancora cambiare fino alla loro partita.

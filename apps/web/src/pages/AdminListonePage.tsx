@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ListoneProviderRolesPreview } from "../admin/ListoneProviderRolesPreview";
 import { useListoneRefresh } from "../admin/ListoneRefreshContext";
 import { ListoneRoleRestoreSection } from "../admin/ListoneRoleRestoreSection";
+import { MarketValueDetailPanel } from "../admin/MarketValueDetailPanel";
 import { SeasonHistoryPanel } from "../admin/SeasonHistoryPanel";
 import { fetchAdminListone } from "../api/admin";
 import { ApiError } from "../api/client";
@@ -477,6 +478,11 @@ export function AdminListonePage() {
       </Modal>
       {/* 1.3: storico delle stagioni passate dal fornitore, medie e Valore di mercato. */}
       <SeasonHistoryPanel defaultSeasonYear={CURRENT_YEAR} />
+      {/* 1.4: come si arriva al Valore di un calciatore (cerca nel listone caricato qui sopra). */}
+      <MarketValueDetailPanel
+        entries={entries}
+        seasonYear={Number.isInteger(Number(seasonYear)) && Number(seasonYear) >= 2000 ? Number(seasonYear) : null}
+      />
       <ListoneRoleRestoreSection
         seasonYear={Number.isInteger(Number(seasonYear)) ? Number(seasonYear) : null}
         onRestored={() => void load()}

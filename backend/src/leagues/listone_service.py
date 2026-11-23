@@ -244,6 +244,7 @@ class LeagueListoneService:
                     listoneUnchanged=listone_result.counters.unchanged,
                     listoneSkippedUnmapped=listone_result.counters.skipped_unmapped,
                     roleChangesSkipped=listone_result.counters.role_changes_skipped,
+                    listoneRemoved=listone_result.counters.deactivated,
                     catalogSynced=True,
                 )
                 self._session.add(

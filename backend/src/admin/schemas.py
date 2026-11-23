@@ -20,6 +20,10 @@ class AdminOverviewResponse(ApiModel):
     users_count: int = Field(alias="usersCount")
     operators_count: int = Field(alias="operatorsCount")
     leagues_count: int = Field(alias="leaguesCount")
+    #: Riepilogo 1.4: leghe per stato (`draft`, `active`, …). Vuoto dai server più vecchi.
+    leagues_by_state: dict[str, int] = Field(default_factory=dict, alias="leaguesByState")
+    #: Riepilogo 1.4: le cose da guardare. Assente dai server più vecchi.
+    watch: AdminWatchResponse | None = None
 
 
 class AdminUserResponse(ApiModel):
@@ -274,6 +278,8 @@ class AdminListoneRefreshCounters(ApiModel):
     listone_skipped_unmapped: int = Field(alias="listoneSkippedUnmapped")
     #: Ruoli che il fornitore cambierebbe ma che restano quelli del listone (congelati).
     role_changes_skipped: int = Field(default=0, alias="roleChangesSkipped")
+    #: Calciatori tolti dal listone (non più in una rosa del fornitore), release 1.4.
+    listone_removed: int = Field(default=0, alias="listoneRemoved")
     catalog_synced: bool = Field(alias="catalogSynced")
 
 
@@ -509,6 +515,67 @@ class AppVersionResponse(ApiModel):
     android: AndroidAppVersionResponse | None = None
 
 
+class AdminAppVersionSaveResponse(AppVersionResponse):
+    """Risposta di ``PUT /admin/app-version`` (release 1.4): la versione e chi è stato avvisato.
+
+    ``notifiedUsers`` = notifiche nuove create con questo salvataggio (0 se si risalva lo stesso
+    versionCode); vuoto se l'invio delle notifiche non è riuscito (la versione resta salvata).
+    """
+
+    notified_users: int | None = Field(default=None, alias="notifiedUsers")
+
+
+class AdminAppUsageUserResponse(ApiModel):
+    user_id: str = Field(alias="userId")
+    #: Nome pubblico: soprannome se scelto, altrimenti nome.
+    display_name: str = Field(alias="displayName")
+    #: Nome del profilo, solo se diverso da ``displayName`` (c'è un soprannome).
+    name: str | None = None
+    email: str
+    first_seen_at: datetime | None = Field(default=None, alias="firstSeenAt")
+    last_seen_at: datetime | None = Field(default=None, alias="lastSeenAt")
+
+
+class AdminAppUsageGroupResponse(ApiModel):
+    """Un gruppo dell'elenco: una versione esatta, una versione non nota, il sito da Android
+    o «app mai usata»."""
+
+    #: ``version``: versione esatta (app 1.4+); ``unknown_recent``: app 1.2 o 1.3;
+    #: ``unknown``: app senza versione (1.1 o precedenti); ``web_android``: sito da un telefono
+    #: Android, app mai vista (ricevono la notifica della nuova versione); ``never``: app mai
+    #: usata / solo sito da computer o iPhone.
+    kind: Literal["version", "unknown_recent", "unknown", "web_android", "never"]
+    #: ``android`` o ``ios`` per l'app, ``web-android`` per il sito da Android, vuoto per
+    #: ``never``.
+    platform: str | None = None
+    version_name: str | None = Field(default=None, alias="versionName")
+    version_code: int | None = Field(default=None, alias="versionCode")
+    #: Vero se il gruppo ha la versione annunciata o una più nuova.
+    up_to_date: bool = Field(default=False, alias="upToDate")
+    users: list[AdminAppUsageUserResponse] = Field(default_factory=list)
+
+
+class AdminAppUsageResponse(ApiModel):
+    """Chi ha quale versione dell'app, versione per versione (``GET /admin/app-version/users``)."""
+
+    generated_at: datetime = Field(alias="generatedAt")
+    announced: AndroidAppVersionResponse | None = None
+    #: Utenti attivi (account non eliminati).
+    total_users: int = Field(alias="totalUsers")
+    #: Utenti visti almeno una volta nell'app (qualsiasi versione; il sito da Android no).
+    app_users: int = Field(alias="appUsers")
+    #: Utenti con la versione annunciata o una più nuova (0 se non è annunciata nessuna versione).
+    up_to_date_users: int = Field(alias="upToDateUsers")
+    groups: list[AdminAppUsageGroupResponse] = Field(default_factory=list)
+
+
+class AdminAppUsageSummaryResponse(ApiModel):
+    """Per la riga «App Android annunciata» del Riepilogo: aggiornati su chi usa l'app."""
+
+    up_to_date_users: int = Field(alias="upToDateUsers")
+    app_users: int = Field(alias="appUsers")
+
+
 class AdminAndroidAppVersionUpdateRequest(ApiModel):
     latest_version_name: NoNulStr = Field(
         alias="latestVersionName",
@@ -542,3 +609,86 @@ class AdminAndroidAppVersionUpdateRequest(ApiModel):
         if value is None:
             return None
         return value.strip() or None
+
+
+# --- Riepilogo del pannello operatore: «Da guardare» (release 1.4, Rosario 22/11) ----------
+
+
+class AdminWatchJobResponse(ApiModel):
+    key: str
+    title: str
+
+
+class AdminWatchJobFailureResponse(ApiModel):
+    """Un job con giri finiti con errore nel periodo guardato (l'errore più recente)."""
+
+    job_key: str = Field(alias="jobKey")
+    title: str
+    failed_at: datetime = Field(alias="failedAt")
+    reason: str | None = None
+    #: Quanti giri finiti con errore nel periodo.
+    failures: int
+    #: Esito dell'ultimo giro, anche se successivo all'errore: ``ok`` = il job è già ripreso.
+    last_outcome: Literal["ok", "failed"] = Field(alias="lastOutcome")
+    last_finished_at: datetime = Field(alias="lastFinishedAt")
+
+
+class AdminListoneUpdateResponse(ApiModel):
+    """Ultimo aggiornamento del listone, salvato per sempre in ``listone_updates``."""
+
+    updated_at: datetime = Field(alias="updatedAt")
+    season_year: int = Field(alias="seasonYear")
+    kind: Literal["refresh", "roles_from_provider", "roles_restored"]
+    #: ``operator`` dal pannello operatore, ``league`` dalla pagina di una lega.
+    source: Literal["operator", "league"]
+    author_display_name: str | None = Field(default=None, alias="authorDisplayName")
+    league_name: str | None = Field(default=None, alias="leagueName")
+    added: int
+    removed: int
+    changed: int
+
+
+class AdminCurrentRoundsResponse(ApiModel):
+    """Giornate in corso (turno aperto o bloccato con la finestra non finita) nelle leghe attive."""
+
+    active_leagues: int = Field(alias="activeLeagues")
+    leagues_in_progress: int = Field(alias="leaguesInProgress")
+    round_numbers: list[int] = Field(default_factory=list, alias="roundNumbers")
+
+
+class AdminNextLineupLockResponse(ApiModel):
+    """Il prossimo blocco delle formazioni fra tutte le leghe attive."""
+
+    lock_at: datetime = Field(alias="lockAt")
+    league_id: str = Field(alias="leagueId")
+    league_name: str = Field(alias="leagueName")
+    round_number: int = Field(alias="roundNumber")
+
+
+class AdminWatchResponse(ApiModel):
+    generated_at: datetime = Field(alias="generatedAt")
+    tester_requests_pending: int = Field(alias="testerRequestsPending")
+    oldest_tester_request_at: datetime | None = Field(default=None, alias="oldestTesterRequestAt")
+    feedback_new: int = Field(alias="feedbackNew")
+    latest_feedback_at: datetime | None = Field(default=None, alias="latestFeedbackAt")
+    jobs_disabled: list[AdminWatchJobResponse] = Field(default_factory=list, alias="jobsDisabled")
+    #: Da quando si guardano gli errori dei job (oggi: le ultime 24 ore).
+    job_failures_since: datetime = Field(alias="jobFailuresSince")
+    job_failures: list[AdminWatchJobFailureResponse] = Field(
+        default_factory=list, alias="jobFailures"
+    )
+    listone_last_update: AdminListoneUpdateResponse | None = Field(
+        default=None, alias="listoneLastUpdate"
+    )
+    current_rounds: AdminCurrentRoundsResponse = Field(alias="currentRounds")
+    next_lineup_lock: AdminNextLineupLockResponse | None = Field(
+        default=None, alias="nextLineupLock"
+    )
+    android_app_version: AndroidAppVersionResponse | None = Field(
+        default=None, alias="androidAppVersion"
+    )
+    #: Release 1.4: quanti hanno la versione annunciata su quanti usano l'app. Vuoto senza
+    #: versione annunciata.
+    android_app_usage: AdminAppUsageSummaryResponse | None = Field(
+        default=None, alias="androidAppUsage"
+    )

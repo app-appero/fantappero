@@ -1,6 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
 import { AuthScreen } from "../screens/AuthScreen";
 import { AuthForgotPasswordScreen } from "../screens/AuthForgotPasswordScreen";
@@ -8,6 +8,7 @@ import { AuthRegisterScreen } from "../screens/AuthRegisterScreen";
 import { AuthResetPasswordScreen } from "../screens/AuthResetPasswordScreen";
 import { AuthVerifyEmailScreen } from "../screens/AuthVerifyEmailScreen";
 import { CreateLeagueScreen } from "../screens/CreateLeagueScreen";
+import { FaqScreen } from "../screens/FaqScreen";
 import { FeedbackScreen } from "../screens/FeedbackScreen";
 import { PrivacyScreen } from "../screens/PrivacyScreen";
 import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
@@ -21,13 +22,14 @@ import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { ReceivedInvitesScreen } from "../screens/ReceivedInvitesScreen";
 import { withLockCountdown } from "../layout/LockCountdownBar";
 import { useAuthSession } from "../session/DemoSessionContext";
+import { startupGate } from "../session/startupRestore";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 import { AdminNavigator } from "./AdminNavigator";
 import { AppTabNavigator } from "./AppTabNavigator";
 import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const { colors, spacing, typography } = theme;
+const { colors, spacing, typography, radius } = theme;
 
 const CreateLeagueWithCountdown = withLockCountdown(CreateLeagueScreen);
 const LeagueHomeWithCountdown = withLockCountdown(LeagueHomeScreen);
@@ -36,6 +38,7 @@ const JoinLeagueWithCountdown = withLockCountdown(JoinLeagueScreen);
 const ReceivedInvitesWithCountdown = withLockCountdown(ReceivedInvitesScreen);
 const NotificationsWithCountdown = withLockCountdown(NotificationsScreen);
 const FeedbackWithCountdown = withLockCountdown(FeedbackScreen);
+const FaqWithCountdown = withLockCountdown(FaqScreen);
 const ManagerDirectoryWithCountdown = withLockCountdown(ManagerDirectoryScreen);
 const CoachProfileWithCountdown = withLockCountdown(CoachProfileScreen);
 const MatchupDetailWithCountdown = withLockCountdown(MatchupDetailScreen);
@@ -51,12 +54,47 @@ function SessionLoadingScreen() {
   );
 }
 
+/**
+ * Avvio senza rete con una sessione salvata (corsa M5, 22/11): al posto di «Bentornato» un
+ * messaggio di rete con «Riprova». L'app riprova anche da sola (vedi `DemoSessionContext`) e
+ * appena il server risponde entra con la stessa sessione, senza chiedere la password.
+ */
+function SessionOfflineScreen() {
+  const { restoringSession, retrySessionRestore } = useAuthSession();
+  return (
+    <View style={styles.loadingRoot} testID="auth-offline">
+      <Text style={styles.loadingTitle} accessibilityRole="header">
+        Connessione non disponibile
+      </Text>
+      <Text style={styles.loadingMessage}>
+        Non riusciamo a raggiungere FantApperò. Controlla la rete: appena torna l&apos;app riparte da
+        sola, senza rifare l&apos;accesso.
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ busy: restoringSession, disabled: restoringSession }}
+        disabled={restoringSession}
+        onPress={() => void retrySessionRestore()}
+        style={[styles.retryButton, restoringSession && styles.retryButtonBusy]}
+        testID="auth-offline-retry"
+      >
+        {restoringSession ? <ActivityIndicator color={colors.onBrand} /> : null}
+        <Text style={styles.retryLabel}>{restoringSession ? "Riprovo…" : "Riprova"}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 /** Gate auth come web RequireAuth: senza sessione → Accedi; dopo login → app. */
 export function RootNavigator() {
-  const { isAuthenticated, loading } = useAuthSession();
+  const { isAuthenticated, loading, sessionOffline } = useAuthSession();
+  const gate = startupGate({ loading, isAuthenticated, sessionOffline });
 
-  if (loading) {
+  if (gate === "loading") {
     return <SessionLoadingScreen />;
+  }
+  if (gate === "offline") {
+    return <SessionOfflineScreen />;
   }
 
   return (
@@ -150,6 +188,11 @@ export function RootNavigator() {
             options={{ title: "Segnala un problema" }}
           />
           <Stack.Screen
+            name="Faq"
+            component={FaqWithCountdown}
+            options={{ title: "Domande frequenti" }}
+          />
+          <Stack.Screen
             name="ManagerDirectory"
             component={ManagerDirectoryWithCountdown}
             options={{ title: "Fantallenatori" }}
@@ -198,5 +241,25 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
     textAlign: "center",
+  },
+  retryButton: {
+    marginTop: spacing.md,
+    minHeight: 48,
+    minWidth: 160,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+  },
+  retryButtonBusy: {
+    opacity: 0.7,
+  },
+  retryLabel: {
+    color: colors.onBrand,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
 }));

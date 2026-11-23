@@ -404,6 +404,23 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
+  // Badge «In attesa (fuori rosa)» e il «?» delle Domande frequenti accanto (1.4): l'area di
+  // tocco di 44px non allunga la scheda (margini negativi), il cerchio resta di 22px.
+  playerPendingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    marginVertical: -10,
+  },
+  playerPendingBadgeInRow: {
+    alignSelf: "center",
+    flexShrink: 1,
+    marginTop: 0,
+  },
+  playerPendingHelp: {
+    marginLeft: -4,
+  },
   rowActionBadge: {
     width: 28,
     height: 28,

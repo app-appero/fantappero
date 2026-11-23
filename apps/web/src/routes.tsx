@@ -2,6 +2,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { RequireGlobalOperator, RequirePermissions } from "./auth/RequirePermissions";
 import { AdminLayout, AppLayout } from "./layout/AppLayout";
 import {
+  AdminAppVersionPage,
   AdminDashboardPage,
   AdminFeedbackPage,
   AdminLeaguesPage,
@@ -33,6 +34,7 @@ import {
   StandingsPage,
 } from "./pages/AppPages";
 import { DevShowcasePage } from "./pages/DevShowcasePage";
+import { FaqPage } from "./pages/FaqPage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { WireframesHubPage } from "./pages/WireframesHubPage";
@@ -235,6 +237,16 @@ export function AppRoutes() {
     );
   }
 
+  if (pathname === "/domande-frequenti") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["profile:view"]}>
+          <FaqPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
   if (pathname === "/dev/design-system") {
     if (!import.meta.env.DEV) {
       return <NotFoundPage />;
@@ -332,6 +344,16 @@ export function AppRoutes() {
       <AdminSection>
         <RequirePermissions required={["global:operate"]}>
           <AdminFeedbackPage />
+        </RequirePermissions>
+      </AdminSection>
+    );
+  }
+
+  if (pathname === "/admin/versione-app") {
+    return (
+      <AdminSection>
+        <RequirePermissions required={["global:operate"]}>
+          <AdminAppVersionPage />
         </RequirePermissions>
       </AdminSection>
     );

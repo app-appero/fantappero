@@ -1,8 +1,10 @@
-"""Schemi HTTP del pannello operatore: storico stagioni dal fornitore e Valore (1.3)."""
+"""Schemi HTTP del pannello operatore: storico stagioni dal fornitore e Valore (1.3), dettaglio
+del Valore di un calciatore (1.4)."""
 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
@@ -106,3 +108,95 @@ class AdminSeasonHistoryProgressResponse(ApiModel):
     message: str
     error_code: str | None = Field(default=None, alias="errorCode")
     result: AdminSeasonHistoryResultResponse | None = None
+
+
+# --- «Dettaglio del Valore» di un calciatore (1.4) ---------------------------------------------
+
+
+class AdminMarketValueSeasonRow(ApiModel):
+    """Una riga dello storico letta per il Valore (calciatore + club + competizione)."""
+
+    competition: str
+    club: str | None = None
+    #: Peso nella media: presenze (fornitore) o partite con voto (FantApperò).
+    appearances: int
+    average: float | None = None
+    #: ``league`` (contata); ``cup``, ``unknown`` (non campionato) e ``no_rating`` (senza
+    #: media) sono escluse.
+    kind: Literal["league", "cup", "unknown", "no_rating"]
+
+
+class AdminMarketValueSeasonDetail(ApiModel):
+    """Una delle tre stagioni del Valore: da dove vengono i numeri e quanto pesa."""
+
+    slot: Literal["current", "previous", "twoSeasonsAgo"]
+    season_year: int = Field(alias="seasonYear")
+    season_label: str = Field(alias="seasonLabel")
+    is_current: bool = Field(alias="isCurrent")
+    #: Fonte delle righe usate: ``provider`` (fornitore) o ``fantappero``; ``null`` senza righe.
+    source: Literal["provider", "fantappero"] | None = None
+    #: Competizioni contate (nomi), dalla più giocata.
+    competitions: list[str]
+    rows: list[AdminMarketValueSeasonRow]
+    #: Righe escluse (coppe, tipo sconosciuto, senza media).
+    excluded: list[AdminMarketValueSeasonRow]
+    #: ``false`` = stagione senza dati: vale ``missingSeasonIndex`` (in corso: peso 0).
+    has_data: bool = Field(alias="hasData")
+    #: Presenze con voto (n).
+    appearances: int
+    average: float | None = None
+    role_average: float | None = Field(default=None, alias="roleAverage")
+    shrunk_average: float | None = Field(default=None, alias="shrunkAverage")
+    percentile: float | None = None
+    #: Posizione nel ruolo (1 = media ristretta più alta) e calciatori del ruolo con dati.
+    rank: int | None = None
+    pool_size: int | None = Field(default=None, alias="poolSize")
+    weight: float
+    #: Indice che entra nella somma: il percentile, o quello di una stagione senza dati.
+    index_used: float = Field(alias="indexUsed")
+    #: ``weight × indexUsed``.
+    contribution: float
+
+
+class AdminMarketValueLeagueCredits(ApiModel):
+    league_id: str = Field(alias="leagueId")
+    league_name: str = Field(alias="leagueName")
+    budget: int
+    credits: int
+
+
+class AdminMarketValueDetailResponse(ApiModel):
+    """``GET /admin/listone/valori/{athleteId}``: come si arriva al Valore di un calciatore."""
+
+    athlete_id: str = Field(alias="athleteId")
+    canonical_name: str = Field(alias="canonicalName")
+    club_name: str | None = Field(default=None, alias="clubName")
+    role: Literal["P", "D", "C", "A"]
+    season_year: int = Field(alias="seasonYear")
+    season_label: str = Field(alias="seasonLabel")
+    #: ``computed``: dettaglio completo; ``outdated``: riga scritta prima della 1.4 (solo
+    #: percentili e pesi: ricalcolare i valori); ``not_computed``: nessuna riga, vale il valore
+    #: base del ruolo fino al prossimo ricalcolo.
+    status: Literal["computed", "outdated", "not_computed"]
+    #: Versione della formula con cui è stata scritta la riga.
+    version: str | None = None
+    computed_at: datetime | None = Field(default=None, alias="computedAt")
+    #: Indice combinato p (0..1).
+    value_index: float = Field(alias="valueIndex")
+    #: Crediti per il budget di riferimento, non arrotondati.
+    reference_value: float = Field(alias="referenceValue")
+    #: Crediti al budget di riferimento, arrotondati (almeno 1).
+    reference_credits: int = Field(alias="referenceCredits")
+    reference_budget: int = Field(alias="referenceBudget")
+    role_top: float = Field(alias="roleTop")
+    floor: float
+    curve_exponent: float = Field(alias="curveExponent")
+    missing_season_index: float = Field(alias="missingSeasonIndex")
+    shrink_appearances: int = Field(alias="shrinkAppearances")
+    current_full_weight_appearances: int = Field(alias="currentFullWeightAppearances")
+    #: Valore (crediti di riferimento) di chi non ha storico, nello stesso ruolo.
+    base_reference_value: float = Field(alias="baseReferenceValue")
+    #: Dalla stagione in corso alla più vecchia.
+    seasons: list[AdminMarketValueSeasonDetail]
+    #: Crediti al budget della lega (solo con ``leagueId``).
+    league: AdminMarketValueLeagueCredits | None = None

@@ -27,6 +27,7 @@ const EVENT_GLYPH: Record<string, string> = {
   "sistema.formazione": "⏰",
   "sistema.turno_omologato": "🏁",
   "sistema.avvisi_operatori": "📣",
+  "sistema.versione_app": "📲",
 };
 
 type Change = { eventKey: string; inAppEnabled?: boolean; pushEnabled?: boolean };

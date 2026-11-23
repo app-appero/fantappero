@@ -86,9 +86,59 @@ describe("filterNavItems", () => {
     expect(items.find((item) => item.id === "admin-home")?.active).toBe(false);
   });
 
-  it("marks Pannello active only on the exact /admin path", () => {
+  it("marks Riepilogo active only on the exact /admin path", () => {
     const items = filterNavItems(ADMIN_NAV_ITEMS, canFactory(operatorContext), "/admin");
     expect(items.find((item) => item.id === "admin-home")?.active).toBe(true);
+  });
+
+  it("Riepilogo 1.4: la prima voce si chiama «Riepilogo» e «Versione app» viene dopo «Segnalazioni»", () => {
+    const items = filterNavItems(
+      ADMIN_NAV_ITEMS,
+      canFactory(operatorContext),
+      "/admin/versione-app",
+    );
+    expect(items.map((item) => item.label)).toEqual([
+      "Riepilogo",
+      "Leghe globali",
+      "Utenti",
+      "Listone",
+      "Turni",
+      "Job automatici",
+      "Notifiche",
+      "Email",
+      "Segnalazioni",
+      "Versione app",
+    ]);
+    expect(items.find((item) => item.id === "admin-app-version")?.active).toBe(true);
+    expect(items.find((item) => item.id === "admin-home")?.active).toBe(false);
+    expect(NAV_LABELS["admin-app-version"]).toBe("Versione app");
+  });
+});
+
+describe("Domande frequenti 1.4 nel menù", () => {
+  it("mette «Domande frequenti» subito dopo «Segnala un problema» e prima di «Profilo»", () => {
+    const labels = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/turni").map(
+      (item) => item.label,
+    );
+    const feedback = labels.indexOf("Segnala un problema");
+    expect(feedback).toBeGreaterThan(-1);
+    expect(labels.slice(feedback, feedback + 3)).toEqual([
+      "Segnala un problema",
+      "Domande frequenti",
+      "Profilo",
+    ]);
+  });
+
+  it("apre /domande-frequenti e la evidenzia anche con un link diretto a una domanda", () => {
+    const items = filterNavItems(
+      APP_NAV_ITEMS,
+      canFactory(memberContext),
+      "/domande-frequenti",
+    );
+    const faq = items.find((item) => item.id === "faq");
+    expect(faq?.path).toBe("/domande-frequenti");
+    expect(faq?.active).toBe(true);
+    expect(items.filter((item) => item.active).map((item) => item.id)).toEqual(["faq"]);
   });
 });
 

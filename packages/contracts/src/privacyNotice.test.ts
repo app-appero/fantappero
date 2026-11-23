@@ -6,8 +6,8 @@ import { PRIVACY_NOTICE_SECTIONS, PRIVACY_NOTICE_VERSION } from "./privacyNotice
 const bullets = (id: string): readonly string[] =>
   PRIVACY_NOTICE_SECTIONS.find((section) => section.id === id)?.bullets ?? [];
 
-test("versione dell'informativa approvata il 21/11/2026", () => {
-  assert.equal(PRIVACY_NOTICE_VERSION, "2026-11c");
+test("versione dell'informativa approvata il 23/11/2026", () => {
+  assert.equal(PRIVACY_NOTICE_VERSION, "2026-11d");
 });
 
 test("l'informativa copre l'accesso con Google e con email e password", () => {
@@ -23,4 +23,17 @@ test("l'informativa copre la richiesta di accesso al pilota e il telefono per Wh
   assert.match(request, /nome, cognome, l'email con cui hai fatto l'accesso e, se li indichi, il numero di telefono e un motivo/);
   assert.match(request, /gruppo WhatsApp dei tester/);
   assert.match(request, /Puoi chiedere di cancellarlo quando vuoi/);
+});
+
+test("l'informativa 2026-11d copre l'uso dell'app e del sito da Android", () => {
+  const list = bullets("dati");
+  const usage = list.find((text) => text.startsWith("Uso dell'app:"));
+  assert.ok(usage, "manca la voce Uso dell'app");
+  assert.equal(
+    usage,
+    "Uso dell'app: la versione dell'app che usi, quando l'hai aperta l'ultima volta e, se usi il sito da un telefono Android, che lo usi da Android: per avvisarti quando c'è un aggiornamento dell'app e sapere chi deve ancora aggiornare.",
+  );
+  // Nello stile delle altre voci: dopo «Notifiche», ultima della lista.
+  assert.equal(list.indexOf(usage), list.length - 1);
+  assert.ok(list[list.length - 2]?.startsWith("Notifiche:"));
 });

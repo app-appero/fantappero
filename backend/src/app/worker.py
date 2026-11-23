@@ -118,3 +118,4 @@ import sports_data.quality.tasks  # noqa: E402, F401
 import sports_data.roster.tasks  # noqa: E402, F401
 import sports_data.scheduler.tasks  # noqa: E402, F401
 import sports_data.season_import_tasks  # noqa: E402, F401
+import system_jobs.run_recorder  # noqa: E402, F401 — esito di ogni giro dei job (1.4)

@@ -17,6 +17,7 @@ import type {
   AdminListoneRefreshProgress,
   AdminListoneRoleRestoreRequest,
   AdminListoneRoleRestoreResult,
+  AdminMarketValueDetail,
   AdminMarketValuesRefreshRequest,
   AdminMarketValuesRefreshResult,
   AdminOverview,
@@ -40,7 +41,12 @@ import type {
   PaginatedAdminLeagues,
   PaginatedAdminUsers,
 } from "@fantappero/contracts";
-import type { AndroidAppVersionUpdate, AppVersionInfo } from "@fantappero/contracts";
+import type {
+  AdminAppUsage,
+  AndroidAppVersionUpdate,
+  AppVersionInfo,
+  AppVersionSaveResult,
+} from "@fantappero/contracts";
 import { apiRequest } from "./client";
 
 export function fetchSystemJobs(accessToken: string): Promise<SystemJob[]> {
@@ -231,6 +237,22 @@ export function refreshAdminMarketValues(
     method: "POST",
     body,
   });
+}
+
+/** «Dettaglio del Valore» (1.4): ogni passaggio del Valore di un calciatore, dall'ultimo ricalcolo. */
+export function fetchAdminMarketValueDetail(
+  accessToken: string,
+  athleteId: string,
+  options: { seasonYear: number; leagueId?: string | null },
+): Promise<AdminMarketValueDetail> {
+  const params = new URLSearchParams({ seasonYear: String(options.seasonYear) });
+  if (options.leagueId) {
+    params.set("leagueId", options.leagueId);
+  }
+  return apiRequest<AdminMarketValueDetail>(
+    `/admin/listone/valori/${encodeURIComponent(athleteId)}?${params}`,
+    { accessToken },
+  );
 }
 
 // --- Pannello operatore: turni, calendario, formazioni IA (EP-turni-automazione) ---
@@ -475,11 +497,21 @@ export function fetchAppVersionConfig(accessToken: string): Promise<AppVersionIn
   return apiRequest<AppVersionInfo>("/admin/app-version", { accessToken });
 }
 
+/** Dalla 1.4 il server manda anche la notifica a chi non ha la versione e dice a quanti. */
 export function saveAppVersionConfig(
   accessToken: string,
   body: AndroidAppVersionUpdate,
-): Promise<AppVersionInfo> {
-  return apiRequest<AppVersionInfo>("/admin/app-version", { accessToken, method: "PUT", body });
+): Promise<AppVersionSaveResult> {
+  return apiRequest<AppVersionSaveResult>("/admin/app-version", {
+    accessToken,
+    method: "PUT",
+    body,
+  });
+}
+
+/** «Versione app» (1.4): chi ha quale versione dell'app, versione per versione. */
+export function fetchAppVersionUsers(accessToken: string): Promise<AdminAppUsage> {
+  return apiRequest<AdminAppUsage>("/admin/app-version/users", { accessToken });
 }
 
 export function fetchTestMode(accessToken: string): Promise<AdminTestMode> {

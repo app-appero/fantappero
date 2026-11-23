@@ -74,6 +74,8 @@ export type RootStackParamList = {
   ReceivedInvites: ReceivedInvitesParams | undefined;
   Notifications: undefined;
   Feedback: undefined;
+  /** «Domande frequenti» (1.4); `domanda` apre subito quella risposta. */
+  Faq: { domanda?: string } | undefined;
   Privacy: undefined;
   ManagerDirectory: undefined;
   CoachProfile: { userId: string; leagueId?: string };
@@ -92,6 +94,7 @@ export type AdminStackParamList = {
   AdminNotifications: WireframeParams | undefined;
   AdminEmail: WireframeParams | undefined;
   AdminFeedback: WireframeParams | undefined;
+  AdminAppVersion: WireframeParams | undefined;
 };
 
 declare global {

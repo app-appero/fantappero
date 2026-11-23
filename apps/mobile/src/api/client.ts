@@ -5,6 +5,7 @@ import {
   type UnauthorizedRecovery,
 } from "@fantappero/api-client";
 import { File } from "expo-file-system";
+import { installedAppVersionHeaders } from "../appVersion/installedVersion";
 import { loadMobileEnv, MobileEnvError } from "../config/env";
 import { buildUploadFormValue } from "./uploadValue";
 
@@ -52,6 +53,8 @@ const client = createApiClient<UploadFile>({
   // Con Expo 58 `{ uri, name, type }` da solo non basta: vedi `uploadValue.ts`.
   buildUploadValue: (file) =>
     buildUploadFormValue(file, (uri) => new File(uri).bytes()) as unknown as Blob,
+  // Release 1.4: la versione installata in ogni richiesta (elenco «Versione app» dell'operatore).
+  extraHeaders: installedAppVersionHeaders,
   networkErrorMessage: () => "Connessione non disponibile. Riprova tra poco.",
   invalidResponseMessage: () => "Risposta non valida. Riprova tra poco.",
   notFoundMessage: () => "Risorsa non trovata. Riprova tra poco.",

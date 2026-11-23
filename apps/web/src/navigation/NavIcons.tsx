@@ -86,6 +86,16 @@ export function IconMessage(props: IconProps) {
   );
 }
 
+/** Cerchio con il punto di domanda: «Domande frequenti». */
+export function IconHelp(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" />
+    </IconBase>
+  );
+}
+
 export function IconMenu(props: IconProps) {
   return (
     <IconBase width={24} height={24} {...props}>

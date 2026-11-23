@@ -5,7 +5,14 @@ export type NotificationRoute =
   | { kind: "stack"; name: keyof RootStackParamList; params?: Record<string, string> }
   | { kind: "matchup"; slotId: string }
   | { kind: "tab"; screen: keyof AppTabParamList; params?: Record<string, string> }
-  | { kind: "admin"; screen: keyof AdminStackParamList };
+  | { kind: "admin"; screen: keyof AdminStackParamList }
+  // Link esterno da aprire nel browser: il download della nuova versione dell'app (1.4).
+  | { kind: "external"; url: string };
+
+/** Solo https, con un dominio e senza spazi: come `isHttpsDownloadUrl` dei contratti. */
+const EXTERNAL_HTTPS_LINK = /^https:\/\/[^\s/?#:@]+(:\d+)?([/?#]\S*)?$/;
+/** Titolo della notifica della nuova versione (backend, template `sistema.versione_app`). */
+const APP_UPDATE_TITLE = /^È disponibile (la versione \S+|una nuova versione) dell'app$/;
 
 const TRADE_TITLES = new Set([
   "Nuova proposta di scambio",
@@ -77,6 +84,12 @@ const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
 export function resolveNotificationRoute(
   item: Pick<NotificationItem, "deepLink" | "title">,
 ): NotificationRoute | null {
+  // «È disponibile la versione X dell'app» (release 1.4): il link è il download dell'APK. È
+  // l'unica notifica che apre un link esterno; per le altre un link esterno non apre nulla.
+  const external = (item.deepLink ?? "").trim();
+  if (APP_UPDATE_TITLE.test(item.title) && EXTERNAL_HTTPS_LINK.test(external)) {
+    return { kind: "external", url: external };
+  }
   // Gli scambi e le aste condividono il percorso web «/mercato»: sull'app hanno schermate diverse.
   // Il titolo v2 è dinamico (interpola il nome della squadra avversaria, es. "Squadra X ti
   // propone uno scambio") e non combacia mai con TRADE_TITLES: il segnale affidabile è il

@@ -1,7 +1,10 @@
 # Informativa privacy — pilota FantApperò
 
-**Stato: v. 2026-11c APPROVATA dal privacy contact (Rosario Trotta) il 21/11/2026.** Contatto
-per le richieste: info@fantappero.it. La 2026-11c aggiunge l'accesso con email e password (password
+**Stato: v. 2026-11d APPROVATA dal privacy contact (Rosario Trotta) il 23/11/2026.** Contatto
+per le richieste: info@fantappero.it. La 2026-11d aggiunge l'uso dell'app (versione dell'app,
+ultima apertura dell'app e, per chi usa il sito da un telefono Android, che lo usa da Android), per
+avvisare quando c'è un aggiornamento dell'app e sapere chi deve ancora aggiornare. La 2026-11c
+(approvata il 21/11/2026) aggiungeva l'accesso con email e password (password
 salvata solo in forma cifrata) e la richiesta di accesso al pilota (nome, cognome, email, telefono per il
 gruppo WhatsApp dei tester e motivo facoltativo). La 2026-11b (approvata il 09/11/2026) parlava solo dell'accesso con
 Google. La 2026-11 (approvata il 04/11/2026)
@@ -42,6 +45,9 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 >   sistema, versione dell'app). Gli allegati sono visibili solo a chi gestisce il progetto.
 > - *Notifiche*: se le attivi nell'app Android, un identificativo del dispositivo per inviarti
 >   le notifiche e le tue preferenze di notifica.
+> - *Uso dell'app*: la versione dell'app che usi, quando l'hai aperta l'ultima volta e, se usi
+>   il sito da un telefono Android, che lo usi da Android: per avvisarti quando c'è un
+>   aggiornamento dell'app e sapere chi deve ancora aggiornare.
 >
 > **Perché li raccogliamo**: solo per far funzionare il gioco (crearti l'account, farti entrare
 > nelle leghe, calcolare punteggi e classifiche, avvisarti di eventi di gioco) e per capire e

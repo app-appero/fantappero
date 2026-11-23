@@ -23,6 +23,7 @@ from market.valuation import (
     credits_for_budget,
     mid_rank_percentiles,
     season_percentiles,
+    season_positions,
     season_weights,
     select_season_average,
     shrink_rating,
@@ -193,6 +194,71 @@ def test_three_good_games_do_not_make_a_starter() -> None:
     # E con il peso basso della stagione in corso vale meno di un titolare medio.
     assert result["new"].reference_value < result["s10"].reference_value
     assert result["new"].reference_value > base_reference_value("A")
+
+
+def test_season_positions_give_role_mean_shrunk_rank_and_pool_size() -> None:
+    inputs = [
+        ValuationInput(key="a", role="P", previous=SeasonSample(7.0, 30)),
+        ValuationInput(key="b", role="P", previous=SeasonSample(6.5, 10)),
+        ValuationInput(key="c", role="P", previous=SeasonSample(6.5, 10)),
+        ValuationInput(key="d", role="P", previous=None),
+        ValuationInput(key="x", role="A", previous=SeasonSample(8.0, 30)),
+    ]
+    positions = season_positions(inputs, "previous")
+    assert set(positions) == {"a", "b", "c", "x"}  # «d» non ha dati: fuori dal gruppo
+    role_mean = (7.0 * 30 + 6.5 * 10 + 6.5 * 10) / 50
+    assert positions["a"].role_mean == pytest.approx(role_mean)
+    assert positions["a"].shrunk == pytest.approx(shrink_rating(7.0, 30, role_mean))
+    assert positions["a"].pool_size == 3
+    assert positions["a"].rank == 1
+    assert positions["b"].rank == positions["c"].rank == 2  # pari merito
+    assert positions["b"].percentile == pytest.approx(1 / 3)
+    assert positions["x"].pool_size == 1 and positions["x"].rank == 1
+
+
+def test_components_explain_every_step_of_the_value() -> None:
+    inputs = [
+        ValuationInput(
+            key=f"p{i}",
+            role="P",
+            current=SeasonSample(6.2 + 0.05 * i, 6),
+            previous=SeasonSample(6.7 + 0.04 * i, 30),
+        )
+        for i in range(10)
+    ]
+    valued = compute_valuations(inputs)["p7"]
+    components = valued.components()
+    seasons = components["seasons"]
+    assert list(seasons) == ["current", "previous", "twoSeasonsAgo"]
+    current, previous, two_ago = seasons["current"], seasons["previous"], seasons["twoSeasonsAgo"]
+    assert current["hasData"] is True
+    assert current["appearances"] == 6
+    assert current["average"] == pytest.approx(6.55)
+    assert current["poolSize"] == 10 and current["rank"] == 3
+    assert current["percentile"] == pytest.approx(0.75)
+    assert current["weight"] == pytest.approx(0.5 * 6 / 15)
+    assert previous["shrunkAverage"] == pytest.approx(
+        shrink_rating(6.98, 30, previous["roleAverage"]), abs=1e-3
+    )
+    # Stagione senza dati: indice 0,33 con il suo peso.
+    assert two_ago["hasData"] is False
+    assert two_ago["indexUsed"] == pytest.approx(MISSING_SEASON_INDEX)
+    assert two_ago["percentile"] is None and two_ago["poolSize"] is None
+    # Dai passaggi salvati si rifà il numero: somma dei contributi = p, poi la curva.
+    assert sum(season["contribution"] for season in seasons.values()) == pytest.approx(
+        components["valueIndex"], abs=1e-3
+    )
+    assert components["referenceValue"] == pytest.approx(
+        components["floor"]
+        + (components["roleTop"] - components["floor"])
+        * components["valueIndex"] ** components["curveExponent"],
+        abs=1e-3,
+    )
+    assert components["roleTop"] == valuation.TOP_REFERENCE_CREDITS["P"]
+    assert components["referenceBudget"] == REFERENCE_BUDGET
+    # I campi della 1.3 restano.
+    assert components["percentiles"]["previous"] == previous["percentile"]
+    assert components["weights"]["current"] == current["weight"]
 
 
 def test_no_history_gets_the_base_value_of_the_role() -> None:

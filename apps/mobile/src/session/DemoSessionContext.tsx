@@ -15,6 +15,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,6 +24,8 @@ import { AppState } from "react-native";
 import { ApiError, getApiErrorMessage, setUnauthorizedRecovery } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { buildPermissionContext } from "./demoSession";
+import { sameLeagueList, subscribeLeagueListRefresh } from "./leagueListRefresh";
+import { OFFLINE_RETRY_INTERVAL_MS, restoreSessionAtStartup } from "./startupRestore";
 import {
   clearImpersonatorSession,
   clearStoredActiveLeagueId,
@@ -50,6 +53,11 @@ export type AuthSessionContextValue = {
   user: SessionUser | null;
   isAuthenticated: boolean;
   loading: boolean;
+  /** Avvio senza rete con una sessione salvata: si mostra «Connessione non disponibile». */
+  sessionOffline: boolean;
+  /** «Riprova» in corso su «Connessione non disponibile». */
+  restoringSession: boolean;
+  retrySessionRestore: () => Promise<void>;
   leagues: readonly LeagueSummary[];
   activeLeagueId: string | null;
   activeLeague: LeagueSummary | null;
@@ -91,6 +99,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [activeLeagueId, setActiveLeagueIdState] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [impersonator, setImpersonator] = useState<StoredSession | null>(null);
+  /** Sessione salvata ma server irraggiungibile all'avvio (vedi `startupRestore.ts`). */
+  const [sessionOffline, setSessionOffline] = useState(false);
+  const [restoringSession, setRestoringSession] = useState(false);
 
   const clearToLoggedOut = useCallback(() => {
     setAccessToken(null);
@@ -99,6 +110,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setLeagues([]);
     setActiveLeagueIdState(null);
     setImpersonator(null);
+    setSessionOffline(false);
     setLoading(false);
   }, []);
 
@@ -115,81 +127,75 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const mounted = useRef(true);
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const stored = await loadStoredSession();
-      if (!stored) {
-        if (!cancelled) {
-          clearToLoggedOut();
-        }
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const restoreInFlight = useRef<Promise<void> | null>(null);
+
+  /**
+   * Riprende la sessione salvata (all'avvio e, se il server non risponde, a ogni nuovo
+   * tentativo). Le decisioni sono in `startupRestore.ts`; qui si applicano allo stato.
+   */
+  const restoreSession = useCallback((): Promise<void> => {
+    if (restoreInFlight.current) {
+      return restoreInFlight.current;
+    }
+    const run = (async () => {
+      const outcome = await restoreSessionAtStartup({
+        loadStoredSession,
+        fetchMe: authApi.fetchMe,
+        getMemorySession,
+        isTransientError: isTransientApiError,
+        loadImpersonatorSession,
+        clearImpersonatorSession,
+        forgetSession: async () => {
+          await clearStoredSession();
+          setMemorySession(null);
+        },
+        refreshStoredSession,
+      });
+      if (!mounted.current) {
+        return;
+      }
+      if (outcome.kind === "signedOut") {
+        clearToLoggedOut();
+        return;
+      }
+      if (outcome.kind === "offline") {
+        // Rete assente all'avvio: sessione tenuta, «Connessione non disponibile» (M5, 22/11).
+        setSessionOffline(true);
+        setLoading(false);
         return;
       }
 
-      let session = stored;
-      try {
-        const me = await authApi.fetchMe(session.accessToken);
-        session = { ...session, user: me };
+      // Anche dopo «Connessione non disponibile»: caricamento finché non arrivano le leghe.
+      setLoading(true);
+      setSessionOffline(false);
+      const { session } = outcome;
+      if (outcome.persist) {
         await persistSession(session);
-      } catch (error) {
-        const renewed = getMemorySession();
-        if (renewed && renewed.accessToken !== session.accessToken) {
-          session = renewed;
-        } else if (isTransientApiError(error)) {
-          // Rete assente al rientro: tieni la sessione salvata, il prossimo
-          // 401 la rinnova. Non è un login fallito.
-        } else if (!session.refreshToken) {
-          const operator = await loadImpersonatorSession();
-          if (!operator) {
-            await clearStoredSession();
-            setMemorySession(null);
-            if (!cancelled) {
-              clearToLoggedOut();
-            }
-            return;
-          }
-          await clearImpersonatorSession();
-          session = operator;
-          await persistSession(session);
-        } else {
-          try {
-            // Stessa corsia degli altri rinnovi: il refresh token è monouso, due
-            // rinnovi in parallelo ne brucerebbero uno e butterebbero fuori l'utente.
-            const renewedToken = await refreshStoredSession();
-            const renewedSession = getMemorySession();
-            if (!renewedToken || !renewedSession) {
-              if (!cancelled) {
-                clearToLoggedOut();
-              }
-              return;
-            }
-            session = renewedSession;
-            await persistSession(session);
-          } catch (refreshError) {
-            if (!isTransientApiError(refreshError)) {
-              await clearStoredSession();
-              setMemorySession(null);
-              if (!cancelled) {
-                clearToLoggedOut();
-              }
-              return;
-            }
-          }
-        }
+      } else {
+        // Già salvata da un rinnovo appena fatto.
+        setMemorySession(session);
+        setAccessToken(session.accessToken);
+        setUser(session.user);
       }
-
-      if (cancelled) {
+      if (!mounted.current) {
         return;
       }
 
       const paused = await loadImpersonatorSession();
-      if (!cancelled) {
+      if (mounted.current) {
         setImpersonator(paused);
       }
 
       try {
         const memberships = await fetchMyLeagues(session.accessToken);
-        if (cancelled) {
+        if (!mounted.current) {
           return;
         }
         const storedLeagueId = await loadStoredActiveLeagueId();
@@ -205,16 +211,53 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         // Keep memberships already in memory; a schema/API error must not
         // look like the user lost every league.
       } finally {
-        if (!cancelled) {
+        if (mounted.current) {
           setLoading(false);
         }
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    const tracked = run.finally(() => {
+      restoreInFlight.current = null;
+    });
+    restoreInFlight.current = tracked;
+    return tracked;
   }, [clearToLoggedOut, persistSession]);
+
+  useEffect(() => {
+    void restoreSession();
+  }, [restoreSession]);
+
+  /** «Riprova» di «Connessione non disponibile». */
+  const retrySessionRestore = useCallback(async () => {
+    setRestoringSession(true);
+    try {
+      await restoreSession();
+    } finally {
+      if (mounted.current) {
+        setRestoringSession(false);
+      }
+    }
+  }, [restoreSession]);
+
+  // Senza rete all'avvio l'app riprova da sola, e subito quando torna in primo piano: appena il
+  // server risponde entra con la stessa sessione, senza password (M5, 22/11).
+  useEffect(() => {
+    if (!sessionOffline) {
+      return;
+    }
+    const timer = setInterval(() => {
+      void restoreSession();
+    }, OFFLINE_RETRY_INTERVAL_MS);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void restoreSession();
+      }
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [restoreSession, sessionOffline]);
 
   useEffect(() => {
     setUnauthorizedRecovery((input) => recoverAccessToken(input.accessToken));
@@ -263,7 +306,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       return [];
     }
     const memberships = await fetchMyLeagues(token);
-    setLeagues(memberships);
+    // Nessuna novità: stesso array, nessun ridisegno (si rilegge a ogni «tira per aggiornare»).
+    setLeagues((current) => (sameLeagueList(current, memberships) ? current : memberships));
     setActiveLeagueIdState((current) => {
       const next = resolvePreferredLeagueId(memberships, current);
       if (next) {
@@ -275,6 +319,30 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     });
     return memberships;
   }, [accessToken]);
+
+  // Leghe create o tolte fuori dall'app (sito, API): il selettore le vede tirando una pagina
+  // per aggiornarla o tornando nell'app, senza riavviarla (corsa M3, 22/11).
+  const signedIn = user !== null;
+  useEffect(() => {
+    if (!signedIn) {
+      return;
+    }
+    const refresh = () => {
+      void refreshMemberships().catch(() => {
+        // Elenco accessorio: un errore di rete lascia quello già in memoria.
+      });
+    };
+    const unsubscribe = subscribeLeagueListRefresh(refresh);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        refresh();
+      }
+    });
+    return () => {
+      unsubscribe();
+      subscription.remove();
+    };
+  }, [refreshMemberships, signedIn]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -496,6 +564,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: user !== null,
       loading,
+      sessionOffline,
+      restoringSession,
+      retrySessionRestore,
       leagues,
       activeLeagueId,
       activeLeague,
@@ -520,6 +591,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [
       user,
       loading,
+      sessionOffline,
+      restoringSession,
+      retrySessionRestore,
       leagues,
       activeLeagueId,
       activeLeague,

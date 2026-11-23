@@ -20,37 +20,15 @@ import { AdminJobsScreen } from "../screens/admin/AdminJobsScreen";
 import { AdminTurniScreen } from "../screens/admin/AdminTurniScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
+import { AdminAppVersionScreen } from "../screens/admin/AdminAppVersionScreen";
 import { consumePendingAdminScreen, openAdminScreen, registerLeaveAdmin } from "./adminEntry";
+import { ADMIN_NAV_ID_BY_ROUTE, ADMIN_SCREEN_BY_ID } from "./adminScreens";
 import { filterMobileNavItems, MOBILE_ADMIN_NAV_ITEMS } from "./navConfig";
 import type { AdminStackParamList, RootStackParamList } from "./types";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
 const { colors } = theme;
-
-const ADMIN_SCREEN_BY_ID: Record<string, keyof AdminStackParamList> = {
-  "admin-home": "AdminHome",
-  "admin-leagues": "AdminLeagues",
-  "admin-users": "AdminUsers",
-  "admin-listone": "AdminListone",
-  "admin-turni": "AdminTurni",
-  "admin-jobs": "AdminJobs",
-  "admin-notifications": "AdminNotifications",
-  "admin-email": "AdminEmail",
-  "admin-feedback": "AdminFeedback",
-};
-
-const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
-  AdminHome: "admin-home",
-  AdminLeagues: "admin-leagues",
-  AdminUsers: "admin-users",
-  AdminListone: "admin-listone",
-  AdminTurni: "admin-turni",
-  AdminJobs: "admin-jobs",
-  AdminNotifications: "admin-notifications",
-  AdminEmail: "admin-email",
-  AdminFeedback: "admin-feedback",
-};
 
 /**
  * Pannello operatore: le sezioni si aprono dal menu in alto a sinistra,
@@ -184,6 +162,12 @@ export function AdminNavigator() {
             {({ navigation }) => {
               rememberStack(navigation);
               return <AdminNotificationsScreen />;
+            }}
+          </Stack.Screen>
+          <Stack.Screen name="AdminAppVersion">
+            {({ navigation }) => {
+              rememberStack(navigation);
+              return <AdminAppVersionScreen />;
             }}
           </Stack.Screen>
         </Stack.Navigator>

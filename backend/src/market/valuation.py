@@ -30,6 +30,11 @@ Formula (approvata sul canvas «Proposte 1.3», scheda Valore di mercato):
 
 Chi non ha storico (nessuna stagione con dati) ha p = MISSING_SEASON_INDEX, cioè il
 **valore base del ruolo** (``base_reference_value``).
+
+1.4 («Dettaglio del Valore» per l'operatore): ``Valuation.components`` conserva ogni passaggio
+(per stagione: presenze, media, media del ruolo, media ristretta, percentile, posizione e
+numero di calciatori del ruolo, peso; poi p, massimo del ruolo e valore di riferimento), così il
+numero si spiega senza rifare il calcolo.
 """
 
 from __future__ import annotations
@@ -82,6 +87,9 @@ TOP_REFERENCE_CREDITS: dict[str, float] = {"P": 30.0, "D": 32.0, "C": 48.0, "A":
 SEASON_AVERAGE_DECIMALS = 2
 
 ROLES = ("P", "D", "C", "A")
+#: Le tre stagioni del Valore, come si chiamano in ``components_json``.
+SEASON_SLOTS = ("current", "previous", "twoSeasonsAgo")
+_SLOTS = SEASON_SLOTS
 
 
 # -- tipi ---------------------------------------------------------------------
@@ -125,6 +133,22 @@ class ValuationInput:
 
 
 @dataclass(frozen=True)
+class SeasonPosition:
+    """Dove sta un calciatore nel suo ruolo in una stagione (punto 1 della formula)."""
+
+    #: Media del ruolo nella stagione, pesata per presenze con voto.
+    role_mean: float
+    #: ``(n · media + K · media_ruolo) / (n + K)``.
+    shrunk: float
+    #: Percentile a rango medio della media ristretta nel ruolo (0..1).
+    percentile: float
+    #: Posizione nel ruolo: 1 = media ristretta più alta (i pari merito hanno la stessa).
+    rank: int
+    #: Calciatori del ruolo con dati in quella stagione.
+    pool_size: int
+
+
+@dataclass(frozen=True)
 class Valuation:
     key: Hashable
     role: str
@@ -133,6 +157,45 @@ class Valuation:
     weights: SeasonWeights
     percentiles: dict[str, float | None] = field(default_factory=dict)
     has_history: bool = False
+    #: Media e presenze di ogni stagione (``None`` = senza dati).
+    samples: dict[str, SeasonSample | None] = field(default_factory=dict)
+    #: Posizione nel ruolo di ogni stagione con dati.
+    positions: dict[str, SeasonPosition | None] = field(default_factory=dict)
+
+    def slot_weight(self, slot: str) -> float:
+        if slot == "current":
+            return self.weights.current
+        if slot == "previous":
+            return self.weights.previous
+        return self.weights.two_seasons_ago
+
+    def slot_index(self, slot: str) -> float:
+        """Indice che la stagione porta nella somma: il percentile, o quello di una stagione
+        senza dati (0 per la stagione in corso, che allora pesa 0)."""
+        percentile = self.percentiles.get(slot)
+        if percentile is not None:
+            return percentile
+        return 0.0 if slot == "current" else MISSING_SEASON_INDEX
+
+    def season_components(self, slot: str) -> dict[str, Any]:
+        sample = self.samples.get(slot)
+        position = self.positions.get(slot)
+        weight = self.slot_weight(slot)
+        index = self.slot_index(slot)
+        usable = sample is not None and sample.usable
+        return {
+            "hasData": position is not None,
+            "appearances": sample.appearances if usable and sample is not None else 0,
+            "average": _round_or_none(sample.rating if usable and sample is not None else None),
+            "roleAverage": _round_or_none(position.role_mean if position else None),
+            "shrunkAverage": _round_or_none(position.shrunk if position else None),
+            "percentile": _round_or_none(position.percentile if position else None),
+            "rank": position.rank if position else None,
+            "poolSize": position.pool_size if position else None,
+            "weight": round(weight, 4),
+            "indexUsed": round(index, 4),
+            "contribution": round(weight * index, 4),
+        }
 
     def components(self) -> dict[str, Any]:
         return {
@@ -142,7 +205,21 @@ class Valuation:
                 for slot, value in self.percentiles.items()
             },
             "hasHistory": self.has_history,
+            "valueIndex": round(self.value_index, 6),
+            "referenceValue": round(self.reference_value, 4),
+            "roleTop": TOP_REFERENCE_CREDITS[self.role],
+            "floor": FLOOR_REFERENCE_CREDITS,
+            "curveExponent": CURVE_EXPONENT,
+            "referenceBudget": REFERENCE_BUDGET,
+            "missingSeasonIndex": MISSING_SEASON_INDEX,
+            "shrinkAppearances": SHRINK_APPEARANCES,
+            "currentFullWeightAppearances": CURRENT_FULL_WEIGHT_APPEARANCES,
+            "seasons": {slot: self.season_components(slot) for slot in _SLOTS},
         }
+
+
+def _round_or_none(value: float | None, digits: int = 4) -> float | None:
+    return round(float(value), digits) if value is not None else None
 
 
 @dataclass(frozen=True)
@@ -269,9 +346,6 @@ def select_season_average(
     return None
 
 
-_SLOTS = ("current", "previous", "twoSeasonsAgo")
-
-
 def _slot_sample(item: ValuationInput, slot: str) -> SeasonSample | None:
     if slot == "current":
         return item.current
@@ -285,34 +359,54 @@ def _role_mean(samples: Sequence[SeasonSample]) -> float:
     return sum(float(sample.rating or 0.0) * sample.appearances for sample in samples) / total
 
 
-def season_percentiles(inputs: Sequence[ValuationInput], slot: str) -> dict[Hashable, float]:
-    """Percentile nel ruolo della media ristretta, per una stagione (``slot``)."""
+def season_positions(inputs: Sequence[ValuationInput], slot: str) -> dict[Hashable, SeasonPosition]:
+    """Per una stagione (``slot``): media del ruolo, media ristretta, percentile e posizione
+    nel ruolo di ogni calciatore con dati."""
     by_role: dict[str, list[tuple[Hashable, SeasonSample]]] = defaultdict(list)
     for item in inputs:
         sample = _slot_sample(item, slot)
         if sample is not None and sample.usable:
             by_role[item.role].append((item.key, sample))
-    result: dict[Hashable, float] = {}
+    result: dict[Hashable, SeasonPosition] = {}
     for population in by_role.values():
         mean = _role_mean([sample for _, sample in population])
         shrunk = {
             key: shrink_rating(float(sample.rating or 0.0), sample.appearances, mean)
             for key, sample in population
         }
-        result.update(mid_rank_percentiles(shrunk))
+        percentiles = mid_rank_percentiles(shrunk)
+        ordered = sorted(shrunk.values())
+        count = len(ordered)
+        for key, value in shrunk.items():
+            result[key] = SeasonPosition(
+                role_mean=mean,
+                shrunk=value,
+                percentile=percentiles[key],
+                rank=count - bisect_right(ordered, value) + 1,
+                pool_size=count,
+            )
     return result
+
+
+def season_percentiles(inputs: Sequence[ValuationInput], slot: str) -> dict[Hashable, float]:
+    """Percentile nel ruolo della media ristretta, per una stagione (``slot``)."""
+    return {key: position.percentile for key, position in season_positions(inputs, slot).items()}
 
 
 def compute_valuations(inputs: Sequence[ValuationInput]) -> dict[Hashable, Valuation]:
     """Valore di ogni calciatore: percentili per stagione nel ruolo, poi pesi, poi curva."""
-    percentiles = {slot: season_percentiles(inputs, slot) for slot in _SLOTS}
+    positions = {slot: season_positions(inputs, slot) for slot in _SLOTS}
     result: dict[Hashable, Valuation] = {}
     for item in inputs:
         current_appearances = item.current.appearances if item.current is not None else 0
         if item.current is None or not item.current.usable:
             current_appearances = 0
         weights = season_weights(current_appearances)
-        slot_percentile = {slot: percentiles[slot].get(item.key) for slot in _SLOTS}
+        slot_position = {slot: positions[slot].get(item.key) for slot in _SLOTS}
+        slot_percentile = {
+            slot: (position.percentile if position is not None else None)
+            for slot, position in slot_position.items()
+        }
         index = (
             weights.current * (slot_percentile["current"] or 0.0)
             + weights.previous * _or_missing(slot_percentile["previous"])
@@ -326,6 +420,8 @@ def compute_valuations(inputs: Sequence[ValuationInput]) -> dict[Hashable, Valua
             weights=weights,
             percentiles=slot_percentile,
             has_history=any(value is not None for value in slot_percentile.values()),
+            samples={slot: _slot_sample(item, slot) for slot in _SLOTS},
+            positions=slot_position,
         )
     return result
 

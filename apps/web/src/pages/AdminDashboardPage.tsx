@@ -1,13 +1,29 @@
-import type { AdminOverview } from "@fantappero/contracts";
+import {
+  buildOperatorWatchItems,
+  formatLeaguesByState,
+  type AdminOverview,
+  type OperatorWatchTarget,
+} from "@fantappero/contracts";
 import { Breadcrumb, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAdminOverview } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { ADMIN_NAV_ITEMS } from "../navigation/navConfig";
 import { Link } from "../router/simpleRouter";
-import { AdminAppVersionPanel } from "./AdminAppVersionPanel";
 
+/** Pagina della voce di menù a cui porta una riga di «Da guardare». */
+function targetPath(target: OperatorWatchTarget): string {
+  return ADMIN_NAV_ITEMS.find((item) => item.id === target)?.path ?? "/admin";
+}
+
+/**
+ * «Riepilogo» del pannello operatore (release 1.4, canvas «Pannello operatore» approvato da
+ * Rosario il 22/11): chi sei e l'ambiente, i numeri, le leghe per stato e «Da guardare», le cose
+ * che aspettano l'operatore, ognuna con il link alla sua sezione. Niente schede che ripetono il
+ * menù; la versione dell'app ha la sua voce «Versione app».
+ */
 export function AdminDashboardPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,11 +56,11 @@ export function AdminDashboardPage() {
     void load();
   }, [load]);
 
+  const leagueStates = overview ? formatLeaguesByState(overview.leaguesByState) : "";
+  const watchItems = overview?.watch ? buildOperatorWatchItems(overview.watch, new Date()) : null;
+
   return (
-    <PageContainer
-      title="Pannello operatore"
-      header={<Breadcrumb items={[{ label: "Operazioni" }]} />}
-    >
+    <PageContainer title="Riepilogo" header={<Breadcrumb items={[{ label: "Operazioni" }]} />}>
       {loading ? (
         <UiStatePanel
           state="loading"
@@ -62,71 +78,72 @@ export function AdminDashboardPage() {
         />
       ) : null}
       {!loading && !error && overview ? (
-        <div className="fa-admin-overview" data-testid="admin-dashboard-success">
-          <section className="fa-admin-overview__hero" aria-labelledby="admin-overview-identity">
-            <div>
-              <h2 id="admin-overview-identity" className="fa-admin-overview__label">
-                Identità operatore
-              </h2>
-              <p className="fa-admin-overview__name" data-testid="admin-overview-name">
-                {overview.operatorDisplayName}
-              </p>
-            </div>
-            <p className="fa-admin-overview__env">
-              Ambiente:{" "}
-              <strong data-testid="admin-overview-environment">{overview.environment}</strong>
-            </p>
-          </section>
+        <div className="fa-admin-summary" data-testid="admin-dashboard-success">
+          <p className="fa-admin-summary__id">
+            <strong data-testid="admin-overview-name">{overview.operatorDisplayName}</strong>
+            <span>operatore</span>
+            <span className="fa-admin-summary__env" data-testid="admin-overview-environment">
+              {overview.environment}
+            </span>
+          </p>
           <section aria-labelledby="admin-overview-counts">
             <h2 id="admin-overview-counts" className="fa-sr-only">
-              Conteggi piattaforma
+              Numeri della piattaforma
             </h2>
-            <ul className="fa-admin-overview__tiles">
+            <ul className="fa-admin-summary__kpis">
               <li>
-                <span className="fa-admin-overview__label">Utenti registrati</span>
-                <strong>{overview.usersCount}</strong>
+                <strong data-testid="admin-overview-users">{overview.usersCount}</strong>
+                <span>Utenti</span>
               </li>
               <li>
-                <span className="fa-admin-overview__label">Operatori</span>
-                <strong>{overview.operatorsCount}</strong>
+                <strong data-testid="admin-overview-operators">{overview.operatorsCount}</strong>
+                <span>Operatori</span>
               </li>
               <li>
-                <span className="fa-admin-overview__label">Leghe</span>
-                <strong>{overview.leaguesCount}</strong>
+                <strong data-testid="admin-overview-leagues">{overview.leaguesCount}</strong>
+                <span>Leghe</span>
               </li>
             </ul>
+            {leagueStates ? (
+              <p className="fa-admin-summary__states" data-testid="admin-overview-league-states">
+                Leghe: {leagueStates}
+              </p>
+            ) : null}
           </section>
-          <nav className="fa-admin-overview__links" aria-label="Sezioni operatore">
-            <Link to="/admin/utenti">
-              <strong>Utenti</strong>
-              <span>Promuovi, revoca, impersona</span>
-            </Link>
-            <Link to="/admin/leghe">
-              <strong>Leghe globali</strong>
-              <span>Tutte le leghe della piattaforma</span>
-            </Link>
-            <Link to="/admin/listone">
-              <strong>Listone</strong>
-              <span>Aggiorna il listone dal provider</span>
-            </Link>
-            <Link to="/admin/turni">
-              <strong>Turni</strong>
-              <span>Sincronizza, calcola, apri</span>
-            </Link>
-            <Link to="/admin/job">
-              <strong>Job automatici</strong>
-              <span>Accendi, spegni, cambia la frequenza</span>
-            </Link>
-            <Link to="/admin/email">
-              <strong>Email</strong>
-              <span>Scrivi e invia email dal portale</span>
-            </Link>
-            <Link to="/admin/notifiche">
-              <strong>Notifiche</strong>
-              <span>Avvisi, novità e prove agli utenti</span>
-            </Link>
-          </nav>
-          <AdminAppVersionPanel />
+          <section aria-labelledby="admin-watch-title">
+            <h2 id="admin-watch-title" className="fa-admin-summary__label">
+              Da guardare
+            </h2>
+            {watchItems ? (
+              <ul className="fa-admin-watch" data-testid="admin-watch">
+                {watchItems.map((row) => (
+                  <li key={row.id} data-testid={`admin-watch-${row.id}`} data-tone={row.tone}>
+                    <Link to={targetPath(row.target)} className="fa-admin-watch__row">
+                      <span
+                        className={`fa-admin-watch__dot fa-admin-watch__dot--${row.tone}`}
+                        aria-hidden="true"
+                      />
+                      <span className="fa-admin-watch__text">
+                        <strong>{row.title}</strong>
+                        {row.details.map((detail) => (
+                          <span key={detail}>{detail}</span>
+                        ))}
+                      </span>
+                      <span className="fa-admin-watch__go">
+                        {row.targetLabel}
+                        <span aria-hidden="true"> ›</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="fa-admin-summary__note" data-testid="admin-watch-unavailable">
+                Le cose da guardare non sono disponibili in questo momento. Le sezioni restano nel
+                menù.
+              </p>
+            )}
+          </section>
         </div>
       ) : null}
       {!loading && !error && !overview ? (

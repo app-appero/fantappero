@@ -54,6 +54,7 @@ const DEMO_LEAGUE: LeagueDetail = {
     turnCoverageThreshold: 0.75,
     lineupLockMarginMinutes: 15,
     minutesThreshold: 15,
+    maxAutomaticSubstitutions: 5,
     voluntaryReleaseRefundPercent: 50,
     leagueExitRefundPercent: 100,
     maxActiveTradeProposalsPerTeam: 10,
@@ -386,6 +387,13 @@ export function LeagueHomePage() {
                     <dt>Titolari minimi per il turno</dt>
                     <dd>{Math.round(league.rules.turnCoverageThreshold * 100)}%</dd>
                   </div>
+                  {/* Le «Domande frequenti» (1.4) rimandano qui per il numero di cambi della lega. */}
+                  {league.rules.maxAutomaticSubstitutions != null ? (
+                    <div>
+                      <dt>Cambi automatici (max)</dt>
+                      <dd>{league.rules.maxAutomaticSubstitutions}</dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt>Scambi</dt>
                     <dd>{league.rules.options.allowTrades ? "Attivi" : "Disattivati"}</dd>

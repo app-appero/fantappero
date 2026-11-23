@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
+from sqlalchemy.orm import Session
+
 import database.models  # noqa: F401 — register ORM mappers
 from admin.listone_service import PLATFORM_JOB_SCOPE, refresh_platform_listone
 from app.worker import celery_app
 from auth.exceptions import ValidationAuthError
+from auth.models.user import User
 from config.settings.loader import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
 from leagues.listone_refresh_progress import ListoneRefreshProgress, save_progress
+from sports_data.listone.update_log import record_listone_update
+
+
+def _actor(session: Session, actor_id: str) -> User | None:
+    """L'operatore che ha avviato l'aggiornamento (None se l'id non è valido)."""
+    try:
+        return session.get(User, UUID(actor_id))
+    except (TypeError, ValueError):
+        return None
 
 
 @celery_app.task(name="admin.refresh_platform_listone_from_provider")
@@ -49,6 +63,19 @@ def refresh_platform_listone_task(
                 on_progress=lambda percent, stage, message: publish(percent, stage, message),
                 update_roles=update_roles,
             )
+            # Registro permanente per il Riepilogo operatore (1.4): stessa transazione.
+            counters = result.counters
+            record_listone_update(
+                session,
+                season_year=season_year,
+                kind="refresh",
+                source="operator",
+                actor=_actor(session, actor_id),
+                added=counters.listone_created,
+                removed=counters.listone_removed,
+                changed=counters.listone_updated,
+            )
+            session.flush()
             save_progress(
                 ListoneRefreshProgress(
                     job_id=job_id,

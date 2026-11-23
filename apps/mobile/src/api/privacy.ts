@@ -4,6 +4,7 @@ import type {
   DeleteAccountRequest,
   PrivacyMessageResponse,
 } from "@fantappero/contracts";
+import { installedAppVersionHeaders } from "../appVersion/installedVersion";
 import { loadMobileEnv } from "../config/env";
 import { ApiError, apiRequest } from "./client";
 
@@ -26,6 +27,7 @@ async function downloadJson<T>(path: string, accessToken: string): Promise<T> {
   const response = await fetch(`${expoPublicApiBaseUrl}${path}`, {
     method: "GET",
     headers: {
+      ...installedAppVersionHeaders(),
       Accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
     },

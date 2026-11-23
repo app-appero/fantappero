@@ -116,8 +116,9 @@ export const SORT_BY_AVERAGE_LABEL = "Ordina per media";
 
 /**
  * Righe già filtrate nell'ordine scelto: con «Ordina per media» accesa le ordina con `sortDesc`
- * (nell'app `sortBySeasonAverageDesc` dei contratti: media più alta prima, chi non l'ha in
- * fondo); spenta, restano nell'ordine del listone.
+ * (nell'app `sortBySeasonAverageDesc` dei contratti: prima le medie della stagione in corso,
+ * poi quelle della scorsa, ognuna dalla più alta, chi non l'ha in fondo); spenta, restano
+ * nell'ordine del listone.
  */
 export function orderListoneRows<T extends AthleteMarketFields>(
   rows: readonly T[],

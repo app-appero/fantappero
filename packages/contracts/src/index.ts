@@ -425,12 +425,47 @@ export {
 export type { MarketGateState, MarketStatusBadge } from "./marketGate.js";
 
 export {
+  APP_VERSION_CONFIRM_CANCEL_LABEL,
+  EMPTY_APP_VERSION_FORM,
   appUpdateBannerText,
+  appVersionFormFrom,
+  appVersionSaveConfirmation,
+  appVersionSavedMessage,
+  appVersionUpdateFrom,
   displayAppVersionName,
   isHttpsDownloadUrl,
   isNewerAppVersion,
+  validateAppVersionForm,
 } from "./appVersion.js";
-export type { AndroidAppVersion, AndroidAppVersionUpdate, AppVersionInfo } from "./appVersion.js";
+export type {
+  AndroidAppVersion,
+  AndroidAppVersionUpdate,
+  AppVersionFormErrors,
+  AppVersionFormFields,
+  AppVersionInfo,
+  AppVersionSaveConfirmation,
+  AppVersionSaveResult,
+} from "./appVersion.js";
+
+export {
+  appUsageGroupHint,
+  appUsageGroupLabel,
+  appUsageGroupTitle,
+  appUsageSummaryLine,
+  appUsageUserName,
+  appUsageUserSeen,
+  buildOperatorWatchItems,
+  formatLeaguesByState,
+  formatRomeDayMonth,
+  formatRomeDaysAgo,
+  formatRomeWhen,
+  listoneUpdateSummary,
+} from "./operatorSummary.js";
+export type {
+  OperatorWatchItem,
+  OperatorWatchTarget,
+  OperatorWatchTone,
+} from "./operatorSummary.js";
 
 export {
   LIVE_SEAT_CALL_COLOR,
@@ -513,6 +548,18 @@ export type {
   AdminSeasonHistorySeasonEstimate,
   AdminSeasonHistoryStopReason,
   AdminOverview,
+  AdminCurrentRounds,
+  AdminListoneUpdate,
+  AdminListoneUpdateKind,
+  AdminNextLineupLock,
+  AdminAppUsage,
+  AdminAppUsageGroup,
+  AdminAppUsageGroupKind,
+  AdminAppUsageSummary,
+  AdminAppUsageUser,
+  AdminWatch,
+  AdminWatchJob,
+  AdminWatchJobFailure,
   AdminResultRecoveryJob,
   AdminResultRecoveryProgress,
   AdminResultRecoveryResult,
@@ -677,6 +724,24 @@ export {
 } from "./privacyNotice.js";
 export type { PrivacyNoticeSection } from "./privacyNotice.js";
 
+export {
+  FAQ_GROUPS,
+  FAQ_HELP,
+  FAQ_HELP_ALL_LABEL,
+  FAQ_HELP_CLOSE_LABEL,
+  FAQ_INTRO,
+  FAQ_PATH,
+  FAQ_QUESTION_PARAM,
+  FAQ_TITLE,
+  faqHelpItem,
+  faqHelpLabel,
+  faqItems,
+  faqQuestionHref,
+  findFaqItem,
+  toggleFaqItem,
+} from "./faq.js";
+export type { FaqGroup, FaqHelpId, FaqItem } from "./faq.js";
+
 export { probableToneOf } from "./probableTone.js";
 export type { ProbableTone } from "./probableTone.js";
 
@@ -730,3 +795,30 @@ export {
   seasonLabel,
   sortBySeasonAverageDesc,
 } from "./athleteValue.js";
+
+export type {
+  AdminMarketValueDetail,
+  AdminMarketValueLeagueCredits,
+  AdminMarketValueSeasonDetail,
+  AdminMarketValueSeasonRow,
+  AdminMarketValueStatus,
+  MarketValueRowKind,
+  MarketValueSeasonSlot,
+} from "./marketValueDetail.js";
+export {
+  formatPercentileOrdinal,
+  formatValueNumber,
+  formatWeightPercent,
+  marketValueBaseSentence,
+  marketValueBudgetSentence,
+  marketValueCreditsForBudget,
+  marketValueCurveSentence,
+  marketValueExcludedText,
+  marketValueIndexSentence,
+  marketValueRolePlural,
+  marketValueRowKindLabel,
+  marketValueSeasonName,
+  marketValueSeasonSentence,
+  marketValueSourceLabel,
+  marketValueStatusText,
+} from "./marketValueDetail.js";
