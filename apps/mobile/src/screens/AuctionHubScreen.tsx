@@ -1,13 +1,15 @@
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from "@react-navigation/core";
 import { useEffect, useState } from "react";
 import { ScreenTabs } from "../components/ScreenTabs";
+import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
 import { MarketGateBar } from "../market/MarketGateBar";
+import { useAuthSession } from "../session/DemoSessionContext";
 import { AuctionLiveScreen } from "./AuctionLiveScreen";
 import { AuctionScreen } from "./AuctionScreen";
-import { auctionModeFromParams, type AuctionMode } from "./auctionMode";
+import { auctionHubHasLeague, auctionModeFromParams, type AuctionMode } from "./auctionMode";
 
 const AUCTION_MODE_TABS = [
   { id: "buste", label: "Buste chiuse" },
@@ -26,6 +28,7 @@ const AUCTION_MODE_TABS = [
  */
 export function AuctionHubScreen() {
   const navigation = useNavigation<NavigationProp<AppTabParamList>>();
+  const { activeLeagueId } = useAuthSession();
   const route = useRoute<RouteProp<AppTabParamList, "Auction">>();
   const requested = auctionModeFromParams(route.params);
   const [mode, setMode] = useState<AuctionMode>(requested ?? "buste");
@@ -55,14 +58,26 @@ export function AuctionHubScreen() {
         onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
         testID="market-hub-tabs"
       />
-      <MarketGateBar />
-      <ScreenTabs
-        items={AUCTION_MODE_TABS}
-        activeId={mode}
-        onSelect={(id) => setMode(id as AuctionMode)}
-        testID="auction-mode-tabs"
-      />
-      {mode === "buste" ? <AuctionScreen key={refreshKey} /> : <AuctionLiveScreen key={refreshKey} />}
+      {auctionHubHasLeague(activeLeagueId) ? (
+        <>
+          <MarketGateBar />
+          <ScreenTabs
+            items={AUCTION_MODE_TABS}
+            activeId={mode}
+            onSelect={(id) => setMode(id as AuctionMode)}
+            testID="auction-mode-tabs"
+          />
+          {mode === "buste" ? <AuctionScreen key={refreshKey} /> : <AuctionLiveScreen key={refreshKey} />}
+        </>
+      ) : (
+        // Account senza leghe: niente «Mercato aperto» né «Configura asta» (corsa M4, 22/11).
+        <UiStatePanel
+          state="empty"
+          title="Nessuna lega"
+          message="L'asta si svolge dentro una lega: creane una o unisciti con un codice invito."
+          testID="auction-no-league"
+        />
+      )}
     </PageContainer>
   );
 }
