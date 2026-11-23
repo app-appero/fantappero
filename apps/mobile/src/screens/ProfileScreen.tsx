@@ -29,7 +29,9 @@ import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { deleteAccountAndForget } from "../session/accountDeletion";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { clearLastUser } from "../session/lastUser";
 import { useAppTheme } from "../theme/AppTheme";
 import { THEME_OPTIONS } from "../theme/themePreference";
 import { resolveAvatarUrl } from "../utils/avatar";
@@ -330,11 +332,16 @@ export function ProfileScreen() {
     }
     setSaving(true);
     try {
-      await deleteAccount(accessToken, {
-        confirmPhrase: deletePhrase,
-        ...(deletePassword ? { password: deletePassword } : {}),
+      // Account eliminato: si dimentica anche l'ultimo accesso, niente «Bentornato» (M1, 22/11).
+      await deleteAccountAndForget({
+        deleteAccount: () =>
+          deleteAccount(accessToken, {
+            confirmPhrase: deletePhrase,
+            ...(deletePassword ? { password: deletePassword } : {}),
+          }),
+        forgetLastUser: clearLastUser,
+        logout,
       });
-      await logout();
     } catch (error) {
       setFormError(getApiErrorMessage(error, "Eliminazione non riuscita."));
       setSaving(false);
