@@ -139,6 +139,28 @@ def test_email_login_after_a_policy_bump_records_the_new_version(
     assert datetime.fromisoformat(after["policyConsentAt"]) > first_consent_at
 
 
+def test_informativa_2026_11d_accettata_al_prossimo_accesso(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Release 1.4 (Rosario 23/11): l'informativa 2026-11d aggiunge l'uso dell'app; chi aveva
+    accettato la 2026-11c la accetta al prossimo accesso, come per le versioni prima."""
+    monkeypatch.delenv("PROFILE_POLICY_VERSION", raising=False)
+    reset_settings_cache()
+    reset_db_cache()
+    assert get_api_settings().profile_policy_version == "2026-11d"
+
+    email = "consenso.2026-11d@example.com"
+    assert _register(client, email).status_code == 201
+    stored = _stored_profile(db_session, email)
+    stored.policy_version = "2026-11c"
+    db_session.commit()
+    # Account che aveva accettato la 2026-11c: l'accesso registra la 2026-11d.
+    after = _profile(client, _login(client, email))
+    assert after["policyVersion"] == "2026-11d"
+    assert after["currentPolicyVersion"] == "2026-11d"
+    assert _stored_profile(db_session, email).policy_version == "2026-11d"
+
+
 def test_registering_an_existing_address_does_not_touch_its_acceptance(
     client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
