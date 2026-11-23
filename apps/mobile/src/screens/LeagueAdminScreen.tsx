@@ -198,6 +198,36 @@ export function LeagueAdminScreen() {
   const marketGate = useMarketGate({ reloadToken: members.length + invitesReload });
   const pendingInviteCount = marketGate.pendingInviteCount;
 
+  // Amministratori: passare il controllo, condividerlo (co-admin) o toglierlo a un co-admin.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminTargetId, setAdminTargetId] = useState("");
+  const [adminMode, setAdminMode] = useState<"co_admin" | "transfer">("co_admin");
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!replaceOpen || !leagueId || !accessToken) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCandidatesLoading(true);
+      void fetchManagerDirectory(accessToken, leagueId, {
+        query: replaceQuery.trim() || undefined,
+        available: true,
+        pageSize: 8,
+      })
+        .then((result) =>
+          setCandidates(result.items.filter((item) => !item.inLeague && !item.isSelf)),
+        )
+        .catch(() => setCandidates([]))
+        .finally(() => setCandidatesLoading(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [replaceOpen, replaceQuery, leagueId, accessToken]);
+
+  // Tutti gli hook stanno sopra questo return: dopo «Elimina lega» la lega sparisce dalla
+  // sessione, il permesso cade e la schermata si ridisegna da qui. Con hook più in basso
+  // React vedeva meno hook del giro prima e mostrava «Qualcosa è andato storto» (QA 22→23/11).
   if (!can(["league:admin"])) {
     return (
       <PageContainer title="Amministrazione lega" testID="screen-league-admin">
@@ -306,13 +336,6 @@ export function LeagueAdminScreen() {
     }
   }
 
-  // Amministratori: passare il controllo, condividerlo (co-admin) o toglierlo a un co-admin.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [adminTargetId, setAdminTargetId] = useState("");
-  const [adminMode, setAdminMode] = useState<"co_admin" | "transfer">("co_admin");
-  const [adminError, setAdminError] = useState<string | null>(null);
-
   function openAdmin() {
     setAdminTargetId("");
     setAdminMode("co_admin");
@@ -352,26 +375,6 @@ export function LeagueAdminScreen() {
       await revokeLeagueAdmin(accessToken, leagueId, userId);
     });
   }
-
-  useEffect(() => {
-    if (!replaceOpen || !leagueId || !accessToken) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      setCandidatesLoading(true);
-      void fetchManagerDirectory(accessToken, leagueId, {
-        query: replaceQuery.trim() || undefined,
-        available: true,
-        pageSize: 8,
-      })
-        .then((result) =>
-          setCandidates(result.items.filter((item) => !item.inLeague && !item.isSelf)),
-        )
-        .catch(() => setCandidates([]))
-        .finally(() => setCandidatesLoading(false));
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [replaceOpen, replaceQuery, leagueId, accessToken]);
 
   function openReplace() {
     setReplaceFromId("");
