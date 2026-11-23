@@ -4054,9 +4054,13 @@ h2 {
   text-transform: uppercase;
 }
 
-.fa-pitch-player__score {
+/* Voto sul campo: bianco su blu notte. Solo il colore di fondo, non «background:», che
+   azzerava il gradiente di «s.v.» (viola) e «provvisorio» (blu) di layout.css (QA 22→23/11).
+   Il voto definitivo ha i suoi colori (fondo bianco, testo scuro) e qui non si tocca: questa
+   regola viene dopo layout.css e li copriva entrambi. */
+.fa-pitch-player__score:not(.fa-pitch-player__score--final) {
   color: #ffffff;
-  background: rgba(8, 12, 30, 0.78);
+  background-color: rgba(8, 12, 30, 0.78);
   font-weight: 700;
 }
 
