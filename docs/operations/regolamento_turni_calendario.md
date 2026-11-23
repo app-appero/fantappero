@@ -61,6 +61,8 @@ Le regole qui sotto descrivono il comportamento del codice; dove il codice cambi
 
 ## 5. Domande frequenti (testo per i fantallenatori)
 
+Dalla 1.4 queste risposte sono sul sito e nell'app, nella voce di menù «Domande frequenti» subito dopo «Segnala un problema», con in più «Cos'è la regola del 75%?» (dal punto 2): il testo mostrato sta in `packages/contracts/src/faq.ts` e va aggiornato insieme a questo capitolo.
+
 **Perché un turno è «saltato»?**
 Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare almeno 9 titolari con giocatori che giocano davvero, per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.
 

@@ -677,6 +677,19 @@ export {
 } from "./privacyNotice.js";
 export type { PrivacyNoticeSection } from "./privacyNotice.js";
 
+export {
+  FAQ_GROUPS,
+  FAQ_INTRO,
+  FAQ_PATH,
+  FAQ_QUESTION_PARAM,
+  FAQ_TITLE,
+  faqItems,
+  faqQuestionHref,
+  findFaqItem,
+  toggleFaqItem,
+} from "./faq.js";
+export type { FaqGroup, FaqItem } from "./faq.js";
+
 export { probableToneOf } from "./probableTone.js";
 export type { ProbableTone } from "./probableTone.js";
 
