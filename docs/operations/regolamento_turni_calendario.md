@@ -63,15 +63,18 @@ Le regole qui sotto descrivono il comportamento del codice; dove il codice cambi
 
 Dalla 1.4 queste risposte sono sul sito e nell'app, nella voce di menù «Domande frequenti» subito dopo «Segnala un problema», con in più «Cos'è la regola del 75%?» (dal punto 2): il testo mostrato sta in `packages/contracts/src/faq.ts` e va aggiornato insieme a questo capitolo.
 
-**Regola standard (Rosario, 23/11).** Ogni lega può cambiare la soglia dei titolari (da 50% a 100%), il numero di cambi automatici (da 0 a 5) e i minuti del blocco (da 0 a 60). Dove una risposta cita 9 titolari, 5 cambi o 15 minuti, dice che è la regola standard e rimanda a «Regolamento» nella home della lega, dove dalla 1.4 compare anche «Cambi automatici (max)».
+**Regola standard (Rosario, 23/11).** Ogni lega può cambiare la soglia dei titolari (da 50% a 100%), il numero di cambi automatici (da 0 a 5) e i minuti del blocco (da 0 a 60). Dove una risposta cita 9 titolari, 5 cambi o 15 minuti, dice che è la regola standard e rimanda a «Regolamento» nella home della lega, dove dalla 1.4 compaiono anche «Cambi automatici (max)» e «Partite minime per turno».
 
 **Il «?» accanto alle scritte (1.4).** Un piccolo «?» apre la risposta giusta dal basso (sul sito dal computer, in una finestra al centro), con il link «Tutte le domande frequenti» alla pagina con quella risposta aperta:
 - accanto a «Stato: Turno saltato» in Turni › Turni europei (uno solo: dal 23/11 non c'è più quello vicino al menù dei turni) → «Perché un turno è «saltato»?»;
 - accanto al badge «In esubero» del giocatore in Rosa (sito e app; prima «In attesa», Rosario 23/11) → «Ho un giocatore «in esubero»: cosa faccio?»;
 - accanto all'orario del blocco in Formazione → «Quando si blocca la formazione?».
 
-**Perché un turno è «saltato»?**
-Perché in quella finestra almeno una squadra della lega non avrebbe potuto schierare, con giocatori che giocano davvero, almeno 9 titolari (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»). Succede per esempio durante una sosta di uno dei campionati. Per non svantaggiare nessuno, il turno non conta per nessuno.
+**Perché un turno è «saltato»?** (due motivi, testo approvato da Rosario il 23/11)
+Per uno di questi due motivi:
+1) in quella finestra si giocano troppo poche partite dei campionati della lega: sotto il minimo della lega, 25 con la regola standard (la tua lega può averne scelto un altro, lo trovi in «Regolamento» alla voce «Partite minime per turno»). Nel turno vedi il numero, per esempio «20 partite eleggibili su 25»;
+2) almeno una squadra della lega non avrebbe potuto schierare, con giocatori che giocano davvero, almeno 9 titolari (è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»). Succede per esempio durante una sosta di uno dei campionati.
+Per non svantaggiare nessuno, il turno non conta per nessuno.
 
 **Se un mio titolare non gioca, prendo 0?**
 No: entra un giocatore della tua panchina, nell'ordine che hai scelto e rispettando il modulo, fino a 5 cambi (è la regola standard: la tua lega può averne scelti altri, li trovi in «Regolamento»). È il normale funzionamento del fantacalcio.

@@ -383,6 +383,11 @@ export function LeagueHomePage() {
                     <dt>Lock formazione</dt>
                     <dd>{league.rules.lineupLockMarginMinutes} min</dd>
                   </div>
+                  {/* Le «Domande frequenti» (1.4) rimandano qui per il minimo di partite del turno. */}
+                  <div>
+                    <dt>Partite minime per turno</dt>
+                    <dd>{league.rules.minFixturesPerRound}</dd>
+                  </div>
                   <div>
                     <dt>Titolari minimi per il turno</dt>
                     <dd>{Math.round(league.rules.turnCoverageThreshold * 100)}%</dd>

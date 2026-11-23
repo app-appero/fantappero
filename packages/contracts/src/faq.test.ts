@@ -91,6 +91,13 @@ test("ogni numero che la lega può cambiare dice che è la regola standard e rim
     /almeno 9 titolari possibili in quel campionato \(è la regola standard: la tua lega può averne scelta un'altra, la trovi in «Regolamento»\)/,
   );
   assert.match(answer("regola-75"), /Il 75% è la regola standard: la percentuale la sceglie la lega/);
+  // Turno saltato: due motivi (Rosario 23/11), anche il minimo di partite della lega (25 standard).
+  assert.match(answer("turno-saltato"), /Per uno di questi due motivi/);
+  assert.match(
+    answer("turno-saltato"),
+    /25 con la regola standard \(la tua lega può averne scelto un altro, lo trovi in «Regolamento» alla voce «Partite minime per turno»\)/,
+  );
+  assert.match(answer("turno-saltato"), /«20 partite eleggibili su 25»/);
   // Cambi automatici (0-5 per lega) e minuti del blocco (0-60 per lega).
   assert.match(
     answer("titolare-non-gioca"),

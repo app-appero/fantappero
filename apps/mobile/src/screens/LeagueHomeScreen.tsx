@@ -272,6 +272,8 @@ export function LeagueHomeScreen() {
                 ["Crediti iniziali", `${league.rules.totalCredits}`],
                 ["Soglia minuti per il voto", `${league.rules.minutesThreshold} min`],
                 ["Lock formazione", `${league.rules.lineupLockMarginMinutes} min`],
+                // Le «Domande frequenti» (1.4) rimandano qui per il minimo di partite del turno.
+                ["Partite minime per turno", `${league.rules.minFixturesPerRound}`],
                 ["Titolari minimi per il turno", `${Math.round(league.rules.turnCoverageThreshold * 100)}%`],
                 // Le «Domande frequenti» (1.4) rimandano qui per il numero di cambi della lega.
                 ...(league.rules.maxAutomaticSubstitutions != null
