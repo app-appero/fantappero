@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from admin.exceptions import AdminError
 from admin.listone_roles_service import AdminListoneRolesService
 from admin.listone_service import AdminListoneService
+from admin.market_value_detail import NOT_FOUND_CODES as MARKET_VALUE_NOT_FOUND_CODES
+from admin.market_value_detail import market_value_detail
 from admin.schemas import (
     AdminAddBlockedRequest,
     AdminAddTesterRequest,
@@ -38,6 +40,7 @@ from admin.schemas import (
     PaginatedAdminUsersResponse,
 )
 from admin.season_history_schemas import (
+    AdminMarketValueDetailResponse,
     AdminMarketValuesRefreshRequest,
     AdminMarketValuesRefreshResponse,
     AdminSeasonHistoryImportRequest,
@@ -494,3 +497,28 @@ def refresh_market_values(
     """Ricalcola subito storico della stagione in corso, medie stagionali e Valore del listone
     (di norma lo fa il job «Medie e Valore di mercato» dopo ogni giornata)."""
     return service.refresh_market_values(season_year=body.season_year, force=body.force)
+
+
+@router.get(
+    "/listone/valori/{athlete_id}",
+    response_model=AdminMarketValueDetailResponse,
+)
+def get_market_value_detail(
+    athlete_id: UUID,
+    season_year: int = Query(alias="seasonYear", ge=2000, le=2100),
+    league_id: UUID | None = Query(default=None, alias="leagueId"),
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> AdminMarketValueDetailResponse | JSONResponse:
+    """«Dettaglio del Valore» (1.4): come si arriva al Valore di un calciatore, stagione per
+    stagione, dall'ultimo ricalcolo. Con ``leagueId`` anche i crediti al budget di quella lega.
+    Non ricalcola e non chiama il fornitore."""
+    try:
+        return market_value_detail(
+            session, athlete_id=athlete_id, season_year=season_year, league_id=league_id
+        )
+    except ValidationAuthError as exc:
+        status_code = 404 if exc.code in MARKET_VALUE_NOT_FOUND_CODES else 400
+        return JSONResponse(
+            status_code=status_code, content={"message": exc.message, "code": exc.code}
+        )
