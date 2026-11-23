@@ -41,6 +41,13 @@ Il tag si crea **dopo** aver verificato il rilascio, non prima.
   menù «Versione app» (dalla 1.4, sul sito `/admin/versione-app` o nell'app; prima era in fondo
   alla prima pagina del sito) e scrive versione, versionCode e link: chi ha un'app più vecchia
   vede l'avviso «È disponibile la versione … dell'app.» con «Scarica» e «Più tardi».
+- **Dalla 1.4** (Rosario 23/11) il salvataggio manda anche una notifica (elenco e push) con il
+  link a chi non risulta già su quella versione, una sola volta per versionCode: si salva quando
+  l'APK è davvero scaricabile dal link, non prima. Risalvare lo stesso versionCode per correggere
+  link o messaggio non rimanda la notifica. L'avviso nell'app 1.4 torna a ogni ingresso finché
+  non si aggiorna. Chi ha aggiornato si vede subito sotto il modulo, in «Chi ha quale versione»
+  (vedi [`admin_operator_bootstrap.md`](./admin_operator_bootstrap.md)): le app 1.2 e 1.3 non
+  dicono la versione e compaiono come «Versione non nota»; dalla 1.4 in poi la versione è esatta.
 
 ## Tornare indietro
 

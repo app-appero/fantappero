@@ -59,7 +59,8 @@ schermata del pannello nell'app si chiamano «Riepilogo» e non ripetono più il
   attesa (Utenti), segnalazioni nuove (Segnalazioni), job spenti e giri finiti con errore nelle
   ultime 24 ore con il motivo (Job automatici), ultimo aggiornamento del listone con data, autore
   e riassunto (Listone), giornate in corso e prossimo blocco delle formazioni fra tutte le leghe
-  attive (Turni), versione dell'app annunciata (Versione app).
+  attive (Turni), versione dell'app annunciata e, dalla 1.4, quanti la hanno su quanti usano
+  l'app, es. «4 utenti aggiornati su 12 che usano l'app» (Versione app).
 
 Tutto arriva da `GET /admin/overview` (solo `global:operate`, gli altri 403): ai campi di prima si
 aggiungono `leaguesByState` e `watch`. L'esito dei giri dei job sta in `system_job_runs`, scritto
@@ -72,6 +73,46 @@ blocco si calcola a ogni richiesta, con la regola del countdown «Prossimo blocc
 **«Versione app»** è una voce di menù a sé, dopo «Segnalazioni», sul sito (`/admin/versione-app`)
 e nell'app: stesso modulo e stessa chiamata `PUT /admin/app-version` (vedi
 [`release_pilota_regole.md`](./release_pilota_regole.md)).
+
+### «Versione app»: notifica e «Chi ha quale versione» (release 1.4)
+
+Decisione di Rosario del 23/11.
+
+- **Salvare una versione la annuncia davvero.** Con «Salva» parte una notifica «È disponibile la
+  versione X dell'app» (nell'elenco delle notifiche e push, categoria «Sistema», evento «Nuova
+  versione dell'app» nelle preferenze) con il link di download, a tutti gli utenti attivi che
+  **non risultano già** su quella versione o una più nuova (anche a chi usa solo il sito). Con la
+  modalità test accesa va solo a chi può usare l'app (tester in lista e operatori). Si rispettano
+  le preferenze di ognuno (categoria «Sistema» ed evento, in-app e push) e le ore di silenzio
+  della push, come per le altre notifiche. Una sola volta per versionCode: risalvare lo stesso
+  versionCode (per esempio per correggere il link o il messaggio) non la rimanda a chi l'ha già
+  avuta. Il messaggio dopo «Salva» dice a quanti è partita; se l'invio non riesce la versione
+  resta salvata e il messaggio lo dice (salvando di nuovo si riprova).
+- **Toccare la notifica** nell'app 1.4 apre il link di download; sul sito la notifica apre il link
+  in una nuova scheda. Nelle app più vecchie il tocco apre solo l'app (nell'elenco non fa nulla):
+  le 1.2 e 1.3 mostrano poi l'avviso come prima (all'avvio, al più ogni 3 ore), la 1.1 non ha
+  l'avviso e il link resta quello del gruppo WhatsApp.
+- **L'avviso nell'app** (da 1.4) si ripropone a ogni avvio e a ogni ritorno in primo piano finché
+  l'app non è aggiornata; «Più tardi» lo nasconde solo fino al prossimo ingresso.
+- **«Chi ha quale versione»**, sotto il modulo (sito e app, `GET /admin/app-version/users`, solo
+  `global:operate`): un gruppo per versione, la più nuova in cima, es. «1.4.0 (5): 7 utenti» con
+  «aggiornati» se è la versione annunciata o più nuova; per ogni utente soprannome (e nome),
+  email e ultima volta visto nell'app. Poi:
+  - «Versione non nota (app 1.2 o 1.3)»: app che controllano gli aggiornamenti (`GET /app/version`)
+    ma non dicono la versione;
+  - «Versione non nota (app 1.1 o precedente)»: app (User-Agent `okhttp/`) che non controllano
+    gli aggiornamenti;
+  - «App mai usata / solo sito», chiuso: nessuna richiesta dall'app da quando il server registra
+    le versioni (il rilascio 1.4); chi ha usato l'app solo prima del rilascio sta qui finché non la
+    riapre.
+
+Come si registra: dalla 1.4 l'app manda la versione in ogni richiesta (`X-App-Version`,
+`X-App-Version-Code`, `X-App-Platform`); il backend la scrive in `user_app_usage` (una riga per
+utente e piattaforma: versione, da dove si sa, prima e ultima volta), al più una volta ogni
+5 minuti per utente (subito se cambia la versione), dopo la risposta e senza mai far fallire la
+richiesta. Le richieste del sito e quelle fatte impersonando un utente non contano. Una fonte
+meno precisa non cancella una versione esatta. La riga sparisce con l'account e compare
+nell'export dei dati (`appUsage`).
 
 ## Variabili correlate
 
