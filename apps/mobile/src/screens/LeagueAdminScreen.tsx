@@ -44,6 +44,7 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { isLeagueDeletable } from "../leagues/leagueDeleteHelpers";
 import { leagueStateLabel } from "../leagues/leagueLabels";
+import { rulesSavedMessage } from "../leagues/rulesSaved";
 import { MarketGateBarView } from "../market/MarketGateBar";
 import { pendingInvitesLabel } from "../market/marketGateNotice";
 import { useMarketGate } from "../market/useMarketGate";
@@ -126,7 +127,7 @@ export function LeagueAdminScreen() {
   const [expiresInDays, setExpiresInDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
@@ -147,7 +148,7 @@ export function LeagueAdminScreen() {
   const loadAll = useCallback(
     async (options?: { silent?: boolean }) => {
       setActionError(null);
-      setSaveSuccess(false);
+      setSaveSuccess(null);
       if (!leagueId || !accessToken) {
         setLoading(false);
         setRules(null);
@@ -246,7 +247,7 @@ export function LeagueAdminScreen() {
       return;
     }
     setActionError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
     const nextRules: LeagueRules = {
       ...rules,
       participantCount: Number(participantCountText) || rules.participantCount,
@@ -276,9 +277,9 @@ export function LeagueAdminScreen() {
         buildPayloadFromRules(nextRules),
       );
       setRules(saved);
-      setSaveSuccess(true);
+      // Si resta sul regolamento con la conferma, senza passare a «Invitati» (corsa M4, 22/11).
+      setSaveSuccess(rulesSavedMessage(!configurationSaved));
       setConfigurationSaved(true);
-      setSetupTab("invitati");
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile salvare il regolamento."));
     } finally {
@@ -798,7 +799,7 @@ export function LeagueAdminScreen() {
             <UiStatePanel
               state="success"
               title="Regolamento salvato"
-              message="Le modifiche sono state applicate."
+              message={saveSuccess}
               testID="league-admin-rules-saved"
             />
           ) : null}
