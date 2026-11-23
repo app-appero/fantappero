@@ -55,6 +55,7 @@ import {
 } from "../api/leagues";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
+import { formationRoundToLoad } from "./formation/roundSelection";
 import { rosterDepartureNotices, savedStarterSlotIds } from "./formation/savedLineup";
 import { withoutRoleQuotaExcess } from "./formation/roleQuotaExcess";
 import {
@@ -141,6 +142,8 @@ export function FormationScreen() {
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState("");
+  /** Turno scelto a mano da «Strumenti › Cambia turno» (vuoto = turno di default di Turni). */
+  const pickedRoundIdRef = useRef("");
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
@@ -195,8 +198,13 @@ export function FormationScreen() {
       setTurns(list);
       // Stesso turno di default di Turni (EP07-05): il primo non ancora
       // concluso, non una scelta propria di questa schermata — altrimenti le
-      // due schermate possono aprirsi su giornate diverse.
-      const preferred = resolveDefaultEuropeanTurn(list);
+      // due schermate possono aprirsi su giornate diverse. Un turno scelto da
+      // «Cambia turno» resta anche tirando per aggiornare (corsa M3, 22/11).
+      const preferred = formationRoundToLoad(
+        list,
+        pickedRoundIdRef.current,
+        resolveDefaultEuropeanTurn(list),
+      );
       if (!preferred) {
         setSelectedRoundId("");
         setContext(null);
@@ -231,6 +239,8 @@ export function FormationScreen() {
   useEffect(() => {
     targetTeamIdRef.current = "";
     setTargetTeamId("");
+    // Un'altra lega riparte dal suo turno di default.
+    pickedRoundIdRef.current = "";
   }, [activeLeagueId]);
 
   useEffect(() => {
@@ -262,6 +272,7 @@ export function FormationScreen() {
 
   /** Admin e operatore: cambiano il turno dalla scheda Strumenti. */
   async function selectRound(roundId: string) {
+    pickedRoundIdRef.current = roundId;
     if (!accessToken || !activeLeagueId || roundId === selectedRoundId) {
       setSelectedRoundId(roundId);
       return;
