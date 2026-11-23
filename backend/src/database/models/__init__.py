@@ -63,6 +63,7 @@ from sports_data.fixtures.models import (
     PlayerMatchStat,
 )
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
+from sports_data.listone.update_models import ListoneUpdate
 from sports_data.predicted.models import (
     FotmobFixtureLink,
     PredictedLineupPlayer,
@@ -77,7 +78,7 @@ from sports_data.season_stats.models import (
     AthleteSeasonStat,
     ProviderCompetitionType,
 )
-from system_jobs.models import SystemJob
+from system_jobs.models import SystemJob, SystemJobRun
 
 __all__ = [
     "AiInteraction",
@@ -114,6 +115,7 @@ __all__ = [
     "LineupDraft",
     "LineupPlayer",
     "LineupSubmission",
+    "ListoneUpdate",
     "TacticalMove",
     "MarketBid",
     "MarketLiveLot",
@@ -151,6 +153,7 @@ __all__ = [
     "SubscriptionPayment",
     "SystemFlag",
     "SystemJob",
+    "SystemJobRun",
     "FeedbackAttachment",
     "FeedbackReport",
     "TradeProposal",

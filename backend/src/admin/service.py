@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import secrets
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import delete as sa_delete
@@ -127,6 +128,15 @@ class AdminService:
             or 0
         )
         leagues_count = self._session.scalar(select(func.count(League.id))) or 0
+        from admin.overview_watch import build_watch, leagues_by_state
+
+        # Riepilogo 1.4: un guasto in «Da guardare» non deve togliere identità e numeri.
+        watch = None
+        try:
+            with self._session.begin_nested():
+                watch = build_watch(self._session, now=datetime.now(UTC))
+        except Exception:
+            _logger.exception("admin_overview_watch_failed")
         return AdminOverviewResponse(
             operatorId=str(operator.id),
             operatorDisplayName=operator.display_name,
@@ -134,6 +144,8 @@ class AdminService:
             usersCount=users_count,
             operatorsCount=operators_count,
             leaguesCount=leagues_count,
+            leaguesByState=leagues_by_state(self._session),
+            watch=watch,
         )
 
     def list_users(

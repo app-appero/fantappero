@@ -109,10 +109,12 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a 70b4367fdb66 (tipi delle competizioni del fornitore, campionato
-            # o coppa, 1.3); prima f3a5c7e9b1d4 (storico stagionale dei calciatori e Valore di
-            # mercato, 1.3). Aggiornare questa costante ad ogni nuova migrazione in coda.
-            assert version == "70b4367fdb66"
+            # Head aggiornata a 3f0f09518f28 (esito dei giri dei job e aggiornamenti del listone
+            # per il Riepilogo operatore, 1.4); prima 70b4367fdb66 (tipi delle competizioni del
+            # fornitore, 1.3). Aggiornare questa costante ad ogni nuova migrazione in coda.
+            assert version == "3f0f09518f28"
+            assert table_exists(engine, "system_job_runs")
+            assert table_exists(engine, "listone_updates")
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

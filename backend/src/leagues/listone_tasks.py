@@ -15,6 +15,7 @@ from database.session import create_engine_from_url, create_session_factory, ses
 from leagues.listone_refresh_progress import ListoneRefreshProgress, save_progress
 from leagues.listone_service import LeagueListoneService
 from leagues.models.league import League
+from sports_data.listone.update_log import record_listone_update
 
 
 @celery_app.task(name="leagues.refresh_listone_from_provider")
@@ -66,6 +67,19 @@ def refresh_league_listone_task(*, job_id: str, league_id: str, actor_id: str) -
                 publish(percent, stage, message)
 
             result = service.refresh_from_provider(access, on_progress=on_progress)
+            # Registro permanente per il Riepilogo operatore (1.4): stessa transazione.
+            record_listone_update(
+                session,
+                season_year=result.season_year,
+                kind="refresh",
+                source="league",
+                actor=user,
+                league=league,
+                added=result.counters.listone_created,
+                removed=result.counters.listone_removed,
+                changed=result.counters.listone_updated,
+            )
+            session.flush()
             save_progress(
                 ListoneRefreshProgress(
                     job_id=job_id,
