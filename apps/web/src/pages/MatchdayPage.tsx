@@ -885,11 +885,9 @@ export function MatchdayPage() {
 
             {!loading && !loadError && turns.length > 0 ? (
               <div className="fa-matchday-europei" data-testid="matchday-turn-list">
-                <div
-                  className={
-                    selectedSkipped ? "fa-matchday-toolbar fa-matchday-toolbar--help" : "fa-matchday-toolbar"
-                  }
-                >
+                {/* Il «?» di un turno saltato sta solo accanto a «Stato: Turno saltato», non qui
+                    accanto al menù (Rosario, 23/11). */}
+                <div className="fa-matchday-toolbar">
                   <Select
                     label="Turno europeo"
                     options={turns.map((turn, index) => ({
@@ -900,10 +898,6 @@ export function MatchdayPage() {
                     onChange={(event) => void selectTurn(event.target.value)}
                     data-testid="matchday-turn-select"
                   />
-                  {/* «?» accanto al turno scelto nel menù, se è saltato (FAQ 1.4). */}
-                  {selectedSkipped ? (
-                    <FaqHelpButton faqId={FAQ_HELP.skippedTurn} data-testid="matchday-turn-select-help" />
-                  ) : null}
                 </div>
               </div>
             ) : null}

@@ -360,8 +360,9 @@ export function MatchdayScreen() {
             testID="matchday-empty"
           />
         ) : (
-          <View style={[styles.section, selectedSkipped ? styles.pickerRow : null]} testID="matchday-turn-list">
-            <View style={selectedSkipped ? styles.pickerGrow : null}>
+          // Il «?» di un turno saltato sta solo accanto a «Stato: Turno saltato», non accanto al
+          // menù dei turni (Rosario, 23/11).
+          <View style={styles.section} testID="matchday-turn-list">
             <OptionPicker
               label="Turno europeo"
               value={selected?.id ?? ""}
@@ -385,11 +386,6 @@ export function MatchdayScreen() {
               scrollToValue={resolveDefaultEuropeanTurn(turns)?.id}
               testID="matchday-turn-select"
             />
-            </View>
-            {/* «?» accanto al turno scelto nel menù, se è saltato (FAQ 1.4). */}
-            {selectedSkipped ? (
-              <FaqHelpButton faqId={FAQ_HELP.skippedTurn} style={styles.pickerHelp} testID="matchday-turn-select-help" />
-            ) : null}
           </View>
         )}
 
@@ -655,19 +651,6 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
-  },
-  // Menù dei turni con il «?» accanto quando il turno scelto è saltato (FAQ 1.4).
-  pickerRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.xs,
-  },
-  pickerGrow: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pickerHelp: {
-    marginRight: -spacing.xs,
   },
   // «Stato: Turno saltato» e il «?» sulla stessa riga; il «?» va a capo con il testo grande.
   statusRow: {

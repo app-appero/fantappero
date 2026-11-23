@@ -47,8 +47,9 @@ import {
   orderedBenchFromRoster,
   planModuleChange,
   preserveLockedStarters,
-  labelFantasyTurnStatus,
+  TURN_DISPLAY_LABEL,
   resolveDefaultEuropeanTurn,
+  resolveTurnDisplayStates,
   restoreBenchActiveRoles,
   rosterDepartureNotices,
   savedStarterSlotIds,
@@ -682,6 +683,10 @@ export function FormationPage() {
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
   );
+  // Menù «Turno» per cambiare turno: lo stato mostrato in Turni, non lo stato interno del ciclo
+  // di vita (`effectiveStatus`), che resta «scheduled» per i turni nati dopo le loro partite e
+  // li faceva leggere «(Programmato)» anche già giocati. Come «Cambia turno» dell'app (M3, 22/11).
+  const turnDisplayStates = useMemo(() => resolveTurnDisplayStates(turns, lockNow), [turns, lockNow]);
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
@@ -2098,9 +2103,9 @@ export function FormationPage() {
                 value={selectedRoundId}
                 onChange={(event) => void selectRound(event.target.value)}
                 data-testid="formation-round"
-                options={turns.map((turn) => ({
+                options={turns.map((turn, index) => ({
                   value: turn.id,
-                  label: `Turno ${turn.number} (${labelFantasyTurnStatus(turn.effectiveStatus)})`,
+                  label: `Turno ${turn.number} (${TURN_DISPLAY_LABEL[turnDisplayStates[index] ?? "upcoming"]})`,
                 }))}
               />
               {isOperator && teams.length > 0 ? (

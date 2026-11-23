@@ -176,7 +176,7 @@ function RosterRoleTable({
                               data-testid={`roster-pending-badge-${slot.athleteId ?? slot.slotIndex}`}
                               title="Scambio accettato con la rosa già al completo (per ruolo o nel totale): svincola qualcuno per schierarlo."
                             >
-                              In attesa
+                              In esubero
                             </Badge>
                             <FaqHelpButton
                               faqId={FAQ_HELP.surplus}

@@ -43,6 +43,20 @@ describe("Turni europei: motivo del turno saltato (corsa M3, 22/11)", () => {
     assert.match(source, /turnSkipReason\(selected, selectedDisplayState\)/);
     assert.match(source, /testID="matchday-turn-skip-reason"/);
   });
+
+  it("un solo «?» per il turno saltato: accanto a «Stato», non accanto al menù (Rosario, 23/11)", () => {
+    const source = readScreen("MatchdayScreen.tsx");
+    const helpButtons = source.match(/<FaqHelpButton\b[^>]*\/>/g) ?? [];
+    assert.equal(helpButtons.length, 1);
+    assert.match(helpButtons[0] ?? "", /faqId=\{FAQ_HELP\.skippedTurn\}/);
+    assert.match(helpButtons[0] ?? "", /testID="matchday-turn-skipped-help"/);
+    // Il «?» segue «Stato: …» nella stessa riga del dettaglio.
+    assert.match(
+      source,
+      /<View style=\{styles\.statusRow\}>\s*<Text style=\{styles\.body\}>Stato: \{TURN_DISPLAY_LABEL\[selectedDisplayState\]\}<\/Text>\s*<FaqHelpButton faqId=\{FAQ_HELP\.skippedTurn\} testID="matchday-turn-skipped-help" \/>/,
+    );
+    assert.doesNotMatch(source, /matchday-turn-select-help/);
+  });
 });
 
 describe("Formazione › Strumenti › Cambia turno (corsa M3, 22/11)", () => {

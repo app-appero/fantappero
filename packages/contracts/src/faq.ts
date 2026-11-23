@@ -152,7 +152,7 @@ export function faqQuestionHref(id: string): string {
 
 /**
  * Le risposte che un piccolo «?» apre accanto a una scritta (1.4, canvas del 22/11): «Turno
- * saltato» in Turni, il giocatore «In attesa» (in esubero) in Rosa, l'orario del blocco in
+ * saltato» in Turni, il giocatore «In esubero» in Rosa, l'orario del blocco in
  * Formazione. Sito e app usano gli stessi id.
  */
 export const FAQ_HELP = {
