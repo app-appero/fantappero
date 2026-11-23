@@ -2,7 +2,7 @@
 
 **Data:** 22 novembre 2026
 **Decisioni:** Rosario, 21–22/11 (canvas «Proposte 1.3», scheda Valore di mercato; `docs/qa/known_issues.md`). Solo campionati nella media e nel Valore, coppe solo nella carriera: Rosario, 22/11.
-**Codice:** `backend/src/sports_data/season_stats/` (storico; `competition_types.py` per campionato o coppa), `backend/src/market/valuation.py` (formule e costanti), `backend/src/market/valuation_service.py` (ricalcolo e letture), `backend/src/admin/season_history_service.py` (pannello operatore).
+**Codice:** `backend/src/sports_data/season_stats/` (storico; `competition_types.py` per campionato o coppa), `backend/src/market/valuation.py` (formule e costanti), `backend/src/market/valuation_service.py` (ricalcolo e letture), `backend/src/admin/season_history_service.py` (pannello operatore), `backend/src/admin/market_value_detail.py` («Dettaglio del Valore», 1.4, § 8).
 
 ## In breve
 
@@ -195,3 +195,45 @@ Il listone arriva intero e si ordina nelle app: «Ordina per media» usa `sortBy
 - Le stagioni passate non hanno le porte inviolate (il fornitore non le dà nell'aggregato).
 - Le statistiche di stagione del fornitore possono includere coppe e competizioni europee (soprattutto per i calciatori cercati uno per uno): sono righe a parte nello storico, visibili nella carriera, ma **non contano** nella media né nel Valore (§ 1.1).
 - Una competizione che il fornitore aggiunge dopo l'ultimo elenco dei tipi è di tipo sconosciuto, quindi esclusa, fino al primo import della stagione successiva (che riscarica l'elenco). Per le stagioni passate non succede: le loro competizioni esistono già quando si scarica l'elenco.
+
+## 8. «Dettaglio del Valore»: come si legge (1.4)
+
+Per capire **perché** un calciatore ha quel Valore (richiesta di Rosario, 23/11). Pannello operatore → **Listone** → scheda **«Dettaglio del Valore»** (sotto «Storico stagioni»; nell'app: menu operatore → Listone, stessa scheda). Si cerca il calciatore per nome o club nel listone caricato nella pagina e lo si tocca.
+
+- API: `GET /admin/listone/valori/{athleteId}?seasonYear=2026` (solo `global:operate`, altrimenti 403; 404 se il calciatore non è nel listone della stagione). Con `&leagueId=…` aggiunge i crediti al budget di quella lega (`league`). La scheda ha invece il campo «Budget della lega» (default 1000) e fa lo stesso conto (proporzionale, arrotondato, almeno 1).
+- Mostra **l'ultimo ricalcolo**, non rifà il conto e non chiama il fornitore: è esattamente il numero che vedono le leghe. Dopo un import o un cambio di dati, «Ricalcola valori» e poi riaprire il dettaglio.
+- Il ricalcolo salva ogni passaggio in `athlete_market_values.components_json` (versione della formula `1.4.0`: stessa formula, solo più dettagli salvati). Una riga scritta prima ha solo percentili e pesi: la scheda lo dice («Dettaglio incompleto») e basta «Ricalcola valori». Un calciatore entrato nel listone dopo l'ultimo ricalcolo non ha riga: vale il valore base del ruolo («Valore non ancora calcolato»).
+
+### Tabella: una colonna per stagione (in corso, scorsa, due fa)
+
+| Riga | Cosa vuol dire |
+| --- | --- |
+| Fonte | `fornitore` (media del fornitore, stagioni passate) o `FantApperò` (media dei nostri voti `player_match_ratings.display`, stagione in corso e stagioni vissute in FantApperò). È la **media voto**, non la fantamedia |
+| Competizioni | Le righe di campionato contate. Sotto, nel calcolo, «Non contano: …» elenca le righe escluse: coppe, competizioni di tipo sconosciuto (§ 1.1) e righe senza media (il fornitore a volte non dà `games.rating`) |
+| Presenze con voto | *n*: presenze (fornitore) o partite con voto (FantApperò), sommate sulle righe contate |
+| Media | Media voto della stagione (pesata per presenze se più righe) |
+| Media dei portieri / difensori / … | Media del ruolo in quella stagione, fra i calciatori del listone con dati |
+| Media ristretta | `(n × media + 8 × media del ruolo) / (n + 8)`: con poche presenze pesa di più la media del ruolo |
+| Percentile | Posizione della media ristretta fra i calciatori dello stesso ruolo con dati in quella stagione: «62° · 69° di 180» = meglio del 62% circa, 69° posto su 180. Stagione passata senza dati: vale 0,33 |
+| Peso | Peso della stagione nel Valore (stagione in corso fino al 50%, pieno a 15 partite con voto; il resto alle passate 30:20) |
+| Contributo a p | Peso × percentile (o × 0,33 se senza dati): la somma dei tre è p |
+
+### Il calcolo in parole
+
+Sotto la tabella la stessa cosa in frasi, per esempio:
+
+1. «Stagione 2025/26 (fornitore, Premier League): 34 presenze, media 7,03 → media ristretta 7,00 (media dei portieri 6,86) → 76° percentile fra 192 portieri, 47° posto → peso 36%»;
+2. «Indice combinato p = 40% × 0,50 + 36% × 0,76 + 24% × 0,30 = 0,55»;
+3. «Curva dei portieri: 1 + (30 − 1) × 0,55^2,4 = 7,8 crediti a budget 1000 → 8 crediti»;
+4. con un budget diverso: «Lega da 500 crediti: 7,8 × 500 / 1000 = 3,90 → 4 crediti».
+
+In fondo il valore base del ruolo (chi non ha storico, p = 0,33) per confronto.
+
+### Cosa guardare quando un Valore sembra sbagliato
+
+- **Una stagione «senza dati» che invece c'è nella carriera**: guardare «Non contano». Coppe e competizioni di tipo sconosciuto non contano per scelta (§ 1.1); una riga di campionato «senza media» vuol dire che il fornitore non ha dato la media di stagione. Una stagione senza dati vale 0,33, cioè sotto la mediana.
+- **Percentile basso con una media buona**: il percentile confronta la media con quella degli altri calciatori dello **stesso ruolo nella stessa stagione**, di tutti i campionati insieme. Se la «Media dei portieri» è alta, o se molti portieri di quella stagione vengono da campionati dove il fornitore dà voti più alti, una media di 6,9–7,0 può stare a metà classifica.
+- **Peso della stagione in corso**: con poche partite con voto pesa poco (es. 3 partite → 10%); il resto lo decidono le stagioni passate.
+- **La curva è convessa**: al 50° percentile combinato (p = 0,5) un portiere vale circa 6,5 crediti su 30 (P 30, D 32, C 48, A 66 al percentile 1); a p = 0,8 vale 18. Pochi punti di percentile in alto valgono molti crediti.
+
+La simulazione con dati sintetici `backend/tests/unit/market/test_valuation_goalkeepers.py` mostra questi effetti sui portieri (per la tabella: `cd backend && PYTHONPATH=src python tests/unit/market/test_valuation_goalkeepers.py`).
