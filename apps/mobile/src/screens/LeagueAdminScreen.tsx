@@ -42,7 +42,7 @@ import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
-import { isLeagueDeletable } from "../leagues/leagueDeleteHelpers";
+import { isLeagueDeletable, stackAfterLeagueDeleted } from "../leagues/leagueDeleteHelpers";
 import { leagueStateLabel } from "../leagues/leagueLabels";
 import { rulesSavedMessage } from "../leagues/rulesSaved";
 import { MarketGateBarView } from "../market/MarketGateBar";
@@ -489,7 +489,8 @@ export function LeagueAdminScreen() {
         // Eliminazione già riuscita.
       }
       setDeleteSuccess("Lega eliminata definitivamente.");
-      navigation.navigate("LeagueHome");
+      // Pila nuova: «indietro» non torna sull'Amministrazione della lega eliminata (QA 23/11).
+      navigation.reset(stackAfterLeagueDeleted());
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile eliminare la lega."));
     } finally {
