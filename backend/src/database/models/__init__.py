@@ -1,6 +1,7 @@
 """ORM models — import all mapped classes for Alembic autogenerate."""
 
 from ai_assistant.models import AiInteraction
+from app_usage.models import UserAppUsage
 from auth.models.auth_session import AuthSession
 from auth.models.auth_token import AuthToken
 from auth.models.blocked_account import BlockedAccount
@@ -159,6 +160,7 @@ __all__ = [
     "TradeProposal",
     "Transfer",
     "User",
+    "UserAppUsage",
     "UserEntitlement",
     "UserProfile",
 ]

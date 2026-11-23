@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
 import jwt
-from fastapi import Depends, Request
+from fastapi import BackgroundTasks, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -23,8 +24,10 @@ from auth.service import AuthService
 from config.settings.api import ApiSettings
 from config.settings.loader import get_api_settings
 from database.session import create_engine_from_url, create_session_factory
+from observability.logging import get_logger
 
 _bearer = HTTPBearer(auto_error=False)
+_logger = get_logger(__name__)
 
 _engine = None
 _session_factory: sessionmaker[Session] | None = None
@@ -140,7 +143,34 @@ def _family_closed(session: Session, access_session: object) -> bool:
     return active is None
 
 
+def _note_app_usage(
+    request: Request, background_tasks: BackgroundTasks, user: User, *, impersonated: bool
+) -> None:
+    """Versione dell'app di chi fa la richiesta (release 1.4): scritta dopo la risposta.
+
+    Mai un errore verso il chiamante: se qualcosa va storto si scrive solo nel log.
+    """
+    if impersonated:
+        # Impersonando, l'app è quella dell'operatore: non dice nulla dell'utente.
+        return
+    try:
+        from app_usage.recorder import observe, record_app_usage, should_record
+
+        observation = observe(request.headers, method=request.method, path=request.url.path)
+        if observation is None:
+            return
+        now = datetime.now(UTC)
+        if should_record(user.id, observation, now=now):
+            background_tasks.add_task(
+                record_app_usage, _get_session_factory(), user.id, observation, now=now
+            )
+    except Exception:
+        _logger.warning("app_usage_note_failed", exc_info=True)
+
+
 def get_current_user(
+    request: Request,
+    background_tasks: BackgroundTasks,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: Session = Depends(get_db_session),
     settings: ApiSettings = Depends(get_api_settings),
@@ -182,4 +212,5 @@ def get_current_user(
         raise SessionRequiredError()
     if BlockList(session).is_blocked(user.email):
         raise AccountBlockedError()
+    _note_app_usage(request, background_tasks, user, impersonated=payload.get("imp") is True)
     return user

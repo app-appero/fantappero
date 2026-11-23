@@ -61,6 +61,10 @@ EVENT_DEFINITIONS: tuple[NotificationEventDefinition, ...] = (
     NotificationEventDefinition(
         "sistema.avvisi_operatori", EVENT_CATEGORY_SISTEMA, "Avvisi operatori"
     ),
+    # Release 1.4 (Rosario 23/11): l'operatore annuncia una nuova versione dell'app.
+    NotificationEventDefinition(
+        "sistema.versione_app", EVENT_CATEGORY_SISTEMA, "Nuova versione dell'app"
+    ),
 )
 
 EVENT_KEYS: frozenset[str] = frozenset(definition.event_key for definition in EVENT_DEFINITIONS)
@@ -96,6 +100,7 @@ EVENT_KEY_BY_TEMPLATE_KEY: dict[str, str] = {
     "risultati.omologazione": "sistema.turno_omologato",
     "risultati.correzione": "sistema.turno_omologato",
     "sistema.generico": "sistema.avvisi_operatori",
+    "sistema.versione_app": "sistema.versione_app",
 }
 
 

@@ -8,7 +8,7 @@ per la riga del Riepilogo (sito e app):
 - ultimo aggiornamento del listone (``listone_updates``);
 - giornate in corso nelle leghe attive e prossimo blocco delle formazioni fra tutte le leghe
   (calcolato a ogni richiesta, con le stesse regole del countdown e dei promemoria);
-- versione dell'app Android annunciata.
+- versione dell'app Android annunciata e quanti la hanno su quanti usano l'app (1.4, 23/11).
 
 Solo letture, tranne i job mancanti che ``list_jobs`` aggiunge come la pagina «Job automatici».
 """
@@ -29,7 +29,9 @@ from admin.schemas import (
     AdminWatchJobFailureResponse,
     AdminWatchJobResponse,
     AdminWatchResponse,
+    AndroidAppVersionResponse,
 )
+from app_usage.service import app_usage_summary
 from auth.models.tester_request import TesterAccessRequest
 from auth.tester_requests import STATUS_PENDING
 from database.enums import FantasyTurnStatus, LeagueState
@@ -92,6 +94,7 @@ def build_watch(session: Session, *, now: datetime) -> AdminWatchResponse:
         )
         for view in recent_failures(session, since=failures_since)
     ]
+    announced = AppVersionStore(session).get().android
     return AdminWatchResponse(
         generatedAt=now,
         testerRequestsPending=int(tester_pending or 0),
@@ -104,8 +107,19 @@ def build_watch(session: Session, *, now: datetime) -> AdminWatchResponse:
         listoneLastUpdate=_listone_last_update(session),
         currentRounds=current_rounds(session, now=now),
         nextLineupLock=next_lineup_lock(session, now=now),
-        androidAppVersion=AppVersionStore(session).get().android,
+        androidAppVersion=announced,
+        androidAppUsage=_app_usage(session, announced),
     )
+
+
+def _app_usage(session: Session, announced: AndroidAppVersionResponse | None):
+    """Aggiornati su chi usa l'app; un guasto qui toglie solo il conteggio, non la riga."""
+    try:
+        with session.begin_nested():
+            return app_usage_summary(session, announced)
+    except Exception:
+        logger.exception("admin_watch_app_usage_failed")
+        return None
 
 
 def _listone_last_update(session: Session) -> AdminListoneUpdateResponse | None:

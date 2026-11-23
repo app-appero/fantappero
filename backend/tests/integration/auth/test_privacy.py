@@ -13,6 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 from tests.integration.database.helpers import create_engine_for_url
 
+from app_usage.models import UserAppUsage
+from app_usage.recorder import reset_app_usage_throttle
 from auth.models.privacy_audit_event import PrivacyAuditEvent
 from auth.models.user import User
 from database.enums import LeagueMemberRole, LeagueState, PrivacyAuditAction
@@ -228,3 +230,39 @@ def test_export_includes_nickname_preferences_and_team_data(
     assert "availableForInvites" in profile
     assert payload["pushDevices"] == []
     assert payload["teams"] == []
+
+
+def test_export_and_delete_include_the_app_version(client: TestClient, db_session: Session) -> None:
+    """Release 1.4: la versione dell'app vista dal server sta nell'export e sparisce con
+    l'account, anche se l'eliminazione stessa arriva dall'app."""
+    reset_app_usage_throttle()
+    session = _register_and_login(client, "appusage-privacy@example.com", "App Privacy")
+    app_14 = {
+        "Authorization": f"Bearer {session['access']}",
+        "User-Agent": "okhttp/4.12.0",
+        "X-App-Version": "1.4.0",
+        "X-App-Version-Code": "5",
+    }
+    assert client.get("/profile/me", headers=app_14).status_code == 200
+
+    payload = client.get("/profile/me/export", headers=app_14).json()
+    [usage] = payload["appUsage"]
+    assert (usage["platform"], usage["versionName"], usage["versionCode"]) == (
+        "android",
+        "1.4.0",
+        5,
+    )
+    assert usage["firstSeenAt"] and usage["lastSeenAt"]
+
+    reset_app_usage_throttle()
+    deleted = client.post(
+        "/profile/me/delete",
+        headers=app_14,
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
+    )
+    assert deleted.status_code == 200
+    db_session.expire_all()
+    rows = db_session.scalars(
+        select(UserAppUsage).where(UserAppUsage.user_id == UUID(session["user_id"]))
+    ).all()
+    assert rows == []

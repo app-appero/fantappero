@@ -109,12 +109,13 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a 3f0f09518f28 (esito dei giri dei job e aggiornamenti del listone
-            # per il Riepilogo operatore, 1.4); prima 70b4367fdb66 (tipi delle competizioni del
-            # fornitore, 1.3). Aggiornare questa costante ad ogni nuova migrazione in coda.
-            assert version == "3f0f09518f28"
+            # Head aggiornata a b7c4e2a91d35 (versione dell'app per utente, 1.4); prima
+            # 3f0f09518f28 (esito dei giri dei job e aggiornamenti del listone per il Riepilogo
+            # operatore, 1.4). Aggiornare questa costante ad ogni nuova migrazione in coda.
+            assert version == "b7c4e2a91d35"
             assert table_exists(engine, "system_job_runs")
             assert table_exists(engine, "listone_updates")
+            assert table_exists(engine, "user_app_usage")
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]
