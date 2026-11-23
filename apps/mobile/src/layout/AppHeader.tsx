@@ -6,6 +6,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
 import { LeagueSelector, type LeagueOption } from "../components/LeagueSelector";
 import { NavIcon } from "../navigation/NavIcons";
+import { notificationsBellLabel } from "./notificationLabels";
 import { useAppTheme } from "../theme/AppTheme";
 
 const { colors, spacing, typography, radius } = theme;
@@ -122,9 +123,7 @@ export function AppHeader({
         {!isAdmin && onNotificationsPress ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={
-              unreadNotifications > 0 ? `Notifiche: ${unreadNotifications} non lette` : "Notifiche"
-            }
+            accessibilityLabel={notificationsBellLabel(unreadNotifications)}
             onPress={onNotificationsPress}
             style={styles.profileButton}
             testID="header-notifications-button"

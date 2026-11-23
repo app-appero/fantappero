@@ -28,6 +28,7 @@ import { NotificationEventSettings } from "../components/NotificationEventSettin
 import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
+import { PROFILE_TABS } from "../layout/notificationLabels";
 import { PageContainer } from "../layout/PageContainer";
 import { deleteAccountAndForget } from "../session/accountDeletion";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -52,11 +53,6 @@ function parseQuietHour(value: string): number | null | undefined {
   }
   return parsed;
 }
-
-const PROFILE_TABS = [
-  { id: "utente", label: "Utente" },
-  { id: "notifiche", label: "Notifiche" },
-] as const;
 
 function ThemePreferenceSection() {
   const { preference, setPreference, resolvedColors } = useAppTheme();

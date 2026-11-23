@@ -7,6 +7,8 @@ const { colors, spacing, typography, radius } = theme;
 export type ScreenTabItem = {
   id: string;
   label: string;
+  /** Nome per il lettore di schermo, se il testo da solo si confonde con altro (es. il campanello). */
+  accessibilityLabel?: string;
 };
 
 /**
@@ -40,6 +42,7 @@ export function ScreenTabs({
           <Pressable
             key={item.id}
             accessibilityRole="tab"
+            accessibilityLabel={item.accessibilityLabel}
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
             onPress={() => onSelect(item.id)}
