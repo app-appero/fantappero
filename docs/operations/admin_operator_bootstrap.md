@@ -91,6 +91,13 @@ Decisioni di Rosario del 23/11.
   versionCode (per esempio per correggere il link o il messaggio) non la rimanda a chi l'ha già
   avuta. Il messaggio dopo «Salva» dice a quanti è partita; se l'invio non riesce la versione
   resta salvata e il messaggio lo dice (salvando di nuovo si riprova).
+- **«Sei sicuro?» prima di salvare** (sito e app): «Salva» apre una conferma «Annunciare la
+  versione 1.4.0 (versionCode 5)? Tutti gli utenti che usano l'app Android (o il sito da un
+  telefono Android) e non hanno ancora questa versione riceveranno una notifica; nell'app
+  vedranno anche l'avviso di aggiornamento.» con «Annulla» e «Annuncia» (sul sito un dialogo,
+  nell'app la finestra di sistema). Si salva solo con «Annuncia»; «Annulla» (o Esc sul sito)
+  lascia tutto com'era e i campi come scritti. Con il versionCode già annunciato la conferma è
+  «Salvare le modifiche alla versione …?» e dice che la notifica non parte di nuovo («Salva»).
 - **Toccare la notifica** nell'app 1.4 apre il link di download; sul sito la notifica apre il link
   in una nuova scheda. Nelle app più vecchie il tocco apre solo l'app (nell'elenco non fa nulla):
   le 1.2 e 1.3 mostrano poi l'avviso come prima (all'avvio, al più ogni 3 ore), la 1.1 non ha

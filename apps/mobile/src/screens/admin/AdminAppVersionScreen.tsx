@@ -1,17 +1,19 @@
 import {
   EMPTY_APP_VERSION_FORM,
   appVersionFormFrom,
+  appVersionSaveConfirmation,
   appVersionSavedMessage,
   appVersionUpdateFrom,
   validateAppVersionForm,
   type AdminAppUsage,
+  type AndroidAppVersionUpdate,
   type AppVersionFormErrors,
   type AppVersionFormFields,
   type AppVersionInfo,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View, type KeyboardTypeOptions } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View, type KeyboardTypeOptions } from "react-native";
 import { adminUiStyles } from "../../admin/adminUiStyles";
 import {
   fetchAppVersionConfig,
@@ -19,6 +21,7 @@ import {
   saveAppVersionConfig,
 } from "../../api/appVersion";
 import { ApiError } from "../../api/client";
+import { confirmAppVersionSave } from "../../appVersion/saveConfirm";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { useScreenData } from "../../hooks/useScreenData";
@@ -51,7 +54,8 @@ const FIELDS: {
  *
  * Decisione di Rosario del 23/11: salvare una versione nuova manda anche la notifica a chi non
  * ce l'ha (il messaggio dice a quanti) e sotto il modulo c'è «Chi ha quale versione», come sul
- * sito.
+ * sito. Prima di salvare si chiede conferma con `Alert.alert` («Annunciare la versione 1.4.0
+ * (versionCode 5)?», «Annulla» / «Annuncia»), con gli stessi testi del sito.
  */
 export function AdminAppVersionScreen() {
   const { accessToken } = useAuthSession();
@@ -107,7 +111,8 @@ export function AdminAppVersionScreen() {
     setErrors((previous) => ({ ...previous, [key]: undefined }));
   }
 
-  async function save() {
+  /** «Salva»: controlla i campi e chiede conferma; si salva solo con «Annuncia». */
+  function requestSave() {
     setMessage(null);
     setSaveError(null);
     const found = validateAppVersionForm(fields);
@@ -115,13 +120,22 @@ export function AdminAppVersionScreen() {
     if (Object.keys(found).length > 0) {
       return;
     }
+    const update = appVersionUpdateFrom(fields);
+    confirmAppVersionSave(
+      Alert.alert,
+      appVersionSaveConfirmation(update, current?.android ?? null),
+      () => void save(update),
+    );
+  }
+
+  async function save(update: AndroidAppVersionUpdate) {
     if (!accessToken) {
       setSaveError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
     setBusy(true);
     try {
-      const saved = await saveAppVersionConfig(accessToken, appVersionUpdateFrom(fields));
+      const saved = await saveAppVersionConfig(accessToken, update);
       setCurrent(saved);
       setFields(appVersionFormFrom(saved));
       setMessage(appVersionSavedMessage(saved));
@@ -202,7 +216,7 @@ export function AdminAppVersionScreen() {
             accessibilityRole="button"
             accessibilityState={{ disabled: busy, busy }}
             disabled={busy}
-            onPress={() => void save()}
+            onPress={requestSave}
             style={({ pressed }) => [
               adminUiStyles.button,
               styles.save,

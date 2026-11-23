@@ -1,14 +1,16 @@
 import {
   EMPTY_APP_VERSION_FORM,
   appVersionFormFrom,
+  appVersionSaveConfirmation,
   appVersionSavedMessage,
   appVersionUpdateFrom,
   validateAppVersionForm,
+  type AndroidAppVersionUpdate,
   type AppVersionFormErrors,
   type AppVersionFormFields,
   type AppVersionInfo,
 } from "@fantappero/contracts";
-import { Button, Input } from "@fantappero/ui";
+import { Button, Input, Modal } from "@fantappero/ui";
 import { useEffect, useState } from "react";
 import { fetchAppVersionConfig, saveAppVersionConfig } from "../api/admin";
 import { getApiErrorMessage } from "../auth/AuthContext";
@@ -25,7 +27,9 @@ type FieldErrors = AppVersionFormErrors;
  *
  * Decisione di Rosario del 23/11: salvare una versione nuova manda anche la notifica a chi non
  * ce l'ha; il messaggio dopo «Salva» dice a quanti. `onSaved` avvisa la pagina (rilegge
- * l'elenco «Chi ha quale versione»).
+ * l'elenco «Chi ha quale versione»). Prima di salvare si chiede conferma in un dialogo
+ * («Annunciare la versione 1.4.0 (versionCode 5)?», «Annulla» / «Annuncia»), lo stesso `Modal`
+ * di «Svuota formazione»; stessi testi dell'app (`appVersionSaveConfirmation`).
  */
 export function AdminAppVersionPanel({
   hideTitle = false,
@@ -37,6 +41,8 @@ export function AdminAppVersionPanel({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Versione in attesa di conferma: il dialogo «Sei sicuro?» è aperto. */
+  const [pending, setPending] = useState<AndroidAppVersionUpdate | null>(null);
 
   useEffect(() => {
     const session = loadStoredSession();
@@ -66,7 +72,8 @@ export function AdminAppVersionPanel({
     setErrors((previous) => ({ ...previous, [key]: undefined }));
   }
 
-  async function save() {
+  /** «Salva»: controlla i campi e chiede conferma; si salva solo con «Annuncia». */
+  function requestSave() {
     setMessage(null);
     setError(null);
     const found = validateAppVersionForm(fields);
@@ -74,6 +81,10 @@ export function AdminAppVersionPanel({
     if (Object.keys(found).length > 0) {
       return;
     }
+    setPending(appVersionUpdateFrom(fields));
+  }
+
+  async function save(update: AndroidAppVersionUpdate) {
     const session = loadStoredSession();
     if (!session?.accessToken) {
       setError("Sessione non disponibile. Accedi di nuovo.");
@@ -81,7 +92,7 @@ export function AdminAppVersionPanel({
     }
     setBusy(true);
     try {
-      const saved = await saveAppVersionConfig(session.accessToken, appVersionUpdateFrom(fields));
+      const saved = await saveAppVersionConfig(session.accessToken, update);
       setCurrent(saved);
       setFields(appVersionFormFrom(saved));
       setMessage(appVersionSavedMessage(saved));
@@ -94,6 +105,7 @@ export function AdminAppVersionPanel({
   }
 
   const android = current?.android ?? null;
+  const confirmation = pending ? appVersionSaveConfirmation(pending, android) : null;
 
   return (
     <section
@@ -121,7 +133,7 @@ export function AdminAppVersionPanel({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void save();
+          requestSave();
         }}
       >
         <Input
@@ -167,6 +179,41 @@ export function AdminAppVersionPanel({
           </Button>
         </div>
       </form>
+      <Modal
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        title={confirmation?.title ?? ""}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setPending(null)}
+              data-testid="admin-appversion-confirm-cancel"
+            >
+              {confirmation?.cancelLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                const update = pending;
+                setPending(null);
+                if (update) {
+                  void save(update);
+                }
+              }}
+              data-testid="admin-appversion-confirm"
+            >
+              {confirmation?.confirmLabel}
+            </Button>
+          </>
+        }
+      >
+        <p className="fa-field__hint" data-testid="admin-appversion-confirm-message">
+          {confirmation?.message}
+        </p>
+      </Modal>
       {message ? <p role="status">{message}</p> : null}
       {error ? (
         <p role="alert" className="fa-field__error">

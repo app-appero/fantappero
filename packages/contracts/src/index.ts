@@ -425,9 +425,11 @@ export {
 export type { MarketGateState, MarketStatusBadge } from "./marketGate.js";
 
 export {
+  APP_VERSION_CONFIRM_CANCEL_LABEL,
   EMPTY_APP_VERSION_FORM,
   appUpdateBannerText,
   appVersionFormFrom,
+  appVersionSaveConfirmation,
   appVersionSavedMessage,
   appVersionUpdateFrom,
   displayAppVersionName,
@@ -441,6 +443,7 @@ export type {
   AppVersionFormErrors,
   AppVersionFormFields,
   AppVersionInfo,
+  AppVersionSaveConfirmation,
   AppVersionSaveResult,
 } from "./appVersion.js";
 

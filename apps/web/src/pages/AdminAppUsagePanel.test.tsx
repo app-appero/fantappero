@@ -182,6 +182,11 @@ describe("«Chi ha quale versione» (release 1.4, Rosario 23/11)", () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>('[data-testid="admin-appversion-save"]')?.click();
     });
+    // «Sei sicuro?» (Rosario 23/11): si salva solo dopo la conferma.
+    expect(saveMock).not.toHaveBeenCalled();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="admin-appversion-confirm"]')?.click();
+    });
     expect(saveMock).toHaveBeenCalledTimes(1);
     expect(usersMock).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Nessuna notifica nuova");

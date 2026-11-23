@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AdminAppUsageGroup, AdminAppUsageUser, AdminWatch } from "./admin.ts";
-import { appVersionSavedMessage } from "./appVersion.ts";
+import { appVersionSaveConfirmation, appVersionSavedMessage } from "./appVersion.ts";
 import {
   appUsageGroupHint,
   appUsageGroupLabel,
@@ -124,5 +124,29 @@ describe("chi ha quale versione dell'app (release 1.4, Rosario 23/11)", () => {
     assert.match(appVersionSavedMessage({ android, notifiedUsers: null }), /non è partita/);
     // Server più vecchio: il testo di prima.
     assert.equal(appVersionSavedMessage({ android }), "Versione salvata: chi ha un'app più vecchia vedrà l'avviso.");
+  });
+
+  it("«Sei sicuro?» prima di salvare una versione nuova (Rosario 23/11)", () => {
+    const update = { latestVersionName: "1.4.0", latestVersionCode: 5, downloadUrl: "https://x.example/a", message: null };
+    const announced13 = { latestVersionName: "1.3.0", latestVersionCode: 4, downloadUrl: "https://x.example/b", message: null };
+    for (const current of [null, undefined, announced13]) {
+      assert.deepEqual(appVersionSaveConfirmation(update, current), {
+        title: "Annunciare la versione 1.4.0 (versionCode 5)?",
+        message:
+          "Tutti gli utenti che usano l'app Android (o il sito da un telefono Android) e non hanno ancora questa versione riceveranno una notifica; nell'app vedranno anche l'avviso di aggiornamento.",
+        confirmLabel: "Annuncia",
+        cancelLabel: "Annulla",
+      });
+    }
+  });
+
+  it("stesso versionCode già annunciato: la conferma dice che la notifica non riparte", () => {
+    const current = { latestVersionName: "1.4.0", latestVersionCode: 5, downloadUrl: "https://x.example/a", message: null };
+    const fixLink = { ...current, downloadUrl: "https://x.example/corretto" };
+    const confirmation = appVersionSaveConfirmation(fixLink, current);
+    assert.equal(confirmation.title, "Salvare le modifiche alla versione 1.4.0 (versionCode 5)?");
+    assert.match(confirmation.message, /la notifica non parte di nuovo/);
+    assert.equal(confirmation.confirmLabel, "Salva");
+    assert.equal(confirmation.cancelLabel, "Annulla");
   });
 });

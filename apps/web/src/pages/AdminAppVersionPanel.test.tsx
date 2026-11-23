@@ -69,6 +69,24 @@ describe("AdminAppVersionPanel", () => {
     });
   }
 
+  function dialog(): HTMLElement | null {
+    return container.querySelector<HTMLElement>('[role="dialog"]');
+  }
+
+  async function click(testId: string) {
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)?.click();
+    });
+  }
+
+  async function fillVersion14() {
+    await act(async () => {
+      setValue(field("app-version-name"), "1.4.0");
+      setValue(field("app-version-code"), "5");
+      setValue(field("app-version-url"), "https://drive.google.com/drive/folders/fantappero-1-4");
+    });
+  }
+
   it("senza versione impostata spiega che non c'è avviso e mostra il suggerimento", async () => {
     fetchMock.mockResolvedValue({ android: null });
     await render();
@@ -92,6 +110,9 @@ describe("AdminAppVersionPanel", () => {
       setValue(field("app-version-message"), "Più veloce");
     });
     await submit();
+    // Prima la conferma, poi il salvataggio.
+    expect(saveMock).not.toHaveBeenCalled();
+    await click("admin-appversion-confirm");
     expect(saveMock).toHaveBeenCalledWith("t", {
       latestVersionName: "1.3.0",
       latestVersionCode: 4,
@@ -127,8 +148,99 @@ describe("AdminAppVersionPanel", () => {
     saveMock.mockRejectedValue(new Error("Dati non validi: downloadUrl."));
     await render();
     await submit();
+    await click("admin-appversion-confirm");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
       "Dati non validi: downloadUrl.",
     );
+  });
+
+  describe("«Sei sicuro?» prima di salvare (Rosario 23/11)", () => {
+    it("chiede conferma in un dialogo accessibile; «Annulla» non salva nulla", async () => {
+      fetchMock.mockResolvedValue({ android: SAVED });
+      await render();
+      await fillVersion14();
+      await submit();
+
+      const shown = dialog();
+      expect(shown).not.toBeNull();
+      expect(shown?.getAttribute("aria-modal")).toBe("true");
+      const titleId = shown?.getAttribute("aria-labelledby") ?? "";
+      expect(document.getElementById(titleId)?.textContent).toBe(
+        "Annunciare la versione 1.4.0 (versionCode 5)?",
+      );
+      expect(shown?.textContent).toContain(
+        "Tutti gli utenti che usano l'app Android (o il sito da un telefono Android) e non hanno ancora questa versione riceveranno una notifica; nell'app vedranno anche l'avviso di aggiornamento.",
+      );
+      const buttons = [...(shown?.querySelectorAll("footer button") ?? [])].map(
+        (button) => button.textContent,
+      );
+      expect(buttons).toEqual(["Annulla", "Annuncia"]);
+      // Il focus va nel dialogo.
+      expect(document.activeElement).toBe(shown);
+
+      await click("admin-appversion-confirm-cancel");
+      expect(dialog()).toBeNull();
+      expect(saveMock).not.toHaveBeenCalled();
+      expect(container.textContent).toContain("Ora annunciata: 1.3.0 (versionCode 4).");
+      // I campi restano come scritti, per correggerli o riprovare.
+      expect(field("app-version-code").value).toBe("5");
+    });
+
+    it("«Annuncia» salva la versione scritta e chiude il dialogo", async () => {
+      fetchMock.mockResolvedValue({ android: SAVED });
+      const announced = {
+        latestVersionName: "1.4.0",
+        latestVersionCode: 5,
+        downloadUrl: "https://drive.google.com/drive/folders/fantappero-1-4",
+        message: null,
+      };
+      saveMock.mockResolvedValue({ android: announced, notifiedUsers: 3 });
+      await render();
+      await fillVersion14();
+      await submit();
+      await click("admin-appversion-confirm");
+
+      expect(dialog()).toBeNull();
+      expect(saveMock).toHaveBeenCalledTimes(1);
+      expect(saveMock).toHaveBeenCalledWith("t", announced);
+      expect(container.textContent).toContain(
+        "Versione salvata: notifica inviata a 3 utenti che non hanno ancora questa versione.",
+      );
+    });
+
+    it("Esc chiude il dialogo senza salvare", async () => {
+      fetchMock.mockResolvedValue({ android: SAVED });
+      await render();
+      await fillVersion14();
+      await submit();
+      await act(async () => {
+        dialog()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+      expect(dialog()).toBeNull();
+      expect(saveMock).not.toHaveBeenCalled();
+    });
+
+    it("stesso versionCode già annunciato: la conferma dice che la notifica non riparte", async () => {
+      fetchMock.mockResolvedValue({ android: SAVED });
+      saveMock.mockResolvedValue({ android: SAVED, notifiedUsers: 0 });
+      await render();
+      await submit();
+      const shown = dialog();
+      expect(shown?.textContent).toContain("Salvare le modifiche alla versione 1.3.0 (versionCode 4)?");
+      expect(shown?.textContent).toContain("la notifica non parte di nuovo");
+      expect(
+        container.querySelector('[data-testid="admin-appversion-confirm"]')?.textContent,
+      ).toBe("Salva");
+      await click("admin-appversion-confirm");
+      expect(saveMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("con un campo non valido non chiede conferma", async () => {
+      fetchMock.mockResolvedValue({ android: null });
+      await render();
+      await submit();
+      expect(dialog()).toBeNull();
+      expect(saveMock).not.toHaveBeenCalled();
+    });
   });
 });

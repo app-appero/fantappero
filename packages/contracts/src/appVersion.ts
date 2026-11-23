@@ -158,3 +158,45 @@ export function appVersionUpdateFrom(fields: AppVersionFormFields): AndroidAppVe
     message: fields.message.trim() || null,
   };
 }
+
+// --- «Sei sicuro?» prima di salvare (sito e app, decisione di Rosario del 23/11) -------------
+
+/** Testi della conferma prima di «Salva»: dialogo sul sito, `Alert.alert` nell'app. */
+export interface AppVersionSaveConfirmation {
+  title: string;
+  message: string;
+  /** Tasto che salva davvero: «Annuncia» (versione nuova) o «Salva» (stessa versione). */
+  confirmLabel: string;
+  cancelLabel: string;
+}
+
+export const APP_VERSION_CONFIRM_CANCEL_LABEL = "Annulla";
+
+/**
+ * Conferma prima di salvare la versione: salvare un versionCode nuovo manda la notifica e fa
+ * comparire l'avviso nell'app, quindi si chiede «Annunciare la versione 1.4.0 (versionCode 5)?».
+ * Se il versionCode è quello già annunciato (per esempio per correggere link o messaggio) la
+ * notifica non riparte e la conferma lo dice.
+ */
+export function appVersionSaveConfirmation(
+  update: AndroidAppVersionUpdate,
+  current: AndroidAppVersion | null | undefined,
+): AppVersionSaveConfirmation {
+  const label = `${update.latestVersionName} (versionCode ${update.latestVersionCode})`;
+  if (current && current.latestVersionCode === update.latestVersionCode) {
+    return {
+      title: `Salvare le modifiche alla versione ${label}?`,
+      message:
+        "È la versione già annunciata: la notifica non parte di nuovo. L'avviso nell'app userà il link e il messaggio nuovi.",
+      confirmLabel: "Salva",
+      cancelLabel: APP_VERSION_CONFIRM_CANCEL_LABEL,
+    };
+  }
+  return {
+    title: `Annunciare la versione ${label}?`,
+    message:
+      "Tutti gli utenti che usano l'app Android (o il sito da un telefono Android) e non hanno ancora questa versione riceveranno una notifica; nell'app vedranno anche l'avviso di aggiornamento.",
+    confirmLabel: "Annuncia",
+    cancelLabel: APP_VERSION_CONFIRM_CANCEL_LABEL,
+  };
+}
