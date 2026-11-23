@@ -1,6 +1,7 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { DISPLAY_FONT } from "../theme/fonts";
+import { requestLeagueListRefresh } from "../session/leagueListRefresh";
 import {
   RefreshControl,
   ScrollView,
@@ -54,6 +55,8 @@ export function PageContainer({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              // Con la pagina si rilegge anche l'elenco delle leghe del selettore (M3, 22/11).
+              requestLeagueListRefresh();
               void onRefresh();
             }}
             tintColor={colors.accent}

@@ -23,6 +23,7 @@ import { AppState } from "react-native";
 import { ApiError, getApiErrorMessage, setUnauthorizedRecovery } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { buildPermissionContext } from "./demoSession";
+import { sameLeagueList, subscribeLeagueListRefresh } from "./leagueListRefresh";
 import {
   clearImpersonatorSession,
   clearStoredActiveLeagueId,
@@ -263,7 +264,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       return [];
     }
     const memberships = await fetchMyLeagues(token);
-    setLeagues(memberships);
+    // Nessuna novità: stesso array, nessun ridisegno (si rilegge a ogni «tira per aggiornare»).
+    setLeagues((current) => (sameLeagueList(current, memberships) ? current : memberships));
     setActiveLeagueIdState((current) => {
       const next = resolvePreferredLeagueId(memberships, current);
       if (next) {
@@ -275,6 +277,30 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     });
     return memberships;
   }, [accessToken]);
+
+  // Leghe create o tolte fuori dall'app (sito, API): il selettore le vede tirando una pagina
+  // per aggiornarla o tornando nell'app, senza riavviarla (corsa M3, 22/11).
+  const signedIn = user !== null;
+  useEffect(() => {
+    if (!signedIn) {
+      return;
+    }
+    const refresh = () => {
+      void refreshMemberships().catch(() => {
+        // Elenco accessorio: un errore di rete lascia quello già in memoria.
+      });
+    };
+    const unsubscribe = subscribeLeagueListRefresh(refresh);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        refresh();
+      }
+    });
+    return () => {
+      unsubscribe();
+      subscription.remove();
+    };
+  }, [refreshMemberships, signedIn]);
 
   const login = useCallback(
     async (email: string, password: string) => {
