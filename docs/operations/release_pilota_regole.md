@@ -37,9 +37,10 @@ Il tag si crea **dopo** aver verificato il rilascio, non prima.
   versionCode Android non installa l'APK come aggiornamento e l'avviso non funziona.
 - Usati finora: versionCode `1` per pilota-1 e pilota-1.1 (versione `0.0.0`), `3` per pilota-1.2
   (versione `1.2.0`), `4` per pilota-1.3 (versione `1.3.0`). Il prossimo APK parte da `5`.
-- Pubblicato l'APK (Drive, gruppo WhatsApp), l'operatore apre il pannello operatore sul sito,
-  sezione «Versione dell'app Android», e scrive versione, versionCode e link: chi ha un'app più
-  vecchia vede l'avviso «È disponibile la versione … dell'app.» con «Scarica» e «Più tardi».
+- Pubblicato l'APK (Drive, gruppo WhatsApp), l'operatore apre nel pannello operatore la voce di
+  menù «Versione app» (dalla 1.4, sul sito `/admin/versione-app` o nell'app; prima era in fondo
+  alla prima pagina del sito) e scrive versione, versionCode e link: chi ha un'app più vecchia
+  vede l'avviso «È disponibile la versione … dell'app.» con «Scarica» e «Più tardi».
 
 ## Tornare indietro
 

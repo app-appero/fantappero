@@ -855,6 +855,8 @@ export interface LeagueListoneRefreshCounters {
   listoneSkippedUnmapped: number;
   /** Ruoli che il fornitore cambierebbe ma che restano quelli del listone (congelati). */
   roleChangesSkipped: number;
+  /** Calciatori tolti dal listone (release 1.4; assente dai server più vecchi). */
+  listoneRemoved?: number;
   catalogSynced: boolean;
 }
 

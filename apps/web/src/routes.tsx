@@ -2,6 +2,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { RequireGlobalOperator, RequirePermissions } from "./auth/RequirePermissions";
 import { AdminLayout, AppLayout } from "./layout/AppLayout";
 import {
+  AdminAppVersionPage,
   AdminDashboardPage,
   AdminFeedbackPage,
   AdminLeaguesPage,
@@ -343,6 +344,16 @@ export function AppRoutes() {
       <AdminSection>
         <RequirePermissions required={["global:operate"]}>
           <AdminFeedbackPage />
+        </RequirePermissions>
+      </AdminSection>
+    );
+  }
+
+  if (pathname === "/admin/versione-app") {
+    return (
+      <AdminSection>
+        <RequirePermissions required={["global:operate"]}>
+          <AdminAppVersionPage />
         </RequirePermissions>
       </AdminSection>
     );

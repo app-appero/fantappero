@@ -70,3 +70,64 @@ export function appUpdateBannerText(versionName: string): string {
 export function isHttpsDownloadUrl(url: string): boolean {
   return /^https:\/\/[^\s/?#:@]+(:\d+)?([/?#]\S*)?$/.test(url.trim());
 }
+
+// --- modulo «Versione app» del pannello operatore (sito e app, release 1.4) -------------------
+
+/** I quattro campi del modulo, come li scrive l'operatore. */
+export interface AppVersionFormFields {
+  name: string;
+  code: string;
+  url: string;
+  message: string;
+}
+
+export type AppVersionFormErrors = Partial<Record<keyof AppVersionFormFields, string>>;
+
+export const EMPTY_APP_VERSION_FORM: AppVersionFormFields = { name: "", code: "", url: "", message: "" };
+
+const VERSION_NAME_PATTERN = /^[0-9]+(\.[0-9]+){0,3}$/;
+/** Come il server (`ANDROID_MAX_VERSION_CODE`). */
+const MAX_VERSION_CODE = 2_100_000_000;
+const MAX_MESSAGE_LENGTH = 200;
+
+/** Campi precompilati con la versione annunciata (vuoti se non c'è). */
+export function appVersionFormFrom(info: AppVersionInfo | null | undefined): AppVersionFormFields {
+  const android = info?.android;
+  return android
+    ? {
+        name: android.latestVersionName,
+        code: String(android.latestVersionCode),
+        url: android.downloadUrl,
+        message: android.message ?? "",
+      }
+    : { ...EMPTY_APP_VERSION_FORM };
+}
+
+/** Errori dei campi, con i testi mostrati sotto ciascun campo. Vuoto = si può salvare. */
+export function validateAppVersionForm(fields: AppVersionFormFields): AppVersionFormErrors {
+  const errors: AppVersionFormErrors = {};
+  if (!VERSION_NAME_PATTERN.test(fields.name.trim())) {
+    errors.name = "Scrivi la versione con numeri e punti, per esempio 1.3.0.";
+  }
+  const code = Number(fields.code.trim());
+  if (!/^\d+$/.test(fields.code.trim()) || code < 1 || code > MAX_VERSION_CODE) {
+    errors.code = "Il versionCode è un numero intero maggiore di zero.";
+  }
+  if (!isHttpsDownloadUrl(fields.url)) {
+    errors.url = "Il link deve iniziare con https://";
+  }
+  if (fields.message.trim().length > MAX_MESSAGE_LENGTH) {
+    errors.message = "Il messaggio può avere al massimo 200 caratteri.";
+  }
+  return errors;
+}
+
+/** Corpo di `PUT /admin/app-version` dai campi già validati. */
+export function appVersionUpdateFrom(fields: AppVersionFormFields): AndroidAppVersionUpdate {
+  return {
+    latestVersionName: fields.name.trim(),
+    latestVersionCode: Number(fields.code.trim()),
+    downloadUrl: fields.url.trim(),
+    message: fields.message.trim() || null,
+  };
+}

@@ -54,7 +54,23 @@ describe("mobile navigation", () => {
       MOBILE_ADMIN_NAV_ITEMS,
       (required) => hasPermissions(operatorContext, required),
     );
-    assert.equal(operatorVisible.length, 9);
+    // Riepilogo 1.4: «Versione app» è la decima voce, dopo «Segnalazioni».
+    assert.equal(operatorVisible.length, 10);
+    assert.deepEqual(
+      operatorVisible.map((item) => item.label),
+      [
+        "Riepilogo",
+        "Leghe globali",
+        "Utenti",
+        "Listone",
+        "Turni",
+        "Job automatici",
+        "Notifiche",
+        "Email",
+        "Segnalazioni",
+        "Versione app",
+      ],
+    );
     const memberVisible = filterMobileNavItems(
       MOBILE_ADMIN_NAV_ITEMS,
       (required) => hasPermissions(memberContext, required),

@@ -94,6 +94,7 @@ export type AdminStackParamList = {
   AdminNotifications: WireframeParams | undefined;
   AdminEmail: WireframeParams | undefined;
   AdminFeedback: WireframeParams | undefined;
+  AdminAppVersion: WireframeParams | undefined;
 };
 
 declare global {

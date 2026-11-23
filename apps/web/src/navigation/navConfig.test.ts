@@ -86,9 +86,32 @@ describe("filterNavItems", () => {
     expect(items.find((item) => item.id === "admin-home")?.active).toBe(false);
   });
 
-  it("marks Pannello active only on the exact /admin path", () => {
+  it("marks Riepilogo active only on the exact /admin path", () => {
     const items = filterNavItems(ADMIN_NAV_ITEMS, canFactory(operatorContext), "/admin");
     expect(items.find((item) => item.id === "admin-home")?.active).toBe(true);
+  });
+
+  it("Riepilogo 1.4: la prima voce si chiama «Riepilogo» e «Versione app» viene dopo «Segnalazioni»", () => {
+    const items = filterNavItems(
+      ADMIN_NAV_ITEMS,
+      canFactory(operatorContext),
+      "/admin/versione-app",
+    );
+    expect(items.map((item) => item.label)).toEqual([
+      "Riepilogo",
+      "Leghe globali",
+      "Utenti",
+      "Listone",
+      "Turni",
+      "Job automatici",
+      "Notifiche",
+      "Email",
+      "Segnalazioni",
+      "Versione app",
+    ]);
+    expect(items.find((item) => item.id === "admin-app-version")?.active).toBe(true);
+    expect(items.find((item) => item.id === "admin-home")?.active).toBe(false);
+    expect(NAV_LABELS["admin-app-version"]).toBe("Versione app");
   });
 });
 

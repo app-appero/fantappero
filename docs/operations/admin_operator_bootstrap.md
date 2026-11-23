@@ -49,6 +49,30 @@ Non è richiesto alcun flag per "disattivare" il bootstrap dopo il primo operato
 
 Un operator già autenticato promuove/revoca altri operator da `/admin/utenti` (conferma esplicita richiesta). Non è necessario ripetere il bootstrap — quello serve solo per il primo operator della piattaforma.
 
+## La prima pagina del pannello: «Riepilogo» (release 1.4)
+
+Decisione di Rosario del 22/11 (canvas «Pannello operatore»). `/admin` sul sito e la prima
+schermata del pannello nell'app si chiamano «Riepilogo» e non ripetono più il menù:
+
+- in una riga chi sei e l'ambiente; i numeri di utenti, operatori e leghe; le leghe per stato;
+- **«Da guardare»**, sei righe che portano ciascuna alla sua voce di menù: richieste tester in
+  attesa (Utenti), segnalazioni nuove (Segnalazioni), job spenti e giri finiti con errore nelle
+  ultime 24 ore con il motivo (Job automatici), ultimo aggiornamento del listone con data, autore
+  e riassunto (Listone), giornate in corso e prossimo blocco delle formazioni fra tutte le leghe
+  attive (Turni), versione dell'app annunciata (Versione app).
+
+Tutto arriva da `GET /admin/overview` (solo `global:operate`, gli altri 403): ai campi di prima si
+aggiungono `leaguesByState` e `watch`. L'esito dei giri dei job sta in `system_job_runs`, scritto
+dal worker a fine giro (segnali Celery, `system_jobs/run_recorder.py`): `ok` oppure `failed` con
+il motivo; i giri saltati perché il job è spento non si scrivono. Per ogni job restano gli ultimi
+50 giri riusciti e gli errori degli ultimi 30 giorni (al massimo 100). L'ultimo aggiornamento del
+listone viene da `listone_updates` (vedi [`sports_listone.md`](./sports_listone.md)); il prossimo
+blocco si calcola a ogni richiesta, con la regola del countdown «Prossimo blocco».
+
+**«Versione app»** è una voce di menù a sé, dopo «Segnalazioni», sul sito (`/admin/versione-app`)
+e nell'app: stesso modulo e stessa chiamata `PUT /admin/app-version` (vedi
+[`release_pilota_regole.md`](./release_pilota_regole.md)).
+
 ## Variabili correlate
 
 | Variabile | Obbligatoria | Descrizione |

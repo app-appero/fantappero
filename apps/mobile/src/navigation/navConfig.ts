@@ -128,6 +128,13 @@ export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    // Riepilogo 1.4: come sul sito, la versione dell'app ha la sua voce (prima nell'app non c'era).
+    id: "admin-app-version",
+    path: "/admin/versione-app",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -149,7 +156,7 @@ export const NAV_LABELS: Record<string, string> = {
   feedback: "Segnala un problema",
   faq: "Domande frequenti",
   profile: "Profilo",
-  "admin-home": "Pannello",
+  "admin-home": "Riepilogo",
   "admin-leagues": "Leghe globali",
   "admin-users": "Utenti",
   "admin-listone": "Listone",
@@ -158,6 +165,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-notifications": "Notifiche",
   "admin-email": "Email",
   "admin-feedback": "Segnalazioni",
+  "admin-app-version": "Versione app",
   auth: "Accedi",
 };
 

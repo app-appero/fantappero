@@ -425,12 +425,36 @@ export {
 export type { MarketGateState, MarketStatusBadge } from "./marketGate.js";
 
 export {
+  EMPTY_APP_VERSION_FORM,
   appUpdateBannerText,
+  appVersionFormFrom,
+  appVersionUpdateFrom,
   displayAppVersionName,
   isHttpsDownloadUrl,
   isNewerAppVersion,
+  validateAppVersionForm,
 } from "./appVersion.js";
-export type { AndroidAppVersion, AndroidAppVersionUpdate, AppVersionInfo } from "./appVersion.js";
+export type {
+  AndroidAppVersion,
+  AndroidAppVersionUpdate,
+  AppVersionFormErrors,
+  AppVersionFormFields,
+  AppVersionInfo,
+} from "./appVersion.js";
+
+export {
+  buildOperatorWatchItems,
+  formatLeaguesByState,
+  formatRomeDayMonth,
+  formatRomeDaysAgo,
+  formatRomeWhen,
+  listoneUpdateSummary,
+} from "./operatorSummary.js";
+export type {
+  OperatorWatchItem,
+  OperatorWatchTarget,
+  OperatorWatchTone,
+} from "./operatorSummary.js";
 
 export {
   LIVE_SEAT_CALL_COLOR,
@@ -513,6 +537,13 @@ export type {
   AdminSeasonHistorySeasonEstimate,
   AdminSeasonHistoryStopReason,
   AdminOverview,
+  AdminCurrentRounds,
+  AdminListoneUpdate,
+  AdminListoneUpdateKind,
+  AdminNextLineupLock,
+  AdminWatch,
+  AdminWatchJob,
+  AdminWatchJobFailure,
   AdminResultRecoveryJob,
   AdminResultRecoveryProgress,
   AdminResultRecoveryResult,

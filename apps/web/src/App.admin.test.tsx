@@ -213,7 +213,25 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     expect(html).toContain('data-surface="admin"');
     expect(html).toContain('data-testid="admin-dashboard-success"');
     expect(html).not.toContain('data-testid="route-forbidden"');
+    // Riepilogo 1.4: niente schede che ripetono il menù né modulo della versione dell'app.
+    expect(html).not.toContain('data-testid="admin-appversion"');
+    expect(html).toContain('data-testid="admin-watch-unavailable"');
+    expect(html).toContain(">Riepilogo<");
+    expect(html).toContain(">Versione app<");
     unmount();
+  });
+
+  it("«Versione app» è una pagina a sé, solo per l'operatore (Riepilogo 1.4)", async () => {
+    const member = await renderAppAt("/admin/versione-app", MEMBER);
+    expect(member.html).toContain('data-testid="route-forbidden"');
+    expect(member.html).not.toContain('data-testid="admin-appversion"');
+    member.unmount();
+
+    const operator = await renderAppAt("/admin/versione-app", OPERATOR);
+    expect(operator.html).toContain('data-testid="admin-appversion-page"');
+    expect(operator.html).toContain('data-testid="admin-appversion"');
+    expect(operator.html).toContain("Nessuna versione impostata");
+    operator.unmount();
   });
 
   it("smoke: operator reaches /admin/utenti with real user data", async () => {
