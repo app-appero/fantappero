@@ -58,20 +58,27 @@ function rosterContainerBlock(): { query: string; body: string } {
   throw new Error("blocco @container non chiuso");
 }
 
-describe("Rosa: nome e badge «In attesa» in colonna stretta (QA 20-21/11, WEB-1)", () => {
+describe("Rosa: nome e badge «In esubero» in colonna stretta (QA 20-21/11, WEB-1)", () => {
   it("mette nome e badge nello stesso blocco che va a capo", () => {
     const html = renderSummary();
     const text = /<span class="fa-auction-player__text">([\s\S]*?)<\/span><\/span><\/td>/.exec(html);
     expect(text, html).not.toBeNull();
     expect(text?.[1]).toContain("J. Valou");
     expect(text?.[1]).toContain('class="fa-badge fa-badge--warning fa-auction-player__badge"');
-    expect(text?.[1]).toContain("In attesa");
+    expect(text?.[1]).toContain("In esubero");
   });
 
-  it("accanto a «In attesa» c'è il «?» che apre la risposta sull'esubero (FAQ 1.4)", () => {
+  it("il badge del giocatore in esubero si legge «In esubero», non più «In attesa» (Rosario, 23/11)", () => {
+    const html = renderSummary();
+    const badge = /data-testid="roster-pending-badge-valou"[^>]*>([^<]*)</.exec(html)?.[1];
+    expect(badge, html).toBe("In esubero");
+    expect(html).not.toContain("In attesa");
+  });
+
+  it("accanto a «In esubero» c'è il «?» che apre la risposta sull'esubero (FAQ 1.4)", () => {
     const html = renderSummary();
     const pending = /<span class="fa-faq-help-inline">([\s\S]*?)<\/button><\/span>/.exec(html)?.[1] ?? "";
-    expect(pending).toContain("In attesa");
+    expect(pending).toContain("In esubero");
     expect(pending).toContain('data-testid="roster-pending-help-valou"');
     expect(pending).toContain('aria-label="Ho un giocatore in esubero: cosa faccio?"');
     // Solo chi è in esubero ha il «?».

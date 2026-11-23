@@ -1256,7 +1256,7 @@ a.fa-member-list__identity:focus-visible {
   min-width: 0;
 }
 
-/* Nome e badge «In attesa» della Rosa: affiancati se c'è posto, altrimenti il badge va sotto
+/* Nome e badge «In esubero» della Rosa: affiancati se c'è posto, altrimenti il badge va sotto
    il nome. Prima erano affiancati e basta: in colonna stretta il nome scendeva a 0 px e il
    badge restava tagliato («IN ATTES» a 390 px, QA 20-21/11). */
 .fa-auction-player__text {
@@ -1596,7 +1596,7 @@ a.fa-member-list__identity:focus-visible {
     padding-inline: 0.3rem;
   }
 
-  /* «In attesa» intero anche sotto un nome in colonna stretta. */
+  /* «In esubero» intero anche sotto un nome in colonna stretta. */
   .fa-roster-table .fa-auction-player__badge {
     font-size: 0.6rem;
     letter-spacing: 0.02em;
@@ -10579,7 +10579,7 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
 }
 
 /* «?» delle Domande frequenti 1.4 */
-/* ══ Il piccolo «?» accanto a «Turno saltato», «In attesa» (in esubero) e all'orario del
+/* ══ Il piccolo «?» accanto a «Turno saltato», «In esubero» e all'orario del
    blocco (canvas approvato da Rosario il 22/11) ══════════════════════════════════════════
    Il cerchio si vede di 22px, l'area di tocco è di 44px: i margini negativi la tengono fuori
    dall'altezza della riga, così la scritta accanto non si sposta. Un tocco apre la risposta:
@@ -10745,7 +10745,7 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   }
 }
 
-/* Accanto a «Stato: Turno saltato», al menù dei turni, al badge «In attesa» e all'orario del
+/* Accanto a «Stato: Turno saltato», al menù dei turni, al badge «In esubero» e all'orario del
    blocco: il «?» segue la scritta, sulla stessa riga quando c'è posto. */
 .fa-faq-help-inline {
   display: inline-flex;

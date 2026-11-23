@@ -67,7 +67,7 @@ Dalla 1.4 queste risposte sono sul sito e nell'app, nella voce di menù «Domand
 
 **Il «?» accanto alle scritte (1.4).** Un piccolo «?» apre la risposta giusta dal basso (sul sito dal computer, in una finestra al centro), con il link «Tutte le domande frequenti» alla pagina con quella risposta aperta:
 - accanto a «Turno saltato» in Turni › Turni europei, sia vicino al menù dei turni sia in «Stato: Turno saltato» → «Perché un turno è «saltato»?»;
-- accanto a «In attesa» (sito) / «In attesa (fuori rosa)» (app) in Rosa, cioè il giocatore in esubero → «Ho un giocatore «in esubero»: cosa faccio?»;
+- accanto al badge «In esubero» del giocatore in Rosa (sito e app; prima «In attesa», Rosario 23/11) → «Ho un giocatore «in esubero»: cosa faccio?»;
 - accanto all'orario del blocco in Formazione → «Quando si blocca la formazione?».
 
 **Perché un turno è «saltato»?**

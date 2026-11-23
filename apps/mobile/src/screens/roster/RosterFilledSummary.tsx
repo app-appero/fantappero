@@ -14,6 +14,7 @@ import {
 } from "./rosterHelpers";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { filterRosterSlots } from "./listoneFilter";
+import { PENDING_BADGE_LABEL } from "./pendingBadge";
 import { SwipeHint, SwipeRow } from "./SwipeRow";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -179,7 +180,7 @@ function RosterRoleSection({
                         // Il «?» apre «Ho un giocatore in esubero: cosa faccio?» (FAQ 1.4).
                         <View style={styles.playerPendingRow}>
                           <Text style={[styles.playerPendingBadge, styles.playerPendingBadgeInRow]} numberOfLines={1}>
-                            In attesa (fuori rosa)
+                            {PENDING_BADGE_LABEL}
                           </Text>
                           <FaqHelpButton
                             faqId={FAQ_HELP.surplus}
