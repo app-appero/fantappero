@@ -161,9 +161,9 @@ export function AdminAppVersionScreen() {
       {!loading && !loadError ? (
         <View style={styles.form} testID="admin-appversion">
           <Text style={adminUiStyles.meta}>
-            Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi non ha ancora quella
-            versione riceve una notifica (nell&apos;elenco e push) e, a ogni ingresso nell&apos;app,
-            l&apos;avviso con «Scarica».
+            Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi usa l&apos;app Android
+            o il sito da Android e non ha ancora quella versione riceve una notifica (nell&apos;elenco
+            e push) e, a ogni ingresso nell&apos;app, l&apos;avviso con «Scarica».
           </Text>
           <Text style={styles.current} testID="admin-appversion-current">
             {android

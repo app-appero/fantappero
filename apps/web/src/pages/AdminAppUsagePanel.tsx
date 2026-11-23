@@ -19,8 +19,9 @@ function groupKey(group: AdminAppUsageGroup): string {
 /**
  * «Chi ha quale versione» della pagina «Versione app» (release 1.4, decisione di Rosario del
  * 23/11): un gruppo per versione esatta (dalla 1.4 l'app la manda), poi le app 1.2-1.3 e quelle
- * più vecchie (versione non nota), poi chi non ha mai usato l'app. Stessi testi dell'app
- * (`@fantappero/contracts`). «App mai usata / solo sito» parte chiuso perché è il più lungo.
+ * più vecchie (versione non nota), poi chi usa solo il sito da Android (riceve anche lui la
+ * notifica), poi chi non ha mai usato l'app. Stessi testi dell'app (`@fantappero/contracts`).
+ * «App mai usata / solo sito» parte chiuso perché è il più lungo.
  *
  * `reloadKey` cambia dopo un salvataggio del modulo: l'elenco si rilegge.
  */
@@ -92,7 +93,7 @@ export function AdminAppUsagePanel({ reloadKey = 0, now }: { reloadKey?: number;
                 {hint ? <p className="fa-admin-appusage__hint">{hint}</p> : null}
                 <ul className="fa-admin-appusage__users">
                   {group.users.map((user) => {
-                    const seen = appUsageUserSeen(user, at);
+                    const seen = appUsageUserSeen(user, at, group.kind);
                     return (
                       <li key={user.userId}>
                         <strong>{appUsageUserName(user)}</strong>

@@ -76,12 +76,15 @@ e nell'app: stesso modulo e stessa chiamata `PUT /admin/app-version` (vedi
 
 ### «Versione app»: notifica e «Chi ha quale versione» (release 1.4)
 
-Decisione di Rosario del 23/11.
+Decisioni di Rosario del 23/11.
 
 - **Salvare una versione la annuncia davvero.** Con «Salva» parte una notifica «È disponibile la
   versione X dell'app» (nell'elenco delle notifiche e push, categoria «Sistema», evento «Nuova
-  versione dell'app» nelle preferenze) con il link di download, a tutti gli utenti attivi che
-  **non risultano già** su quella versione o una più nuova (anche a chi usa solo il sito). Con la
+  versione dell'app» nelle preferenze) con il link di download, agli utenti attivi che **usano
+  l'app Android** (qualsiasi versione, anche non nota) **o visitano il sito da un telefono
+  Android** e che **non risultano già** su quella versione o una più nuova. Non la ricevono chi
+  usa il sito solo da computer o da iPhone (per iOS quando ci sarà l'app) e chi, da quando il
+  server registra l'uso, non si è visto né nell'app né sul sito da Android. Con la
   modalità test accesa va solo a chi può usare l'app (tester in lista e operatori). Si rispettano
   le preferenze di ognuno (categoria «Sistema» ed evento, in-app e push) e le ore di silenzio
   della push, come per le altre notifiche. Una sola volta per versionCode: risalvare lo stesso
@@ -102,17 +105,24 @@ Decisione di Rosario del 23/11.
     ma non dicono la versione;
   - «Versione non nota (app 1.1 o precedente)»: app (User-Agent `okhttp/`) che non controllano
     gli aggiornamenti;
-  - «App mai usata / solo sito», chiuso: nessuna richiesta dall'app da quando il server registra
-    le versioni (il rilascio 1.4); chi ha usato l'app solo prima del rilascio sta qui finché non la
-    riapre.
+  - «Sito da Android (app non installata o non ancora vista)»: chi non si è mai visto nell'app ma
+    usa il sito da un telefono Android, con l'ultima visita; ricevono anche loro la notifica (chi
+    ha anche l'app sta solo nel gruppo della sua versione);
+  - «App mai usata / solo sito», chiuso: nessuna richiesta dall'app né dal sito da Android da
+    quando il server registra le versioni (il rilascio 1.4), quindi niente notifica; chi ha usato
+    l'app solo prima del rilascio sta qui finché non la riapre.
 
 Come si registra: dalla 1.4 l'app manda la versione in ogni richiesta (`X-App-Version`,
 `X-App-Version-Code`, `X-App-Platform`); il backend la scrive in `user_app_usage` (una riga per
 utente e piattaforma: versione, da dove si sa, prima e ultima volta), al più una volta ogni
 5 minuti per utente (subito se cambia la versione), dopo la risposta e senza mai far fallire la
-richiesta. Le richieste del sito e quelle fatte impersonando un utente non contano. Una fonte
-meno precisa non cancella una versione esatta. La riga sparisce con l'account e compare
-nell'export dei dati (`appUsage`).
+richiesta. Una fonte meno precisa non cancella una versione esatta. Il sito conta solo da un
+telefono Android: una richiesta da un browser con `Android` nello User-Agent (e senza le
+intestazioni dell'app) scrive una riga a parte con piattaforma `web-android` (fonte `browser`,
+nessuna versione), con lo stesso limite di scritture; il sito da computer o da iPhone e le
+richieste fatte impersonando un utente non contano. Le righe spariscono con l'account e
+compaiono nell'export dei dati (`appUsage`); l'informativa le cita dalla 2026-11d («Uso
+dell'app»).
 
 ## Variabili correlate
 

@@ -21,8 +21,9 @@ function groupKey(group: AdminAppUsageGroup): string {
 
 /**
  * «Chi ha quale versione» della pagina «Versione app» (release 1.4, Rosario 23/11): gli stessi
- * gruppi e testi del sito (`@fantappero/contracts`). Ogni gruppo si apre e chiude toccando il
- * titolo; «App mai usata / solo sito» parte chiuso perché è il più lungo.
+ * gruppi e testi del sito (`@fantappero/contracts`), compreso «Sito da Android» per chi usa
+ * solo il sito da un telefono Android. Ogni gruppo si apre e chiude toccando il titolo; «App mai
+ * usata / solo sito» parte chiuso perché è il più lungo.
  */
 export function AppUsageList({ usage, now }: { usage: AdminAppUsage; now?: Date }) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
@@ -73,7 +74,7 @@ export function AppUsageList({ usage, now }: { usage: AdminAppUsage; now?: Date 
             {open && hint ? <Text style={adminUiStyles.meta}>{hint}</Text> : null}
             {open
               ? group.users.map((user) => {
-                  const seen = appUsageUserSeen(user, at);
+                  const seen = appUsageUserSeen(user, at, group.kind);
                   return (
                     <View key={user.userId} style={styles.user}>
                       <Text style={styles.userName}>{appUsageUserName(user)}</Text>

@@ -8,6 +8,7 @@
 
 import type {
   AdminAppUsageGroup,
+  AdminAppUsageGroupKind,
   AdminAppUsageSummary,
   AdminAppUsageUser,
   AdminListoneUpdate,
@@ -375,7 +376,10 @@ export function appUsageSummaryLine(usage: AdminAppUsageSummary): string {
   return `${up} ${plural(up, "utente aggiornato", "utenti aggiornati")} su ${all} che ${plural(all, "usa", "usano")} l'app`;
 }
 
-/** Nome del gruppo: «1.4.0 (5)», «Versione non nota (app 1.2 o 1.3)», «App mai usata / solo sito». */
+/**
+ * Nome del gruppo: «1.4.0 (5)», «Versione non nota (app 1.2 o 1.3)», «Sito da Android (app non
+ * installata o non ancora vista)», «App mai usata / solo sito».
+ */
 export function appUsageGroupLabel(group: AdminAppUsageGroup): string {
   switch (group.kind) {
     case "version": {
@@ -387,6 +391,8 @@ export function appUsageGroupLabel(group: AdminAppUsageGroup): string {
       return "Versione non nota (app 1.2 o 1.3)";
     case "unknown":
       return "Versione non nota (app 1.1 o precedente)";
+    case "web_android":
+      return "Sito da Android (app non installata o non ancora vista)";
     default:
       return "App mai usata / solo sito";
   }
@@ -405,8 +411,10 @@ export function appUsageGroupHint(group: AdminAppUsageGroup): string {
       return "Controllano gli aggiornamenti ma non dicono la versione: si vedrà dalla 1.4 in poi.";
     case "unknown":
       return "Usano l'app ma non controllano gli aggiornamenti.";
+    case "web_android":
+      return "Usano il sito da un telefono Android: ricevono anche loro la notifica della nuova versione.";
     case "never":
-      return "Nessun accesso dall'app da quando il server registra le versioni.";
+      return "Nessun accesso dall'app né dal sito da Android da quando il server registra le versioni: non ricevono la notifica della nuova versione.";
     default:
       return "";
   }
@@ -417,9 +425,20 @@ export function appUsageUserName(user: AdminAppUsageUser): string {
   return user.name ? `${user.displayName} (${user.name})` : user.displayName;
 }
 
-/** «visto nell'app oggi alle 15:00»; vuoto per chi non è mai stato visto. */
-export function appUsageUserSeen(user: AdminAppUsageUser, now: Date = new Date()): string {
-  return user.lastSeenAt ? `visto nell'app ${formatRomeWhen(user.lastSeenAt, now)}` : "";
+/**
+ * «visto nell'app oggi alle 15:00» («visto sul sito da Android …» nel gruppo `web_android`);
+ * vuoto per chi non è mai stato visto.
+ */
+export function appUsageUserSeen(
+  user: AdminAppUsageUser,
+  now: Date = new Date(),
+  kind: AdminAppUsageGroupKind = "version",
+): string {
+  if (!user.lastSeenAt) {
+    return "";
+  }
+  const where = kind === "web_android" ? "sul sito da Android" : "nell'app";
+  return `visto ${where} ${formatRomeWhen(user.lastSeenAt, now)}`;
 }
 
 /** Le sei righe di «Da guardare», nell'ordine del canvas approvato. */

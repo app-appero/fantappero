@@ -105,9 +105,9 @@ export function AdminAppVersionPanel({
         Versione dell'app Android
       </h2>
       <p className="fa-admin-appversion__hint">
-        Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi non ha ancora quella
-        versione riceve una notifica (nell'elenco e push) e, a ogni ingresso nell'app, l'avviso con
-        «Scarica».
+        Quando pubblichi un nuovo APK, aggiorna qui versione e link: chi usa l'app Android o il sito
+        da Android e non ha ancora quella versione riceve una notifica (nell'elenco e push) e, a ogni
+        ingresso nell'app, l'avviso con «Scarica».
       </p>
       {current ? (
         <p data-testid="admin-appversion-current">

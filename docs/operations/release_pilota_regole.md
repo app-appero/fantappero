@@ -42,7 +42,8 @@ Il tag si crea **dopo** aver verificato il rilascio, non prima.
   alla prima pagina del sito) e scrive versione, versionCode e link: chi ha un'app più vecchia
   vede l'avviso «È disponibile la versione … dell'app.» con «Scarica» e «Più tardi».
 - **Dalla 1.4** (Rosario 23/11) il salvataggio manda anche una notifica (elenco e push) con il
-  link a chi non risulta già su quella versione, una sola volta per versionCode: si salva quando
+  link a chi usa l'app Android o il sito da un telefono Android e non risulta già su quella
+  versione (non a chi usa il sito solo da computer o iPhone), una sola volta per versionCode: si salva quando
   l'APK è davvero scaricabile dal link, non prima. Risalvare lo stesso versionCode per correggere
   link o messaggio non rimanda la notifica. L'avviso nell'app 1.4 torna a ogni ingresso finché
   non si aggiorna. Chi ha aggiornato si vede subito sotto il modulo, in «Chi ha quale versione»

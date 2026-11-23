@@ -100,7 +100,7 @@ export interface AdminWatch {
 export interface AdminAppUsageSummary {
   /** Utenti con la versione annunciata o una più nuova (versione esatta, app 1.4+). */
   upToDateUsers: number;
-  /** Utenti visti almeno una volta nell'app, qualsiasi versione. */
+  /** Utenti visti almeno una volta nell'app, qualsiasi versione (il sito da Android non conta). */
   appUsers: number;
 }
 
@@ -109,9 +109,11 @@ export interface AdminAppUsageSummary {
  * - `version`: versione esatta, mandata dall'app 1.4 o successive;
  * - `unknown_recent`: app 1.2 o 1.3 (controllano gli aggiornamenti ma non dicono la versione);
  * - `unknown`: app che non dice nulla (1.1 o precedente);
- * - `never`: mai visto nell'app (solo sito o mai entrato).
+ * - `web_android`: mai visto nell'app ma visto sul sito da un telefono Android (riceve anche lui
+ *   la notifica della nuova versione); assente dai server più vecchi;
+ * - `never`: mai visto nell'app né sul sito da Android (sito da computer o iPhone, o mai entrato).
  */
-export type AdminAppUsageGroupKind = "version" | "unknown_recent" | "unknown" | "never";
+export type AdminAppUsageGroupKind = "version" | "unknown_recent" | "unknown" | "web_android" | "never";
 
 export interface AdminAppUsageUser {
   userId: string;
@@ -121,13 +123,13 @@ export interface AdminAppUsageUser {
   name: string | null;
   email: string;
   firstSeenAt: string | null;
-  /** Ultima volta visto nell'app; `null` nel gruppo `never`. */
+  /** Ultima volta visto nell'app (nel gruppo `web_android`: sul sito da Android); `null` nel gruppo `never`. */
   lastSeenAt: string | null;
 }
 
 export interface AdminAppUsageGroup {
   kind: AdminAppUsageGroupKind;
-  /** `android` (o `ios`); `null` nel gruppo `never`. */
+  /** `android` (o `ios`); `web-android` nel gruppo `web_android`; `null` nel gruppo `never`. */
   platform: string | null;
   versionName: string | null;
   versionCode: number | null;
@@ -145,7 +147,7 @@ export interface AdminAppUsage {
   totalUsers: number;
   appUsers: number;
   upToDateUsers: number;
-  /** Versioni esatte (la più nuova prima), poi versioni non note, poi «app mai usata». */
+  /** Versioni esatte (la più nuova prima), poi versioni non note, sito da Android, «app mai usata». */
   groups: AdminAppUsageGroup[];
 }
 

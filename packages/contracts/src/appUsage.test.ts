@@ -59,6 +59,17 @@ describe("chi ha quale versione dell'app (release 1.4, Rosario 23/11)", () => {
     assert.match(appUsageGroupHint(recent), /dalla 1\.4/);
     assert.notEqual(appUsageGroupHint(old), "");
     assert.notEqual(appUsageGroupHint(never), "");
+    assert.match(appUsageGroupHint(never), /non ricevono la notifica/);
+  });
+
+  it("chi usa solo il sito da Android (Rosario 23/11): gruppo a parte, riceve la notifica", () => {
+    const site = group({ kind: "web_android", platform: "web-android", versionName: null, versionCode: null, upToDate: false });
+    assert.equal(appUsageGroupTitle(site), "Sito da Android (app non installata o non ancora vista): 1 utente");
+    assert.match(appUsageGroupHint(site), /sito da un telefono Android/);
+    assert.match(appUsageGroupHint(site), /ricevono anche loro la notifica/);
+    assert.equal(appUsageUserSeen(user(), NOW, "web_android"), "visto sul sito da Android oggi alle 10:30");
+    assert.equal(appUsageUserSeen(user(), NOW, "unknown"), "visto nell'app oggi alle 10:30");
+    assert.equal(appUsageUserSeen(user({ lastSeenAt: null }), NOW, "web_android"), "");
   });
 
   it("nome, email a parte, e ultima volta nell'app in ora italiana", () => {
