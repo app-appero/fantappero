@@ -244,15 +244,26 @@ def test_export_and_delete_include_the_app_version(client: TestClient, db_sessio
         "X-App-Version-Code": "5",
     }
     assert client.get("/profile/me", headers=app_14).status_code == 200
+    # Informativa 2026-11d: anche l'uso del sito da un telefono Android.
+    android_site = {
+        "Authorization": f"Bearer {session['access']}",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 Chrome/131.0 Mobile",
+    }
+    assert client.get("/profile/me", headers=android_site).status_code == 200
 
     payload = client.get("/profile/me/export", headers=app_14).json()
-    [usage] = payload["appUsage"]
+    by_platform = {usage["platform"]: usage for usage in payload["appUsage"]}
+    assert set(by_platform) == {"android", "web-android"}
+    usage = by_platform["android"]
     assert (usage["platform"], usage["versionName"], usage["versionCode"]) == (
         "android",
         "1.4.0",
         5,
     )
     assert usage["firstSeenAt"] and usage["lastSeenAt"]
+    site = by_platform["web-android"]
+    assert (site["versionName"], site["versionCode"]) == (None, None)
+    assert site["firstSeenAt"] and site["lastSeenAt"]
 
     reset_app_usage_throttle()
     deleted = client.post(

@@ -5,6 +5,11 @@ Una riga per (utente, piattaforma), scritta dal backend a partire dalle richiest
 più vecchie si sa solo che sono app (User-Agent ``okhttp/``) o app dalla 1.2 in poi (chiamano
 ``GET /app/version``). Serve all'elenco «chi ha quale versione» del pannello operatore e a non
 mandare la notifica di una nuova versione a chi ce l'ha già.
+
+Decisione di Rosario del 23/11: anche chi usa il sito da un telefono Android ha una riga, con la
+piattaforma ``web-android`` (fonte ``browser``, mai una versione), perché la notifica della nuova
+versione va a chi usa l'app Android e a chi visita il sito da Android, non a chi usa il sito da
+computer o da iPhone.
 """
 
 from __future__ import annotations
@@ -24,23 +29,38 @@ SOURCE_HEADER = "header"
 SOURCE_VERSION_CHECK = "version_check"
 #: Altra richiesta con User-Agent ``okhttp/`` e senza intestazioni: app, versione non nota.
 SOURCE_USER_AGENT = "user_agent"
-APP_USAGE_SOURCES = (SOURCE_HEADER, SOURCE_VERSION_CHECK, SOURCE_USER_AGENT)
-#: Quanto è precisa ogni fonte: una meno precisa non cancella mai una più precisa.
-SOURCE_RANK = {SOURCE_USER_AGENT: 1, SOURCE_VERSION_CHECK: 2, SOURCE_HEADER: 3}
+#: Il sito, da un browser con ``Android`` nello User-Agent (solo con ``PLATFORM_WEB_ANDROID``).
+SOURCE_BROWSER = "browser"
+APP_USAGE_SOURCES = (SOURCE_HEADER, SOURCE_VERSION_CHECK, SOURCE_USER_AGENT, SOURCE_BROWSER)
+#: Quanto è precisa ogni fonte: una meno precisa non cancella mai una più precisa. Il sito ha
+#: una riga a parte (``PLATFORM_WEB_ANDROID``), quindi non si confronta mai con l'app.
+SOURCE_RANK = {SOURCE_BROWSER: 1, SOURCE_USER_AGENT: 1, SOURCE_VERSION_CHECK: 2, SOURCE_HEADER: 3}
 
 PLATFORM_ANDROID = "android"
 PLATFORM_IOS = "ios"
+#: Le piattaforme dell'app (anche quelle che l'app può dire in ``X-App-Platform``).
 APP_PLATFORMS = (PLATFORM_ANDROID, PLATFORM_IOS)
+#: Il sito aperto da un telefono Android (non l'app): riceve la notifica della nuova versione.
+PLATFORM_WEB_ANDROID = "web-android"
+#: Chi riceve la notifica di una nuova versione dell'app Android: l'app Android (qualsiasi
+#: versione, anche non nota) e il sito da Android. Non il sito da computer o iPhone.
+ANDROID_NOTIFY_PLATFORMS = (PLATFORM_ANDROID, PLATFORM_WEB_ANDROID)
 
 
 class UserAppUsage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    """L'app di un utente su una piattaforma: la versione, o il meglio che se ne sa."""
+    """L'app di un utente su una piattaforma: la versione, o il meglio che se ne sa.
+
+    Con ``platform == "web-android"`` è invece il sito aperto da un telefono Android: nessuna
+    versione, solo prima e ultima visita.
+    """
 
     __tablename__ = "user_app_usage"
     __table_args__ = (
         UniqueConstraint("user_id", "platform", name="uq_user_app_usage_user_platform"),
-        CheckConstraint("source IN ('header', 'version_check', 'user_agent')", name="source"),
-        CheckConstraint("platform IN ('android', 'ios')", name="platform"),
+        CheckConstraint(
+            "source IN ('header', 'version_check', 'user_agent', 'browser')", name="source"
+        ),
+        CheckConstraint("platform IN ('android', 'ios', 'web-android')", name="platform"),
     )
 
     user_id: Mapped[UUID] = mapped_column(

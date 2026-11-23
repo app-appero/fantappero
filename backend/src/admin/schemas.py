@@ -537,11 +537,16 @@ class AdminAppUsageUserResponse(ApiModel):
 
 
 class AdminAppUsageGroupResponse(ApiModel):
-    """Un gruppo dell'elenco: una versione esatta, una versione non nota o «app mai usata»."""
+    """Un gruppo dell'elenco: una versione esatta, una versione non nota, il sito da Android
+    o «app mai usata»."""
 
     #: ``version``: versione esatta (app 1.4+); ``unknown_recent``: app 1.2 o 1.3;
-    #: ``unknown``: app senza versione (1.1 o precedenti); ``never``: app mai usata / solo sito.
-    kind: Literal["version", "unknown_recent", "unknown", "never"]
+    #: ``unknown``: app senza versione (1.1 o precedenti); ``web_android``: sito da un telefono
+    #: Android, app mai vista (ricevono la notifica della nuova versione); ``never``: app mai
+    #: usata / solo sito da computer o iPhone.
+    kind: Literal["version", "unknown_recent", "unknown", "web_android", "never"]
+    #: ``android`` o ``ios`` per l'app, ``web-android`` per il sito da Android, vuoto per
+    #: ``never``.
     platform: str | None = None
     version_name: str | None = Field(default=None, alias="versionName")
     version_code: int | None = Field(default=None, alias="versionCode")
@@ -557,7 +562,7 @@ class AdminAppUsageResponse(ApiModel):
     announced: AndroidAppVersionResponse | None = None
     #: Utenti attivi (account non eliminati).
     total_users: int = Field(alias="totalUsers")
-    #: Utenti visti almeno una volta nell'app (qualsiasi versione).
+    #: Utenti visti almeno una volta nell'app (qualsiasi versione; il sito da Android no).
     app_users: int = Field(alias="appUsers")
     #: Utenti con la versione annunciata o una più nuova (0 se non è annunciata nessuna versione).
     up_to_date_users: int = Field(alias="upToDateUsers")

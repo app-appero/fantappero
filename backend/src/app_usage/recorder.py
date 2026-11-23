@@ -8,7 +8,9 @@ Cosa si ricava da una richiesta già autenticata (``auth.dependencies.get_curren
   1.3, versione non nota»;
 - qualsiasi altra richiesta con User-Agent ``okhttp/`` (React Native su Android) e senza
   intestazioni: «app, versione non nota» (in pratica la 1.1 o precedenti);
-- il sito (User-Agent dei browser) non conta.
+- il sito da un telefono Android (User-Agent di un browser con ``Android``): una riga a parte,
+  piattaforma ``web-android``, perché anche loro ricevono la notifica di una nuova versione
+  dell'app (Rosario 23/11); il sito da computer o da iPhone non conta.
 
 Una fonte meno precisa non cancella mai una più precisa (``SOURCE_RANK``). Le richieste fatte
 impersonando un utente non contano: sarebbe il telefono dell'operatore.
@@ -35,6 +37,8 @@ from sqlalchemy.orm import Session
 from app_usage.models import (
     APP_PLATFORMS,
     PLATFORM_ANDROID,
+    PLATFORM_WEB_ANDROID,
+    SOURCE_BROWSER,
     SOURCE_HEADER,
     SOURCE_RANK,
     SOURCE_USER_AGENT,
@@ -90,8 +94,12 @@ def _is_browser(user_agent: str) -> bool:
     return user_agent.startswith("Mozilla/")
 
 
+def _is_android(user_agent: str) -> bool:
+    return "android" in user_agent.lower()
+
+
 def observe(headers: Mapping[str, str], *, method: str, path: str) -> AppObservation | None:
-    """Cosa sa la richiesta dell'app; ``None`` se non viene dall'app (o non si capisce)."""
+    """Cosa sa la richiesta dell'app (o del sito da Android); ``None`` se non conta."""
     code = _version_code(headers.get(APP_VERSION_CODE_HEADER))
     if code is not None:
         platform = (headers.get(APP_PLATFORM_HEADER) or "").strip().lower()
@@ -103,6 +111,9 @@ def observe(headers: Mapping[str, str], *, method: str, path: str) -> AppObserva
         )
     user_agent = (headers.get("user-agent") or "").strip()
     if _is_browser(user_agent):
+        # Il sito: conta solo da un telefono Android (per la notifica della nuova versione).
+        if _is_android(user_agent):
+            return AppObservation(platform=PLATFORM_WEB_ANDROID, source=SOURCE_BROWSER)
         return None
     if method.upper() == "GET" and path.rstrip("/").endswith(_VERSION_PATH):
         return AppObservation(platform=PLATFORM_ANDROID, source=SOURCE_VERSION_CHECK)

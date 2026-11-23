@@ -6,8 +6,8 @@ la confronta con quella installata. Sta in `system_flags` (chiave ``android_app_
 JSON) come la modalità test: si cambia senza deploy e senza migrazioni.
 
 Release 1.4 (Rosario 23/11): all'annuncio parte anche una notifica (nell'elenco e push) per chi
-non risulta già su quella versione, e l'operatore vede chi ha quale versione
-(``GET /admin/app-version/users``, da ``app_usage``).
+usa l'app Android o il sito da Android e non risulta già su quella versione, e l'operatore vede
+chi ha quale versione (``GET /admin/app-version/users``, da ``app_usage``).
 """
 
 from __future__ import annotations

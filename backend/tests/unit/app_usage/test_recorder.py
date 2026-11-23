@@ -7,7 +7,13 @@ from uuid import uuid4
 
 import pytest
 
-from app_usage.models import SOURCE_HEADER, SOURCE_USER_AGENT, SOURCE_VERSION_CHECK
+from app_usage.models import (
+    PLATFORM_WEB_ANDROID,
+    SOURCE_BROWSER,
+    SOURCE_HEADER,
+    SOURCE_USER_AGENT,
+    SOURCE_VERSION_CHECK,
+)
 from app_usage.recorder import (
     RECORD_INTERVAL,
     AppObservation,
@@ -17,7 +23,18 @@ from app_usage.recorder import (
 )
 
 OKHTTP = {"user-agent": "okhttp/4.12.0"}
-CHROME = {"user-agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0"}
+ANDROID_CHROME = {
+    "user-agent": "Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 Chrome/131.0 Mobile"
+}
+DESKTOP_CHROME = {"user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0"}
+WINDOWS_EDGE = {
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Edg/131.0"
+}
+IPHONE_SAFARI = {
+    "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 "
+    "Version/18.1 Mobile/15E148 Safari/604.1"
+}
+WEB_ANDROID = AppObservation(PLATFORM_WEB_ANDROID, SOURCE_BROWSER)
 NOW = datetime(2026, 11, 23, 12, 0, tzinfo=UTC)
 
 
@@ -75,11 +92,42 @@ def test_okhttp_senza_intestazioni_vale_app_versione_non_nota() -> None:
     )
 
 
-def test_il_sito_non_conta() -> None:
-    assert observe(CHROME, method="GET", path="/leagues") is None
-    assert observe(CHROME, method="GET", path="/app/version") is None
+def test_il_sito_da_computer_o_iphone_non_conta() -> None:
+    for browser in (DESKTOP_CHROME, WINDOWS_EDGE, IPHONE_SAFARI):
+        assert observe(browser, method="GET", path="/leagues") is None, browser
+        assert observe(browser, method="GET", path="/app/version") is None, browser
     assert observe({"user-agent": "python-httpx/0.28"}, method="GET", path="/leagues") is None
     assert observe({}, method="GET", path="/leagues") is None
+
+
+def test_il_sito_da_android_ha_una_riga_a_parte() -> None:
+    """Rosario 23/11: la notifica della nuova versione va anche a chi usa il sito da Android."""
+    assert observe(ANDROID_CHROME, method="GET", path="/leagues") == WEB_ANDROID
+    assert observe(ANDROID_CHROME, method="GET", path="/app/version") == WEB_ANDROID
+    samsung = {
+        "user-agent": "Mozilla/5.0 (Linux; Android 13; SM-S911B) AppleWebKit/537.36 "
+        "SamsungBrowser/23.0 Chrome/115.0 Mobile Safari/537.36"
+    }
+    assert observe(samsung, method="POST", path="/leagues/1/formazione") == WEB_ANDROID
+    # L'app non è mai il sito: con le intestazioni o con okhttp resta l'app.
+    app_headers = {**ANDROID_CHROME, "x-app-version-code": "5", "x-app-version": "1.4.0"}
+    assert observe(app_headers, method="GET", path="/leagues") == AppObservation(
+        "android", SOURCE_HEADER, "1.4.0", 5
+    )
+    okhttp_android = {"user-agent": "okhttp/4.12.0 (Android 14)"}
+    assert observe(okhttp_android, method="GET", path="/leagues").platform == "android"
+    # Solo un browser: un client qualsiasi con «Android» nello User-Agent non conta.
+    dalvik = {"user-agent": "Dalvik/2.1.0 (Linux; U; Android 14; Pixel 8)"}
+    assert observe(dalvik, method="GET", path="/leagues") is None
+
+
+def test_il_sito_da_android_si_scrive_al_piu_ogni_qualche_minuto() -> None:
+    user = uuid4()
+    assert should_record(user, WEB_ANDROID, now=NOW) is True
+    assert should_record(user, WEB_ANDROID, now=NOW + timedelta(minutes=1)) is False
+    # Ha un conto separato dall'app dello stesso utente.
+    assert should_record(user, AppObservation("android", SOURCE_USER_AGENT), now=NOW) is True
+    assert should_record(user, WEB_ANDROID, now=NOW + RECORD_INTERVAL + timedelta(seconds=1))
 
 
 def test_si_scrive_al_piu_ogni_qualche_minuto() -> None:

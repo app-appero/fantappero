@@ -181,7 +181,9 @@ class PrivacyService:
                 for membership in user.league_memberships
             ],
             "pushDevices": self._export_push_devices(user.id),
-            # Versione dell'app vista dal server (release 1.4): piattaforma, versione, quando.
+            # Versione dell'app vista dal server (release 1.4): piattaforma, versione, quando;
+            # piattaforma «web-android» per il sito usato da un telefono Android (informativa
+            # 2026-11d).
             "appUsage": self._export_app_usage(user.id),
             "notificationPreferences": self._export_notification_preferences(user.id),
             "teams": self._export_teams(user.id),
@@ -462,7 +464,8 @@ class PrivacyService:
         self._session.execute(delete(FeedbackReport).where(FeedbackReport.user_id == user_id))
 
     def _delete_app_usage(self, user_id: UUID) -> None:
-        """Toglie la versione dell'app vista dal server (eliminazione «soft», niente cascata)."""
+        """Toglie la versione dell'app (e l'uso del sito da Android) vista dal server
+        (eliminazione «soft», niente cascata)."""
         from app_usage.models import UserAppUsage
 
         self._session.execute(delete(UserAppUsage).where(UserAppUsage.user_id == user_id))

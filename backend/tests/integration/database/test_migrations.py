@@ -109,10 +109,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a b7c4e2a91d35 (versione dell'app per utente, 1.4); prima
-            # 3f0f09518f28 (esito dei giri dei job e aggiornamenti del listone per il Riepilogo
-            # operatore, 1.4). Aggiornare questa costante ad ogni nuova migrazione in coda.
-            assert version == "b7c4e2a91d35"
+            # Head aggiornata a bed6529e6ba1 (sito da Android in user_app_usage, 1.4); prima
+            # b7c4e2a91d35 (versione dell'app per utente, 1.4). Aggiornare questa costante ad
+            # ogni nuova migrazione in coda.
+            assert version == "bed6529e6ba1"
             assert table_exists(engine, "system_job_runs")
             assert table_exists(engine, "listone_updates")
             assert table_exists(engine, "user_app_usage")

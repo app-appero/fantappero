@@ -1,10 +1,12 @@
 """Chi ha quale versione dell'app e notifica di una nuova versione (release 1.4, Rosario 23/11).
 
 - ``build_app_usage_report``: l'elenco del pannello operatore («Versione app»), versione per
-  versione, poi le versioni non note e chi non ha mai usato l'app.
+  versione, poi le versioni non note, chi usa solo il sito da Android e chi non ha mai usato
+  l'app.
 - ``app_usage_summary``: la riga del Riepilogo («4 utenti aggiornati su 12 che usano l'app»).
 - ``notify_new_app_version``: all'annuncio di una versione, una notifica (nell'elenco e push) a
-  chi non risulta già su quella versione o una più nuova; una sola volta per versionCode.
+  chi usa l'app Android o il sito da Android e non risulta già su quella versione o una più
+  nuova; una sola volta per versionCode.
 """
 
 from __future__ import annotations
@@ -24,7 +26,10 @@ from admin.schemas import (
     AndroidAppVersionResponse,
 )
 from app_usage.models import (
+    ANDROID_NOTIFY_PLATFORMS,
+    APP_PLATFORMS,
     PLATFORM_ANDROID,
+    PLATFORM_WEB_ANDROID,
     SOURCE_HEADER,
     SOURCE_VERSION_CHECK,
     UserAppUsage,
@@ -55,15 +60,24 @@ def _up_to_date(latest_code: int):
     )
 
 
+def _uses_android():
+    """L'utente usa l'app Android (qualsiasi versione, anche non nota) o il sito da Android."""
+    return exists().where(
+        UserAppUsage.user_id == User.id,
+        UserAppUsage.platform.in_(ANDROID_NOTIFY_PLATFORMS),
+    )
+
+
 def app_usage_summary(
     session: Session, announced: AndroidAppVersionResponse | None
 ) -> AdminAppUsageSummaryResponse | None:
     if announced is None:
         return None
+    # Chi usa l'app: il sito da Android non conta.
     app_users = session.scalar(
         select(func.count(func.distinct(UserAppUsage.user_id)))
         .join(User, User.id == UserAppUsage.user_id)
-        .where(_active_humans())
+        .where(_active_humans(), UserAppUsage.platform.in_(APP_PLATFORMS))
     )
     up_to_date = session.scalar(
         select(func.count(User.id)).where(
@@ -120,9 +134,14 @@ def build_app_usage_report(
     versions: dict[tuple[str, int, str | None], list[tuple[User, UserAppUsage]]] = {}
     unknown_recent: list[tuple[User, UserAppUsage]] = []
     unknown: list[tuple[User, UserAppUsage]] = []
+    web_android: dict[UUID, UserAppUsage] = {}
     seen: set[UUID] = set()
     for usage in usages:
         user = by_id[usage.user_id]
+        if usage.platform == PLATFORM_WEB_ANDROID:
+            # Il sito da Android: un gruppo a parte, solo per chi non ha mai usato l'app.
+            web_android[user.id] = usage
+            continue
         seen.add(user.id)
         if usage.source == SOURCE_HEADER and usage.version_code is not None:
             key = (usage.platform, usage.version_code, usage.version_name)
@@ -168,8 +187,19 @@ def build_app_usage_report(
                 kind="unknown", platform=PLATFORM_ANDROID, users=_sorted_by_last_seen(unknown)
             )
         )
+    site_only = [
+        (by_id[user_id], usage) for user_id, usage in web_android.items() if user_id not in seen
+    ]
+    if site_only:
+        groups.append(
+            AdminAppUsageGroupResponse(
+                kind="web_android",
+                platform=PLATFORM_WEB_ANDROID,
+                users=_sorted_by_last_seen(site_only),
+            )
+        )
     never = sorted(
-        (user for user in users if user.id not in seen),
+        (user for user in users if user.id not in seen and user.id not in web_android),
         key=lambda user: (user.display_name.lower(), user.email),
     )
     if never:
@@ -199,12 +229,16 @@ def build_app_usage_report(
 
 
 def notification_recipients(session: Session, latest_code: int) -> list[UUID]:
-    """Chi riceve la notifica: utenti attivi non già su quella versione (o una più nuova).
+    """Chi riceve la notifica: utenti attivi non già su quella versione (o una più nuova) che
+    usano l'app Android (qualsiasi versione, anche non nota) o il sito da Android.
 
+    Decisione di Rosario del 23/11: non chi usa il sito solo da computer o da iPhone (per iOS
+    quando ci sarà l'app), né chi da quando il server registra l'uso non si è visto né
+    nell'app né sul sito da Android.
     Con la modalità test accesa, solo chi può usare l'app (tester in lista e operatori), come
     ``GET /app/version`` che agli altri non mostra la versione.
     """
-    stmt = select(User.id).where(_active_humans(), ~_up_to_date(latest_code))
+    stmt = select(User.id).where(_active_humans(), _uses_android(), ~_up_to_date(latest_code))
     access = TesterAccess(session)
     if access.is_test_mode():
         listed = access.listed_emails()
