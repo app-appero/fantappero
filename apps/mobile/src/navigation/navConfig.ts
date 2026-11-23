@@ -54,6 +54,13 @@ export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["profile:view"],
     surface: "app",
   },
+  // Subito dopo «Segnala un problema» (canvas «Domande frequenti», Rosario 22/11).
+  {
+    id: "faq",
+    path: "/domande-frequenti",
+    requiredPermissions: ["profile:view"],
+    surface: "app",
+  },
   {
     id: "profile",
     path: "/profilo",
@@ -140,6 +147,7 @@ export const NAV_LABELS: Record<string, string> = {
   "market-hub": "Mercato",
   formation: "Formazione",
   feedback: "Segnala un problema",
+  faq: "Domande frequenti",
   profile: "Profilo",
   "admin-home": "Pannello",
   "admin-leagues": "Leghe globali",

@@ -17,6 +17,7 @@ export const NAV_ICON_MAP: Record<string, FeatherName> = {
   "market-hub": "repeat",
   formation: "grid",
   feedback: "message-circle",
+  faq: "help-circle",
   profile: "user",
   more: "menu",
   "admin-home": "shield",

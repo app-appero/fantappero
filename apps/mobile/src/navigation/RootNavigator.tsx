@@ -8,6 +8,7 @@ import { AuthRegisterScreen } from "../screens/AuthRegisterScreen";
 import { AuthResetPasswordScreen } from "../screens/AuthResetPasswordScreen";
 import { AuthVerifyEmailScreen } from "../screens/AuthVerifyEmailScreen";
 import { CreateLeagueScreen } from "../screens/CreateLeagueScreen";
+import { FaqScreen } from "../screens/FaqScreen";
 import { FeedbackScreen } from "../screens/FeedbackScreen";
 import { PrivacyScreen } from "../screens/PrivacyScreen";
 import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
@@ -36,6 +37,7 @@ const JoinLeagueWithCountdown = withLockCountdown(JoinLeagueScreen);
 const ReceivedInvitesWithCountdown = withLockCountdown(ReceivedInvitesScreen);
 const NotificationsWithCountdown = withLockCountdown(NotificationsScreen);
 const FeedbackWithCountdown = withLockCountdown(FeedbackScreen);
+const FaqWithCountdown = withLockCountdown(FaqScreen);
 const ManagerDirectoryWithCountdown = withLockCountdown(ManagerDirectoryScreen);
 const CoachProfileWithCountdown = withLockCountdown(CoachProfileScreen);
 const MatchupDetailWithCountdown = withLockCountdown(MatchupDetailScreen);
@@ -148,6 +150,11 @@ export function RootNavigator() {
             name="Feedback"
             component={FeedbackWithCountdown}
             options={{ title: "Segnala un problema" }}
+          />
+          <Stack.Screen
+            name="Faq"
+            component={FaqWithCountdown}
+            options={{ title: "Domande frequenti" }}
           />
           <Stack.Screen
             name="ManagerDirectory"

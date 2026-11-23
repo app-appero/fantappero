@@ -63,6 +63,29 @@ describe("mobile navigation", () => {
   });
 });
 
+describe("Domande frequenti 1.4 nel drawer", () => {
+  it("mette «Domande frequenti» subito dopo «Segnala un problema» e prima di «Profilo»", () => {
+    const labels = filterMobileNavItems(MOBILE_DRAWER_NAV_ITEMS, (required) =>
+      hasPermissions(memberContext, required),
+    ).map((item) => item.label);
+    const feedback = labels.indexOf("Segnala un problema");
+    assert.ok(feedback > -1);
+    assert.deepEqual(labels.slice(feedback, feedback + 3), [
+      "Segnala un problema",
+      "Domande frequenti",
+      "Profilo",
+    ]);
+  });
+
+  it("è la stessa voce del sito: stesso path e stesso permesso di «Segnala un problema»", () => {
+    const faq = MOBILE_DRAWER_NAV_ITEMS.find((item) => item.id === "faq");
+    const feedback = MOBILE_DRAWER_NAV_ITEMS.find((item) => item.id === "feedback");
+    assert.equal(faq?.path, "/domande-frequenti");
+    assert.deepEqual(faq?.requiredPermissions, feedback?.requiredPermissions);
+    assert.equal(NAV_LABELS.faq, "Domande frequenti");
+  });
+});
+
 describe("hub a tab: Lega e Mercato — mobile (EP13-P01)", () => {
   it("non usa più gruppi collassabili nel drawer: le destinazioni correlate sono screen-tabs", () => {
     assert.deepEqual(MOBILE_NAV_GROUPS, []);
