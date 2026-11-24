@@ -411,7 +411,7 @@ def test_waiver_refunds_the_released_player_like_a_voluntary_release(
         (CreditLedgerReason.MARKET_WAIVER_ACQUISITION, -40),
     ]
     refund = new_entries[0]
-    assert refund.note == f"Svincolo Ceduto Pagato (voluntary, {expected_percent}%)"
+    assert refund.note == f"Svincolo Ceduto Pagato (volontario, {expected_percent}%)"
     assert refund.transaction_id.startswith(f"release:{run['team_id']}:0:{run['owned'].id}:v")
     assert refund.balance_after == balance_before + expected_refund
 

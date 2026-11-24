@@ -17,7 +17,11 @@ from fantasy_teams.composition_service import (
     resolve_effective_athlete_roles,
     sync_team_composition_status,
 )
-from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
+from fantasy_teams.ledger import (
+    apply_ledger_movement,
+    find_account_for_team,
+    release_refund_note,
+)
 from fantasy_teams.models import CreditAccount, FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign
 from leagues.models.league import League
@@ -65,8 +69,9 @@ def apply_release_refund(
 
     Stessa regola per lo svincolo volontario e per chi esce dalla rosa con un'offerta degli
     svincolati: ``percent`` del prezzo d'acquisto per difetto (``compute_release_refund``),
-    causale ``market_release_refund``, nota «Svincolo <nome> (<causa>, <percentuale>%)».
-    Un rimborso di 0 crediti non scrive nessun movimento. Il chiamante tiene il blocco sul conto.
+    causale ``market_release_refund``, nota «Svincolo <nome> (<causa>, <percentuale>%)» con la
+    causa in italiano, per esempio «(volontario, 50%)» (``release_refund_note``). Un rimborso
+    di 0 crediti non scrive nessun movimento. Il chiamante tiene il blocco sul conto.
     """
     refund = compute_release_refund(purchase_credits=purchase_credits, refund_percent=percent)
     if refund > 0:
@@ -78,7 +83,7 @@ def apply_release_refund(
             transaction_id=f"release:{team_id}:{slot_index}:{athlete_id}:v{account.version}",
             actor_id=actor_id,
             # Il nome come arriva dal fornitore può avere la codifica rovinata (QA 21-22/11).
-            note=f"Svincolo {repair_provider_text(athlete_name)} ({reason.value}, {percent}%)",
+            note=release_refund_note(repair_provider_text(athlete_name), reason, percent),
         )
     return refund
 

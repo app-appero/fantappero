@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.text_folding import repair_provider_text
 from auth.exceptions import ValidationAuthError
-from database.enums import CreditLedgerReason
+from database.enums import CreditLedgerReason, MarketReleaseReason
 from fantasy_teams.models import CreditAccount, CreditLedgerEntry, FantasyTeam
 from fantasy_teams.validators import (
     validate_credit_amount_nonzero,
@@ -81,6 +82,24 @@ _LEGACY_LIVE_WIN_NOTE = "Assegnazione da asta a buste"
 _LIVE_WIN_NOTE = "Assegnazione da asta a rilanci"
 _LIVE_WIN_TRANSACTION_PREFIX = "market-live:"
 
+# Causa dello svincolo nella nota del rimborso (causale ``market_release_refund``). Fino al
+# 24/11 la nota riportava il valore dell'enum («voluntary», «league_exit»): ora è in italiano.
+_RELEASE_REASON_NOTE_LABELS: dict[str, str] = {
+    MarketReleaseReason.VOLUNTARY.value: "volontario",
+    MarketReleaseReason.LEAGUE_EXIT.value: "uscita dai cinque campionati",
+}
+_LEGACY_RELEASE_NOTE = re.compile(r"^(Svincolo .+) \((voluntary|league_exit), (\d+)%\)$", re.S)
+
+
+def release_refund_note(athlete_name: str, reason: MarketReleaseReason, percent: int) -> str:
+    """Nota del rimborso di uno svincolo del mercato: «Svincolo <nome> (volontario, 50%)».
+
+    Vale per lo svincolo volontario, per l'uscita dai cinque campionati e per chi esce dalla
+    rosa con un'offerta degli svincolati.
+    """
+    label = _RELEASE_REASON_NOTE_LABELS[reason.value]
+    return f"Svincolo {athlete_name} ({label}, {percent}%)"
+
 
 def ledger_note_for_display(entry: CreditLedgerEntry) -> str | None:
     """Nota del movimento da mostrare a web e app.
@@ -89,6 +108,8 @@ def ledger_note_for_display(entry: CreditLedgerEntry) -> str | None:
     22/11 a volte con la codifica rovinata dal fornitore («Assegnazione L. JovanoviÄ\\x87»,
     «D. O&apos;Shea», «N. Kovač \\x8d»). Il registro non si riscrive: si ripara qui, alla
     lettura. La nota libera dell'amministratore (rettifica manuale) resta com'è scritta.
+    Allo stesso modo il rimborso di uno svincolo salvato prima del 24/11 («Svincolo <nome>
+    (voluntary, 50%)») si mostra con la causa in italiano, come quelli scritti dopo.
     """
     if (
         entry.reason == CreditLedgerReason.MARKET_AUCTION_WIN
@@ -98,7 +119,13 @@ def ledger_note_for_display(entry: CreditLedgerEntry) -> str | None:
         return _LIVE_WIN_NOTE
     if entry.note is None or entry.reason == CreditLedgerReason.ADMIN_ADJUSTMENT:
         return entry.note
-    return repair_provider_text(entry.note)
+    note = entry.note
+    if entry.reason == CreditLedgerReason.MARKET_RELEASE_REFUND:
+        legacy = _LEGACY_RELEASE_NOTE.match(note)
+        if legacy is not None:
+            label = _RELEASE_REASON_NOTE_LABELS[legacy.group(2)]
+            note = f"{legacy.group(1)} ({label}, {legacy.group(3)}%)"
+    return repair_provider_text(note)
 
 
 def reconstruct_balance(session: Session, account_id: UUID) -> int:
