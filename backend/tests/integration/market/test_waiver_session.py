@@ -265,6 +265,10 @@ def test_waiver_resolution_swaps_players_and_a_free_release_refunds_nothing(
         )
     ).all()
     assert refunds == []
+    # Rimborso 0: l'esito al vincitore non parla di rimborso.
+    won = _waiver_outcome_notifications(db_session, admin_id)
+    assert len(won) == 1
+    assert won[0].body.endswith("Hai aggiudicato Nuovo Acquisto dagli svincolati per 80 crediti.")
 
 
 def _set_voluntary_refund_percent(
@@ -324,7 +328,9 @@ def _member_with_priced_player_bids_on_free_agent(
     assert bid.status_code == 200, bid.text
     return {
         "league_id": league_id,
+        "prefix": prefix,
         "admin_token": admin_token,
+        "member_id": member_id,
         "member_headers": member_headers,
         "team_id": UUID(team_id),
         "session_id": session_id,
@@ -415,6 +421,16 @@ def test_waiver_refunds_the_released_player_like_a_voluntary_release(
     assert refund.transaction_id.startswith(f"release:{run['team_id']}:0:{run['owned'].id}:v")
     assert refund.balance_after == balance_before + expected_refund
 
+    # L'esito al vincitore dice anche il rimborso di chi è uscito (24/11).
+    won = _waiver_outcome_notifications(db_session, run["member_id"])
+    assert len(won) == 1
+    assert won[0].template_version == 2
+    assert won[0].title == "Svincolato aggiudicato"
+    assert won[0].body == (
+        f"«Lega {run['prefix']}» · Hai aggiudicato Svincolato Nuovo dagli svincolati per "
+        f"40 crediti. +{expected_refund} crediti di rimborso per Ceduto Pagato."
+    )
+
     slot = db_session.scalar(
         select(FantasyRosterSlot).where(
             FantasyRosterSlot.fantasy_team_id == run["team_id"],
@@ -436,6 +452,7 @@ def test_waiver_refunds_the_released_player_like_a_voluntary_release(
     account, replayed = _team_ledger(db_session, run["team_id"])
     assert len(replayed) == len(entries)
     assert account.balance == balance_before + expected_refund - 40
+    assert len(_waiver_outcome_notifications(db_session, run["member_id"])) == 1
 
 
 def test_waiver_refund_is_not_kept_when_the_swap_fails(
@@ -481,6 +498,12 @@ def test_waiver_refund_is_not_kept_when_the_swap_fails(
     assert slot is not None
     assert slot.athlete_id == run["owned"].id
     assert slot.purchase_credits == 25
+
+    # Nessun rimborso, e l'esito non ne parla.
+    lost = _waiver_outcome_notifications(db_session, run["member_id"])
+    assert len(lost) == 1
+    assert lost[0].title == "Svincolato perso"
+    assert "rimborso" not in lost[0].body
 
 
 def test_waiver_bid_lost_when_release_athlete_no_longer_owned(
