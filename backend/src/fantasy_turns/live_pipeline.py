@@ -61,6 +61,21 @@ class LivePipelineResult:
             "errors": list(self.errors),
         }
 
+    def error_lines(self) -> list[str]:
+        """Gli errori come testo, per il risultato del task Celery.
+
+        Il log di Celery sull'esito del task mostra solo i primi livelli del risultato: con i
+        dizionari si leggeva soltanto ``errors: [{...}]`` (pilota, 24/11).
+        """
+        return [_error_text(item) for item in self.errors]
+
+
+def _error_text(error: dict[str, str]) -> str:
+    return (
+        f"round_id={error.get('roundId')} league_id={error.get('leagueId')} "
+        f"code={error.get('code')}"
+    )
+
 
 def select_live_rounds(
     session: Session,
@@ -129,16 +144,28 @@ def process_live_fantasy_rounds(
                 if calculation.homologated:
                     result.rounds_finalized += 1
         except ValidationAuthError as exc:
-            result.errors.append({"roundId": str(round_id), "code": exc.code})
+            # Turno, lega e codice anche nel testo: il formatter dei log di Celery scarta gli
+            # `extra` e prima si leggeva solo il nome dell'evento (pilota, 24/11).
+            error = {"roundId": str(round_id), "leagueId": str(league_id), "code": exc.code}
+            result.errors.append(error)
             logger.warning(
-                "fantasy_live_pipeline_round_skipped",
-                extra={"round_id": str(round_id), "result": exc.code},
+                f"fantasy_live_pipeline_round_skipped {_error_text(error)}",
+                extra={"round_id": str(round_id), "league_id": str(league_id), "result": exc.code},
             )
         except Exception as exc:  # noqa: BLE001 - isolate a single live league
-            result.errors.append({"roundId": str(round_id), "code": type(exc).__name__})
+            error = {
+                "roundId": str(round_id),
+                "leagueId": str(league_id),
+                "code": type(exc).__name__,
+            }
+            result.errors.append(error)
             logger.exception(
-                "fantasy_live_pipeline_round_failed",
-                extra={"round_id": str(round_id)},
+                f"fantasy_live_pipeline_round_failed {_error_text(error)}",
+                extra={
+                    "round_id": str(round_id),
+                    "league_id": str(league_id),
+                    "error_type": type(exc).__name__,
+                },
             )
 
     session.commit()
@@ -147,7 +174,12 @@ def process_live_fantasy_rounds(
         "fantasy_live_pipeline_runs_total",
         labels={"result": "partial" if result.errors else "success"},
     )
-    logger.info("fantasy_live_pipeline_completed", extra=result.as_dict())
+    logger.info(
+        f"fantasy_live_pipeline_completed rounds_considered={result.rounds_considered} "
+        f"rounds_processed={result.rounds_processed} rounds_finalized={result.rounds_finalized} "
+        f"errors={len(result.errors)}",
+        extra=result.as_dict(),
+    )
     return result
 
 
