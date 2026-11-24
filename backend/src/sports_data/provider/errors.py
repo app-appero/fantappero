@@ -5,6 +5,9 @@ from __future__ import annotations
 # User-facing copy: never mention env vars, keys, or backend setup steps.
 PROVIDER_UNAVAILABLE_USER_MESSAGE = "Servizio dati sportivi non disponibile. Riprova tra poco."
 PROVIDER_RATE_LIMITED_USER_MESSAGE = "Troppe richieste. Riprova tra poco."
+PROVIDER_DAILY_LIMIT_USER_MESSAGE = (
+    "Quota giornaliera del fornitore sportivo finita: riprende dopo la mezzanotte UTC."
+)
 PROVIDER_CATALOG_NOT_READY_USER_MESSAGE = "Catalogo club non disponibile. Riprova tra poco."
 
 
@@ -34,6 +37,17 @@ class ProviderRateLimitError(ProviderError):
         self.retry_after_seconds = retry_after_seconds
         self.remaining = remaining
         super().__init__(message, endpoint=endpoint)
+
+
+class ProviderDailyLimitError(ProviderRateLimitError):
+    """Quota giornaliera del piano finita: il fornitore rifiuta tutto fino alla mezzanotte UTC.
+
+    Arriva con HTTP 200 e ``errors.requests`` («You have reached the request limit for the
+    day…»). Non è il limite al minuto: aspettare un minuto e riprovare non serve, quindi il
+    client non fa pause. Resta un ``ProviderRateLimitError`` per chi gestisce già quello.
+    """
+
+    code = "provider_daily_limit_reached"
 
 
 class ProviderHttpError(ProviderError):

@@ -5,11 +5,16 @@ from __future__ import annotations
 from typing import Any
 
 from sports_data.provider.errors import (
+    PROVIDER_DAILY_LIMIT_USER_MESSAGE,
     PROVIDER_RATE_LIMITED_USER_MESSAGE,
+    ProviderDailyLimitError,
     ProviderRateLimitError,
     ProviderResponseError,
 )
 from sports_data.provider.types import ProviderEnvelope, ProviderPaging, ProviderRateLimit
+
+#: Stato dell'account: chiamate del giorno e limite del piano. Non consuma quota.
+STATUS_ENDPOINT = "/status"
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -19,6 +24,31 @@ def _as_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+#: Testi della quota giornaliera finita. API-Football risponde 200 con
+#: ``errors: {"requests": "You have reached the request limit for the day, …"}``.
+_DAILY_LIMIT_MARKERS = ("limit for the day", "daily limit", "requests per day")
+
+
+def errors_indicate_daily_limit(errors: Any) -> bool:
+    """Quota giornaliera del piano finita (distinta dal limite al minuto)."""
+    if errors is None:
+        return False
+    if isinstance(errors, dict):
+        for key, value in errors.items():
+            key_l = str(key).lower().replace("_", "").replace("-", "")
+            if key_l == "requests" and isinstance(value, str) and "limit" in value.lower():
+                return True
+            if errors_indicate_daily_limit(value):
+                return True
+        return False
+    if isinstance(errors, list):
+        return any(errors_indicate_daily_limit(item) for item in errors)
+    if isinstance(errors, str):
+        text = errors.lower()
+        return any(marker in text for marker in _DAILY_LIMIT_MARKERS)
+    return False
 
 
 def errors_indicate_rate_limit(errors: Any) -> bool:
@@ -68,6 +98,34 @@ def parse_rate_limit_headers(headers: dict[str, str] | Any) -> ProviderRateLimit
     )
 
 
+def _optional_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def daily_quota_from_status(envelope: ProviderEnvelope) -> ProviderRateLimit:
+    """Quota giornaliera dell'account dalla risposta di ``/status``.
+
+    Il corpo porta ``response.requests.current`` (chiamate di oggi, tutte le chiavi e gli
+    ambienti che usano lo stesso account) e ``limit_day``. Se mancano restano gli header
+    ``x-ratelimit-requests-*`` della risposta, se ci sono.
+    """
+    fallback = envelope.rate_limit or ProviderRateLimit()
+    body = envelope.response[0] if envelope.response else None
+    requests = body.get("requests") if isinstance(body, dict) else None
+    if not isinstance(requests, dict):
+        return fallback
+    current = _optional_int(requests.get("current"))
+    limit_day = _optional_int(requests.get("limit_day"))
+    if current is None or limit_day is None or limit_day <= 0:
+        return fallback
+    return ProviderRateLimit(limit=limit_day, remaining=max(0, limit_day - current))
+
+
 def parse_envelope(
     payload: dict[str, Any],
     *,
@@ -115,6 +173,11 @@ def parse_envelope(
     response = payload.get("response")
     if response is None:
         response = []
+    if isinstance(response, dict) and resolved_endpoint == STATUS_ENDPOINT:
+        # `/status` è l'unico endpoint con un oggetto (account, abbonamento, chiamate del
+        # giorno) invece di una lista: prima la sonda della quota falliva sempre qui e la
+        # modalità restava `ok` anche a quota quasi finita (pilota, 23-24/11).
+        response = [response]
     if not isinstance(response, list):
         raise ProviderResponseError(
             "Campo response non è una lista",
@@ -136,6 +199,12 @@ def parse_envelope(
         raw=payload,
     )
     if raise_on_errors and envelope.has_errors:
+        if errors_indicate_daily_limit(errors):
+            raise ProviderDailyLimitError(
+                PROVIDER_DAILY_LIMIT_USER_MESSAGE,
+                endpoint=resolved_endpoint,
+                remaining=0,
+            )
         if errors_indicate_rate_limit(errors):
             raise ProviderRateLimitError(
                 PROVIDER_RATE_LIMITED_USER_MESSAGE,

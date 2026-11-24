@@ -71,6 +71,19 @@ class _Provider:
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         params = dict(request.url.params)
+        if request.url.path == "/status":
+            # Sonda della quota dell'import: non consuma quota, non si conta fra le chiamate.
+            return httpx.Response(
+                200,
+                json={
+                    "get": "status",
+                    "parameters": [],
+                    "errors": [],
+                    "results": 1,
+                    "paging": {"current": 1, "total": 1},
+                    "response": {"requests": {"current": 10, "limit_day": 7500}},
+                },
+            )
         self.calls.append(params)
         self.paths.append(request.url.path)
         if request.url.path == "/leagues":

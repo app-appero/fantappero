@@ -16,7 +16,7 @@ from leagues.models.competition import Competition
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
 from sports_data.catalog.models import SportSeason
-from sports_data.fixtures.models import Fixture, OfficialLineup
+from sports_data.fixtures.models import Fixture, OfficialLineup, PlayerMatchStat
 from sports_data.fixtures.sync import (
     FixtureDetailBatch,
     FixtureSyncResult,
@@ -24,6 +24,8 @@ from sports_data.fixtures.sync import (
 )
 from sports_data.provider.client import ApiFootballClient
 from sports_data.provider.constants import MVP_LEAGUE_IDS, PROVIDER_NAME
+from sports_data.provider.envelope import STATUS_ENDPOINT, daily_quota_from_status
+from sports_data.provider.errors import ProviderDailyLimitError
 from sports_data.provider.mapping import map_fixtures
 from sports_data.provider.types import ProviderEnvelope, ProviderRateLimit
 from sports_data.scheduler.locks import JobLock, hold_job_lock
@@ -176,15 +178,35 @@ def run_poll_cycle(
 
         mode = resolve_quota_mode(rate_limit)
         if client is not None and rate_limit is None and fetch_from_provider is not False:
-            # Probe /status once to refresh quota headers when unknown.
+            # Una sonda /status (non consuma quota) per sapere quante chiamate restano oggi.
             try:
-                status_env = client.get("/status", fetch_all_pages=False)
-                mode = resolve_quota_mode(status_env.rate_limit)
-                rate_limit = status_env.rate_limit
-            except Exception:  # noqa: BLE001 — degrade observability, keep last mode
+                rate_limit = daily_quota_from_status(
+                    client.get(STATUS_ENDPOINT, fetch_all_pages=False)
+                )
+                mode = resolve_quota_mode(rate_limit)
+            except ProviderDailyLimitError:
+                # Il fornitore dice già che la quota del giorno è finita.
+                rate_limit = ProviderRateLimit(remaining=0)
+                mode = QuotaMode.CRITICAL_ONLY
                 logger.warning(
-                    "sports_scheduler_status_probe_failed",
-                    extra={"provider": PROVIDER_NAME, "window": window.value},
+                    f"sports_scheduler_status_probe_daily_limit window={window.value} "
+                    f"code={ProviderDailyLimitError.code}",
+                    extra={
+                        "provider": PROVIDER_NAME,
+                        "window": window.value,
+                        "code": ProviderDailyLimitError.code,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001 — degrade observability, keep last mode
+                # Il tipo di errore nel testo: il formatter dei log di Celery scarta gli `extra`.
+                logger.warning(
+                    f"sports_scheduler_status_probe_failed window={window.value} "
+                    f"error={type(exc).__name__}",
+                    extra={
+                        "provider": PROVIDER_NAME,
+                        "window": window.value,
+                        "error_type": type(exc).__name__,
+                    },
                 )
 
         metrics.set_gauge(
@@ -236,7 +258,8 @@ def run_poll_cycle(
             _finalize_run(session, result, lock_token=token, started_at=clock, finished_at=clock)
             metrics.incr(SCHEDULER_RUNS_TOTAL, labels={**labels, "status": result.status})
             logger.warning(
-                "sports_scheduler_degraded",
+                f"sports_scheduler_degraded window={window.value} quota_mode={mode.value} "
+                "action=skip_pre_match",
                 extra={
                     "provider": PROVIDER_NAME,
                     "window": window.value,
@@ -247,7 +270,16 @@ def run_poll_cycle(
             return result
 
         candidates = select_fixtures_for_window(session, window, now=clock, league_ids=league_ids)
-        candidates.sort(key=lambda row: stale_result_rank(row.status_short, row.kickoff_at, clock))
+        # A parità di stato prima le partite ancora senza statistiche giocatore (niente voti):
+        # con il tetto per giro (15 nelle correzioni tardive) l'ordine del database poteva
+        # lasciarle sempre fuori, rimandando l'omologazione del turno.
+        missing_stats = _fixture_ids_missing_player_stats(session, candidates)
+        candidates.sort(
+            key=lambda row: (
+                stale_result_rank(row.status_short, row.kickoff_at, clock),
+                0 if row.id in missing_stats else 1,
+            )
+        )
         fixture_cap = max_fixtures_for_mode(policy.max_fixtures_per_run, mode)
         if fixture_cap is not None:
             candidates = candidates[:fixture_cap]
@@ -258,6 +290,10 @@ def run_poll_cycle(
         status: PollStatus = "ok"
         error_code: str | None = None
         details: dict[str, Any] = {"quota_mode": mode.value}
+        if rate_limit is not None and rate_limit.remaining is not None:
+            details["quota_remaining"] = rate_limit.remaining
+            if rate_limit.limit is not None:
+                details["quota_limit"] = rate_limit.limit
 
         try:
             with Timer(metrics, SCHEDULER_DURATION_SECONDS, labels=labels):
@@ -291,7 +327,7 @@ def run_poll_cycle(
                 status = "degraded_ok"
                 details["degraded"] = True
                 logger.warning(
-                    "sports_scheduler_degraded",
+                    f"sports_scheduler_degraded window={window.value} quota_mode={mode.value}",
                     extra={
                         "provider": PROVIDER_NAME,
                         "window": window.value,
@@ -304,8 +340,14 @@ def run_poll_cycle(
             error_code = type(exc).__name__
             details["error_type"] = error_code
             logger.exception(
-                "sports_scheduler_failed",
-                extra={"provider": PROVIDER_NAME, "window": window.value, "quota_mode": mode.value},
+                f"sports_scheduler_failed window={window.value} quota_mode={mode.value} "
+                f"error={error_code}",
+                extra={
+                    "provider": PROVIDER_NAME,
+                    "window": window.value,
+                    "quota_mode": mode.value,
+                    "error_type": error_code,
+                },
             )
             finished = datetime.now(UTC)
             result = PollCycleResult(
@@ -357,7 +399,7 @@ def run_poll_cycle(
             amount=float(fixtures_polled),
         )
         logger.info(
-            "sports_scheduler_ok",
+            f"sports_scheduler_ok window={window.value} quota_mode={mode.value} status={status}",
             extra={
                 "provider": PROVIDER_NAME,
                 "window": window.value,
@@ -507,6 +549,27 @@ def _fetch_pre_calendars(
             requests += 1
             envelopes.append(env)
     return envelopes, requests
+
+
+def _fixture_ids_missing_player_stats(session: Session, fixtures: Sequence[Fixture]) -> set[UUID]:
+    """Partite senza statistiche giocatore di entrambe le squadre (`evaluate_round_readiness`)."""
+    if not fixtures:
+        return set()
+    clubs_with_stats: dict[UUID, set[UUID]] = {}
+    for fixture_id, club_id in session.execute(
+        select(PlayerMatchStat.fixture_id, PlayerMatchStat.club_id)
+        .where(
+            PlayerMatchStat.fixture_id.in_([row.id for row in fixtures]),
+            PlayerMatchStat.club_id.is_not(None),
+        )
+        .distinct()
+    ).all():
+        clubs_with_stats.setdefault(fixture_id, set()).add(club_id)
+    return {
+        row.id
+        for row in fixtures
+        if not {row.home_club_id, row.away_club_id}.issubset(clubs_with_stats.get(row.id, set()))
+    }
 
 
 def competition_calendar_queries(

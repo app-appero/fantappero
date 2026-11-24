@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from sports_data.provider.errors import (
     ProviderAuthError,
     ProviderConfigError,
+    ProviderDailyLimitError,
     ProviderError,
     ProviderRateLimitError,
 )
@@ -66,6 +67,11 @@ def reason_from_exception(exc: BaseException | None) -> str:
     if exc is None:
         return "Errore sconosciuto."
     name = type(exc).__name__
+    if isinstance(exc, ProviderDailyLimitError):
+        return (
+            "Fornitore sportivo: quota giornaliera finita, riprende dopo la mezzanotte UTC "
+            f"({name})."
+        )
     if isinstance(exc, ProviderRateLimitError):
         return f"Fornitore sportivo: troppe richieste, limite raggiunto ({name})."
     if isinstance(exc, ProviderConfigError):
