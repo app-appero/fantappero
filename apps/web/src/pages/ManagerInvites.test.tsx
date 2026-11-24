@@ -268,7 +268,7 @@ describe("annulla invito nominativo", () => {
     return { items, page: 1, pageSize: 10, total: items.length, totalPages: 1 };
   }
 
-  async function mountDirectory() {
+  async function mountDirectory(onInvitesChanged?: () => void) {
     saveStoredSession({
       accessToken: "token-admin",
       refreshToken: "refresh-admin",
@@ -284,6 +284,7 @@ describe("annulla invito nominativo", () => {
           children: createElement(ManagerDirectory, {
             leagueId: "league-1",
             isDemoMode: false,
+            onInvitesChanged,
           }),
         }),
       );
@@ -332,7 +333,8 @@ describe("annulla invito nominativo", () => {
       createdAt: "2026-11-19T00:00:00Z",
       autoAccepted: false,
     });
-    const { host, cleanup } = await mountDirectory();
+    const onInvitesChanged = vi.fn();
+    const { host, cleanup } = await mountDirectory(onInvitesChanged);
 
     const invite = host.querySelector('[data-testid="manager-invite-user-pending"]');
     expect(invite?.textContent).toBe("Già invitato");
@@ -351,6 +353,7 @@ describe("annulla invito nominativo", () => {
     expect(revokeNamedLeagueInvite).toHaveBeenCalledTimes(1);
     expect(revokeNamedLeagueInvite).toHaveBeenCalledWith("token-admin", "league-1", "invite-1");
     expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBe(2);
+    expect(onInvitesChanged).toHaveBeenCalledTimes(1);
     expect(host.querySelector('[data-testid="manager-revoke-dialog"]')).toBeNull();
 
     const after = host.querySelector('[data-testid="manager-invite-user-pending"]');
@@ -386,11 +389,16 @@ describe("annulla invito nominativo", () => {
     vi.mocked(revokeNamedLeagueInvite).mockRejectedValue(
       new ApiError("L'invito non è più revocabile.", 400, "named_invite_not_pending"),
     );
-    const { host, cleanup } = await mountDirectory();
+    const onInvitesChanged = vi.fn();
+    const { host, cleanup } = await mountDirectory(onInvitesChanged);
 
     await click(host.querySelector('[data-testid="manager-revoke-user-pending"]'));
     await click(host.querySelector('[data-testid="manager-revoke-confirm"]'));
     expect(revokeNamedLeagueInvite).toHaveBeenCalledTimes(1);
+    // Riga vecchia (scheda rimasta aperta): si rileggono la riga e il conto «· 1 invito in
+    // attesa» col banner del mercato, senza aspettare un reload (QA notturna 23→24/11).
+    expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBe(2);
+    expect(onInvitesChanged).toHaveBeenCalledTimes(1);
     expect(
       host.querySelector('[data-testid="manager-directory-revoke-error"]')?.textContent,
     ).toContain("non è più annullabile");
@@ -408,13 +416,16 @@ describe("annulla invito nominativo", () => {
     vi.mocked(createNamedLeagueInvite).mockRejectedValue(
       new ApiError("Invito già inviato.", 400, "named_invite_already_pending"),
     );
-    const { host, cleanup } = await mountDirectory();
+    const onInvitesChanged = vi.fn();
+    const { host, cleanup } = await mountDirectory(onInvitesChanged);
 
     const invite = host.querySelector('[data-testid="manager-invite-user-pending"]');
     expect(invite?.textContent).toBe("Invita");
     await click(invite);
     expect(createNamedLeagueInvite).toHaveBeenCalledWith("token-admin", "league-1", "user-pending");
     expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBe(2);
+    // Anche il conto «· 1 invito in attesa» e il banner del mercato si rileggono (QA 23→24/11).
+    expect(onInvitesChanged).toHaveBeenCalledTimes(1);
 
     const after = host.querySelector('[data-testid="manager-invite-user-pending"]');
     expect(after?.textContent).toBe("Già invitato");
@@ -425,6 +436,26 @@ describe("annulla invito nominativo", () => {
     expect(
       host.querySelector('[data-testid="manager-directory-invite-error"]')?.textContent,
     ).toContain("Hai già invitato questo fantallenatore.");
+    cleanup();
+  });
+
+  it("un errore che non riguarda la riga non rilegge directory né inviti in attesa", async () => {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(createNamedLeagueInvite).mockReset();
+    vi.mocked(fetchManagerDirectory).mockResolvedValue(
+      page([{ ...pending, namedInviteStatus: null, namedInviteId: null }]),
+    );
+    vi.mocked(createNamedLeagueInvite).mockRejectedValue(
+      new ApiError("Errore del server.", 500, "internal_error"),
+    );
+    const onInvitesChanged = vi.fn();
+    const { host, cleanup } = await mountDirectory(onInvitesChanged);
+
+    await click(host.querySelector('[data-testid="manager-invite-user-pending"]'));
+    expect(createNamedLeagueInvite).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBe(1);
+    expect(onInvitesChanged).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-testid="manager-directory-invite-error"]')).not.toBeNull();
     cleanup();
   });
 

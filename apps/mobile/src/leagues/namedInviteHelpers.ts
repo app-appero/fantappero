@@ -34,6 +34,15 @@ export function inviteErrorRefreshesRow(error: { code?: string } | null | undefi
 }
 
 /**
+ * Errori della revoca che dicono che la riga è vecchia (il fantallenatore ha già risposto,
+ * l'invito è scaduto o non c'è più): si ricaricano la riga e gli inviti in attesa accanto al
+ * conto. Come la directory del web.
+ */
+export function revokeErrorRefreshesRow(error: { code?: string } | null | undefined): boolean {
+  return error?.code === "named_invite_not_pending" || error?.code === "named_invite_not_found";
+}
+
+/**
  * Messaggio per gli errori noti della revoca; `null` per gli altri, che il
  * chiamante rende con il messaggio generico dell'API.
  */
