@@ -36,6 +36,7 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from market.assignment import (
+    WaiverSwap,
     apply_release_refund,
     assign_winning_bid,
     assign_winning_waiver_bid,
@@ -408,11 +409,13 @@ class MarketService:
         # Offerte più alte che non si sono potute assegnare (crediti, rosa o ruolo): la notifica
         # non deve dire "offerta inferiore".
         unassignable_bid_ids: set[UUID] = set()
+        # Svincolati vinti con un rimborso di chi esce (KI-23): l'esito al vincitore lo dice.
+        waiver_refunds: dict[UUID, WaiverSwap] = {}
 
         def try_assign(bid: MarketBid) -> bool:
             transaction_id = f"market:{market_session.id}:{bid.fantasy_team_id}:{bid.athlete_id}"
             if market_session.kind == MarketSessionKind.WAIVER:
-                slot = (
+                swap = (
                     assign_winning_waiver_bid(
                         self._session,
                         league=league,
@@ -426,6 +429,9 @@ class MarketService:
                     if bid.release_athlete_id is not None
                     else None
                 )
+                if swap is not None and swap.refund_credits > 0:
+                    waiver_refunds[bid.id] = swap
+                slot = swap.slot if swap is not None else None
             else:
                 slot = assign_winning_bid(
                     self._session,
@@ -561,21 +567,27 @@ class MarketService:
                 outcome = "tiebreak"
             else:
                 outcome = "lost"
+            params: dict[str, object] = {
+                "outcome": outcome,
+                "athlete_name": bid.athlete.canonical_name,
+                "amount_credits": bid.amount_credits,
+                "not_assignable": bid.id in unassignable_bid_ids,
+                "lost_on_tie": bid.id in lost_on_tie_bid_ids,
+                # Asta a buste o svincolati: titoli, testi e link dipendono dal tipo.
+                "session_kind": market_session.kind.value,
+                **league_params(self._session, market_session.league_id),
+            }
+            refunded = waiver_refunds.get(bid.id)
+            if refunded is not None and outcome == "assigned":
+                # v2: «+12 crediti di rimborso per Rossi» (solo con un rimborso maggiore di 0).
+                params["release_refund_credits"] = refunded.refund_credits
+                params["released_athlete_name"] = refunded.released_athlete_name
             notifications.create_notification(
                 user_id=recipient_id,
                 category=NotificationCategory.MERCATO,
                 template_key="mercato.esito_busta",
-                template_version=1,
-                params={
-                    "outcome": outcome,
-                    "athlete_name": bid.athlete.canonical_name,
-                    "amount_credits": bid.amount_credits,
-                    "not_assignable": bid.id in unassignable_bid_ids,
-                    "lost_on_tie": bid.id in lost_on_tie_bid_ids,
-                    # Asta a buste o svincolati: titoli, testi e link dipendono dal tipo.
-                    "session_kind": market_session.kind.value,
-                    **league_params(self._session, market_session.league_id),
-                },
+                template_version=2,
+                params=params,
                 dedup_key=f"market_bid_outcome:{bid.id}",
             )
         if tiebreak_cancelled:
@@ -663,7 +675,7 @@ class MarketService:
                 user_id=recipient_id,
                 category=NotificationCategory.MERCATO,
                 template_key="mercato.esito_busta",
-                template_version=1,
+                template_version=2,
                 params=params,
                 dedup_key=f"market_tiebreak_cancelled:{market_session.id}:{team_id}",
             )

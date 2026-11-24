@@ -11,7 +11,7 @@ template used to exercise the platform end-to-end.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -308,6 +308,29 @@ def _render_esito_svincolati(params: NotificationParams) -> NotificationContent:
         ),
         deep_link=_league_link(_WAIVER_PATH, params),
     )
+
+
+@register_template("mercato.esito_busta", 2)
+def _render_mercato_esito_busta_v2(params: NotificationParams) -> NotificationContent:
+    """Come la v1, più il rimborso di chi esce dalla rosa per uno svincolato vinto (24/11).
+
+    Chi lascia il posto è rimborsato come uno svincolo volontario (KI-23):
+    ``release_refund_credits`` e ``released_athlete_name`` arrivano solo con un rimborso
+    maggiore di 0 e aggiungono «+12 crediti di rimborso per Rossi.» a «Svincolato
+    aggiudicato». Senza rimborso, e per ogni altro esito o per l'asta a buste, il testo è
+    quello della v1. Push ed email usano titolo e testo salvati con la notifica.
+    """
+    content = _render_mercato_esito_busta(params)
+    refund = params.get("release_refund_credits")
+    if (
+        params.get("session_kind") != "waiver"
+        or params.get("outcome") != "assigned"
+        or not isinstance(refund, int)
+        or refund <= 0
+    ):
+        return content
+    released = params.get("released_athlete_name") or "il calciatore svincolato"
+    return replace(content, body=f"{content.body} +{refund} crediti di rimborso per {released}.")
 
 
 @register_template("mercato.asta_live_aggiudicato", 1)

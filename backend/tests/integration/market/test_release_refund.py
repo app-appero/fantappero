@@ -167,6 +167,7 @@ def test_voluntary_release_preview_matches_applied_refund(
     )
     assert ledger_entry is not None
     assert ledger_entry.amount == 100
+    assert ledger_entry.note == "Svincolo Rilasciato Standard (volontario, 50%)"
 
 
 def test_league_exit_reason_refunds_full_amount(
@@ -195,6 +196,13 @@ def test_league_exit_reason_refunds_full_amount(
     )
     assert account is not None
     assert account.balance == 1000
+    note = db_session.scalar(
+        select(CreditLedgerEntry.note).where(
+            CreditLedgerEntry.account_id == account.id,
+            CreditLedgerEntry.reason == CreditLedgerReason.MARKET_RELEASE_REFUND,
+        )
+    )
+    assert note == "Svincolo Trasferito Fuori (uscita dai cinque campionati, 100%)"
 
 
 def test_configured_league_percentage_overrides_standard_default(

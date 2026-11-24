@@ -171,7 +171,7 @@ def test_ledger_notes_are_written_with_repaired_athlete_names(
         (CreditLedgerReason.ROSTER_PURCHASE, f"Rettifica prezzo {JOVANOVIC[1]}"),
         (CreditLedgerReason.ROSTER_RELEASE_REFUND, f"Rimborso {JOVANOVIC[1]}"),
         (CreditLedgerReason.ROSTER_PURCHASE, f"Acquisto {OSHEA[1]}"),
-        (CreditLedgerReason.MARKET_RELEASE_REFUND, f"Svincolo {OSHEA[1]} (voluntary, 50%)"),
+        (CreditLedgerReason.MARKET_RELEASE_REFUND, f"Svincolo {OSHEA[1]} (volontario, 50%)"),
         (CreditLedgerReason.ROSTER_PURCHASE, f"Assegnazione {KOVAC[1]}"),
     ]
     # Salvate già pulite nel registro, e così arrivano a web e app.
@@ -204,10 +204,11 @@ def test_broken_notes_already_stored_are_shown_repaired_admin_note_untouched(
             f"Acquisto {KOVAC[0]}",
             f"Acquisto {KOVAC[1]}",
         ),
+        # Scritto con la causa in inglese (fino al 24/11): si mostra in italiano.
         "qa2211-svincolo": (
             CreditLedgerReason.MARKET_RELEASE_REFUND,
             f"Svincolo {OSHEA[0]} (voluntary, 50%)",
-            f"Svincolo {OSHEA[1]} (voluntary, 50%)",
+            f"Svincolo {OSHEA[1]} (volontario, 50%)",
         ),
     }
     for transaction_id, (reason, note, _shown) in stored.items():

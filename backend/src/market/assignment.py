@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -17,7 +18,11 @@ from fantasy_teams.composition_service import (
     resolve_effective_athlete_roles,
     sync_team_composition_status,
 )
-from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
+from fantasy_teams.ledger import (
+    apply_ledger_movement,
+    find_account_for_team,
+    release_refund_note,
+)
 from fantasy_teams.models import CreditAccount, FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign
 from leagues.models.league import League
@@ -65,8 +70,9 @@ def apply_release_refund(
 
     Stessa regola per lo svincolo volontario e per chi esce dalla rosa con un'offerta degli
     svincolati: ``percent`` del prezzo d'acquisto per difetto (``compute_release_refund``),
-    causale ``market_release_refund``, nota «Svincolo <nome> (<causa>, <percentuale>%)».
-    Un rimborso di 0 crediti non scrive nessun movimento. Il chiamante tiene il blocco sul conto.
+    causale ``market_release_refund``, nota «Svincolo <nome> (<causa>, <percentuale>%)» con la
+    causa in italiano, per esempio «(volontario, 50%)» (``release_refund_note``). Un rimborso
+    di 0 crediti non scrive nessun movimento. Il chiamante tiene il blocco sul conto.
     """
     refund = compute_release_refund(purchase_credits=purchase_credits, refund_percent=percent)
     if refund > 0:
@@ -78,7 +84,7 @@ def apply_release_refund(
             transaction_id=f"release:{team_id}:{slot_index}:{athlete_id}:v{account.version}",
             actor_id=actor_id,
             # Il nome come arriva dal fornitore può avere la codifica rovinata (QA 21-22/11).
-            note=f"Svincolo {repair_provider_text(athlete_name)} ({reason.value}, {percent}%)",
+            note=release_refund_note(repair_provider_text(athlete_name), reason, percent),
         )
     return refund
 
@@ -366,6 +372,16 @@ def resolve_live_swap(
     return updated
 
 
+@dataclass(frozen=True)
+class WaiverSwap:
+    """Esito di un cambio riuscito degli svincolati: lo slot aggiornato e il rimborso di chi
+    è uscito (0 se pagato 0), con il suo nome come compare nella nota del movimento."""
+
+    slot: FantasyRosterSlot
+    refund_credits: int
+    released_athlete_name: str
+
+
 def assign_winning_waiver_bid(
     session: Session,
     *,
@@ -376,7 +392,7 @@ def assign_winning_waiver_bid(
     amount_credits: int,
     transaction_id: str,
     actor_id: UUID | None,
-) -> FantasyRosterSlot | None:
+) -> WaiverSwap | None:
     """Swap a waiver-won free agent in for the bid's declared release (EP08-03).
 
     The release and the acquisition happen atomically on the same roster slot:
@@ -389,7 +405,8 @@ def assign_winning_waiver_bid(
     percentuale «Rimborso svincolo volontario» della lega sul suo prezzo d'acquisto, per
     difetto, con causale e nota dello svincolo volontario (``apply_release_refund``). Come
     nello scambio dell'asta a rilanci il rimborso entra prima dell'addebito e sta nello stesso
-    savepoint: se il cambio non riesce non resta nemmeno il rimborso.
+    savepoint: se il cambio non riesce non resta nemmeno il rimborso. Il rimborso torna nel
+    risultato perché l'esito «Svincolato aggiudicato» lo dice al vincitore.
     """
     slot = session.scalar(
         select(FantasyRosterSlot)
@@ -405,16 +422,19 @@ def assign_winning_waiver_bid(
     if account is None:
         return None
     released = session.get(Athlete, release_athlete_id)
+    released_name = repair_provider_text(
+        released.canonical_name if released is not None else "Calciatore"
+    )
     percent = release_refund_percent(session, league_id=league.id)
     try:
         with session.begin_nested():
-            apply_release_refund(
+            refund_credits = apply_release_refund(
                 session,
                 account,
                 team_id=team.id,
                 slot_index=slot.slot_index,
                 athlete_id=release_athlete_id,
-                athlete_name=released.canonical_name if released is not None else "Calciatore",
+                athlete_name=released_name,
                 purchase_credits=slot.purchase_credits or 0,
                 reason=MarketReleaseReason.VOLUNTARY,
                 percent=percent,
@@ -437,4 +457,6 @@ def assign_winning_waiver_bid(
                 raise _SwapNotHonored
     except _SwapNotHonored:
         return None
-    return updated
+    return WaiverSwap(
+        slot=updated, refund_credits=refund_credits, released_athlete_name=released_name
+    )

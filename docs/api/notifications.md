@@ -33,7 +33,7 @@ copy non riscrive le notifiche già inviate.
 | `sistema.invito_lega` | 1 | Invito nominativo (EP13-P07) |
 | `formazione.scadenza_turno` | 1 | Reminder formazione (EP09-02) |
 | `formazione.blocco_imminente` | 1 | Reminder blocco progressivo per-calciatore (EP-turni-automazione) |
-| `mercato.esito_busta` | 1 | Esito asta a buste (EP09-03) |
+| `mercato.esito_busta` | 2 | Esito asta a buste e svincolati (EP09-03). La v2 (24/11) aggiunge a «Svincolato aggiudicato» il rimborso di chi esce dalla rosa, solo se maggiore di 0: «+12 crediti di rimborso per Rossi.» (`release_refund_credits`, `released_athlete_name`) |
 
 ## Email (EP09-05) — spenta di default per le notifiche di routine (Task 6b)
 

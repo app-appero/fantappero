@@ -138,6 +138,62 @@ def test_render_mercato_esito_busta_sealed_bid_unchanged() -> None:
         assert content.deep_link == "/asta?lega=abc"
 
 
+_WAIVER_WON = {
+    "outcome": "assigned",
+    "athlete_name": "Bomber",
+    "amount_credits": 42,
+    "league_id": "abc",
+    "league_name": "Lega Test",
+    "session_kind": "waiver",
+}
+
+
+def test_render_mercato_esito_busta_v2_waiver_won_shows_the_release_refund() -> None:
+    """KI-23 (24/11): chi esce per fare posto è rimborsato, e l'esito lo dice al vincitore."""
+    content = render_notification(
+        "mercato.esito_busta",
+        2,
+        {**_WAIVER_WON, "release_refund_credits": 12, "released_athlete_name": "Rossi"},
+    )
+    assert content.title == "Svincolato aggiudicato"
+    assert content.body == (
+        "«Lega Test» · Hai aggiudicato Bomber dagli svincolati per 42 crediti. "
+        "+12 crediti di rimborso per Rossi."
+    )
+    assert content.deep_link == "/svincolati?lega=abc"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        _WAIVER_WON,  # nessun rimborso (calciatore pagato 0)
+        {**_WAIVER_WON, "release_refund_credits": 0, "released_athlete_name": "Rossi"},
+        {**_WAIVER_WON, "outcome": "lost", "release_refund_credits": 12},
+        {**_WAIVER_WON, "outcome": "tiebreak"},
+        {**_WAIVER_WON, "outcome": "lost", "tiebreak_cancelled": True},
+        {**_WAIVER_WON, "session_kind": "initial_auction", "release_refund_credits": 12},
+        {**_WAIVER_WON, "session_kind": None},
+    ],
+)
+def test_render_mercato_esito_busta_v2_without_refund_matches_v1(
+    params: dict[str, object],
+) -> None:
+    v1 = render_notification("mercato.esito_busta", 1, params)
+    v2 = render_notification("mercato.esito_busta", 2, params)
+    assert v2 == v1
+    assert "rimborso" not in v2.body
+
+
+def test_render_mercato_esito_busta_v1_ignores_the_refund() -> None:
+    """Le notifiche salvate in v1 restano come sono state scritte."""
+    content = render_notification(
+        "mercato.esito_busta",
+        1,
+        {**_WAIVER_WON, "release_refund_credits": 12, "released_athlete_name": "Rossi"},
+    )
+    assert content.body == "«Lega Test» · Hai aggiudicato Bomber dagli svincolati per 42 crediti."
+
+
 def test_render_mercato_asta_live_perso_variants() -> None:
     """P4: capofila senza crediti (o senza posto) alla chiusura del lotto live."""
     base = {"athlete_name": "Bomber", "amount_credits": 500, "league_id": "abc"}
