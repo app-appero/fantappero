@@ -46,7 +46,9 @@ Il tag si crea **dopo** aver verificato il rilascio, non prima.
   versione (non a chi usa il sito solo da computer o iPhone), una sola volta per versionCode:
   si salva quando l'APK è davvero scaricabile dal link, non prima (prima di salvare il pannello
   chiede conferma, «Annunciare la versione …?» con «Annulla» / «Annuncia»). Risalvare lo stesso
-  versionCode per correggere link o messaggio non rimanda la notifica. L'avviso nell'app 1.4
+  versionCode per correggere link o messaggio non rimanda la notifica. Chi compare su Android
+  dopo l'annuncio (o non l'aveva ancora avuta) la riceve alla sua prima richiesta, sempre una
+  sola volta per versionCode (Rosario 24/11). L'avviso nell'app 1.4
   torna a ogni ingresso finché non si aggiorna. Chi ha aggiornato si vede subito sotto il
   modulo, in «Chi ha quale versione» (vedi
   [`admin_operator_bootstrap.md`](./admin_operator_bootstrap.md)): le app 1.2 e 1.3 non dicono

@@ -19,6 +19,11 @@ Per non scrivere nel database a ogni richiesta, ogni processo scrive al più una
 ``RECORD_INTERVAL`` per utente e piattaforma, subito solo se si sa qualcosa di nuovo (versione
 cambiata o fonte più precisa). La scrittura avviene dopo la risposta, in una sessione a parte:
 non rallenta e non fa mai fallire la richiesta.
+
+Rosario 24/11: dopo ogni scrittura su Android (app o sito da Android) si controlla anche se
+l'utente deve ancora ricevere la notifica della versione annunciata
+(``app_usage.service.notify_app_version_on_sighting``): così la riceve anche chi compare dopo
+l'annuncio, una sola volta per versionCode. Un guasto lì non toglie la riga scritta.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app_usage.models import (
+    ANDROID_NOTIFY_PLATFORMS,
     APP_PLATFORMS,
     PLATFORM_ANDROID,
     PLATFORM_WEB_ANDROID,
@@ -243,8 +249,11 @@ def record_app_usage(
     try:
         session = session_factory()
         try:
-            write_observation(session, user_id, observation, now=now or datetime.now(UTC))
+            row = write_observation(session, user_id, observation, now=now or datetime.now(UTC))
             session.commit()
+            # Dopo il commit: un guasto nella notifica non toglie la riga appena scritta.
+            if row is not None and observation.platform in ANDROID_NOTIFY_PLATFORMS:
+                _notify_announced_version(session, user_id)
         except Exception:
             session.rollback()
             raise
@@ -255,4 +264,21 @@ def record_app_usage(
             "app_usage_record_failed",
             extra={"user_id": str(user_id), "source": observation.source},
             exc_info=True,
+        )
+
+
+def _notify_announced_version(session: Session, user_id: UUID) -> None:
+    """La notifica della versione annunciata, se l'utente non l'ha ancora (Rosario 24/11).
+
+    Non solleva mai: un errore si scrive solo nel log.
+    """
+    try:
+        from app_usage.service import notify_app_version_on_sighting
+
+        notify_app_version_on_sighting(session, user_id)
+        session.commit()
+    except Exception:
+        session.rollback()
+        _logger.warning(
+            "app_usage_version_notify_failed", extra={"user_id": str(user_id)}, exc_info=True
         )

@@ -91,6 +91,13 @@ Decisioni di Rosario del 23/11.
   versionCode (per esempio per correggere il link o il messaggio) non la rimanda a chi l'ha già
   avuta. Il messaggio dopo «Salva» dice a quanti è partita; se l'invio non riesce la versione
   resta salvata e il messaggio lo dice (salvando di nuovo si riprova).
+- **Anche a chi compare dopo l'annuncio** (Rosario 24/11): chi usa l'app Android o il sito da
+  Android per la prima volta dopo il salvataggio (o comunque non l'ha ancora avuta) riceve la
+  stessa notifica quando il server registra il suo uso, cioè alla sua prima richiesta (al più
+  qualche minuto dopo), con le stesse regole: non a chi è già su quella versione o una più nuova,
+  modalità test, preferenze, ore di silenzio. Sempre una sola volta per utente e versionCode,
+  che l'abbia avuta all'annuncio o dopo. Il numero dopo «Salva» conta solo quelle partite al
+  salvataggio.
 - **«Sei sicuro?» prima di salvare** (sito e app): «Salva» apre una conferma «Annunciare la
   versione 1.4.0 (versionCode 5)? Tutti gli utenti che usano l'app Android (o il sito da un
   telefono Android) e non hanno ancora questa versione riceveranno una notifica; nell'app

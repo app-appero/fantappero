@@ -632,3 +632,159 @@ def test_se_la_notifica_non_parte_la_versione_resta_salvata(
     assert saved.status_code == 200, saved.text
     assert saved.json() == {"android": VERSION_5, "notifiedUsers": None}
     assert client.get("/admin/app-version", headers=operator).json() == {"android": VERSION_5}
+
+
+# --- notifica a chi compare dopo l'annuncio (Rosario 24/11) ---------------------------------
+
+
+def _announce(client: TestClient, operator: dict[str, str], version: dict) -> int | None:
+    saved = client.put("/admin/app-version", headers=operator, json=version)
+    assert saved.status_code == 200, saved.text
+    return saved.json()["notifiedUsers"]
+
+
+def test_chi_compare_dopo_l_annuncio_riceve_la_notifica_una_volta(
+    client: TestClient, db_session: Session
+) -> None:
+    operator, _ = _login(client, db_session, "appusage-late-op@example.com", operator=True)
+    late_headers, late = _login(client, db_session, "appusage-late-new@example.com")
+    old_headers, old_code = _login(client, db_session, "appusage-late-oldcode@example.com")
+    assert _announce(client, operator, VERSION_5) == 0
+
+    # Apre l'app 1.3 ore dopo l'annuncio: la notifica arriva subito.
+    assert client.get("/app/version", headers={**late_headers, **OKHTTP}).status_code == 200
+    [item] = _version_notifications(db_session, late)
+    assert item.title == "È disponibile la versione 1.4 dell'app"
+    assert item.deep_link == VERSION_5["downloadUrl"]
+    assert item.category.value == "sistema"
+
+    # Visto di nuovo (anche dopo i minuti di attesa): nessuna seconda notifica.
+    reset_app_usage_throttle()
+    client.get("/app/version", headers={**late_headers, **OKHTTP})
+    client.get("/auth/me", headers={**late_headers, **OKHTTP})
+    assert [n.id for n in _version_notifications(db_session, late)] == [item.id]
+
+    # Versione esatta più vecchia di quella annunciata: la riceve anche lui.
+    older = {**APP_14, "X-App-Version": "1.3.0", "X-App-Version-Code": "4"}
+    client.get("/auth/me", headers={**old_headers, **older})
+    assert len(_version_notifications(db_session, old_code)) == 1
+
+
+def test_chi_era_notificato_all_annuncio_non_la_riceve_di_nuovo(
+    client: TestClient, db_session: Session
+) -> None:
+    operator, _ = _login(client, db_session, "appusage-twice-op@example.com", operator=True)
+    headers, user_id = _login(client, db_session, "appusage-twice@example.com")
+    _set_usage(db_session, user_id, source=SOURCE_VERSION_CHECK)
+    assert _announce(client, operator, VERSION_5) == 1
+    [item] = _version_notifications(db_session, user_id)
+
+    client.get("/app/version", headers={**headers, **OKHTTP})
+    reset_app_usage_throttle()
+    client.get("/auth/me", headers={**headers, **ANDROID_CHROME})
+
+    assert [n.id for n in _version_notifications(db_session, user_id)] == [item.id]
+
+    # Una versione ancora più nuova è un'altra notifica, una sola anche questa.
+    assert _announce(client, operator, {**VERSION_5, "latestVersionCode": 6}) == 1
+    reset_app_usage_throttle()
+    client.get("/app/version", headers={**headers, **OKHTTP})
+    assert sorted(n.dedup_key for n in _version_notifications(db_session, user_id)) == [
+        "app_version:android:5",
+        "app_version:android:6",
+    ]
+
+
+def test_chi_e_gia_aggiornato_o_usa_solo_computer_o_iphone_non_la_riceve(
+    client: TestClient, db_session: Session
+) -> None:
+    operator, _ = _login(client, db_session, "appusage-skip-op@example.com", operator=True)
+    updated_headers, updated = _login(client, db_session, "appusage-skip-updated@example.com")
+    newer_headers, newer = _login(client, db_session, "appusage-skip-newer@example.com")
+    desktop_headers, desktop = _login(client, db_session, "appusage-skip-desktop@example.com")
+    assert _announce(client, operator, VERSION_5) == 0
+
+    client.get("/auth/me", headers={**updated_headers, **APP_14})
+    # Aggiornato nell'app: non la riceve nemmeno dal sito da Android.
+    client.get("/auth/me", headers={**updated_headers, **ANDROID_CHROME})
+    newest = {**APP_14, "X-App-Version": "1.5.0", "X-App-Version-Code": "6"}
+    client.get("/auth/me", headers={**newer_headers, **newest})
+    for browser in (CHROME, IPHONE):
+        client.get("/auth/me", headers={**desktop_headers, **browser})
+        client.get("/app/version", headers={**desktop_headers, **browser})
+
+    for user_id in (updated, newer, desktop):
+        assert _version_notifications(db_session, user_id) == [], user_id
+    assert {row.platform for row in _usage(db_session, updated)} == {
+        "android",
+        PLATFORM_WEB_ANDROID,
+    }
+
+
+def test_chi_usa_il_sito_da_android_dopo_l_annuncio_la_riceve(
+    client: TestClient, db_session: Session
+) -> None:
+    operator, _ = _login(client, db_session, "appusage-lsite-op@example.com", operator=True)
+    headers, user_id = _login(client, db_session, "appusage-lsite@example.com")
+    assert _announce(client, operator, VERSION_5) == 0
+
+    assert client.get("/auth/me", headers={**headers, **ANDROID_CHROME}).status_code == 200
+
+    assert len(_version_notifications(db_session, user_id)) == 1
+
+
+def test_senza_versione_annunciata_chi_compare_non_riceve_nulla(
+    client: TestClient, db_session: Session
+) -> None:
+    headers, user_id = _login(client, db_session, "appusage-noann-late@example.com")
+
+    client.get("/app/version", headers={**headers, **OKHTTP})
+
+    assert len(_usage(db_session, user_id)) == 1
+    assert _version_notifications(db_session, user_id) == []
+
+
+def test_in_modalita_test_chi_compare_dopo_la_riceve_solo_se_puo_usare_l_app(
+    client: TestClient, db_session: Session
+) -> None:
+    operator, _ = _login(client, db_session, "appusage-ltm-op@example.com", operator=True)
+    tester_headers, tester = _login(client, db_session, "appusage-ltm-tester@example.com")
+    outsider_headers, outsider = _login(client, db_session, "appusage-ltm-outsider@example.com")
+    db_session.add(TesterAllowlistEntry(email="appusage-ltm-tester@example.com"))
+    db_session.commit()
+    assert (
+        client.put("/admin/test-mode", headers=operator, json={"enabled": True}).status_code == 200
+    )
+    assert _announce(client, operator, VERSION_5) == 0
+
+    client.get("/app/version", headers={**tester_headers, **OKHTTP})
+    client.get("/auth/me", headers={**outsider_headers, **OKHTTP})
+
+    assert len(_version_notifications(db_session, tester)) == 1
+    assert _version_notifications(db_session, outsider) == []
+
+
+def test_un_guasto_nella_notifica_non_fa_fallire_la_richiesta_ne_la_registrazione(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator, _ = _login(client, db_session, "appusage-lfail-op@example.com", operator=True)
+    headers, user_id = _login(client, db_session, "appusage-lfail@example.com")
+    assert _announce(client, operator, VERSION_5) == 0
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("notifiche giù")
+
+    monkeypatch.setattr("notifications.service.NotificationService.create_notification", _boom)
+    response = client.get("/app/version", headers={**headers, **OKHTTP})
+
+    assert response.status_code == 200
+    assert response.json()["android"]["latestVersionCode"] == 5
+    [row] = _usage(db_session, user_id)
+    assert row.source == SOURCE_VERSION_CHECK
+    assert _version_notifications(db_session, user_id) == []
+
+    # Al giro dopo, finito il guasto, la riceve.
+    monkeypatch.undo()
+    reset_app_usage_throttle()
+    client.get("/app/version", headers={**headers, **OKHTTP})
+    assert len(_version_notifications(db_session, user_id)) == 1
