@@ -170,6 +170,7 @@ export {
   describeRosterImportCandidate,
   leagueHomeNextStep,
   leagueLifecyclePhaseIndex,
+  missingMembersLabel,
   orderLeagueSetupBlockers,
   rosterImportAmbiguousCount,
   rosterImportAmbiguousRows,

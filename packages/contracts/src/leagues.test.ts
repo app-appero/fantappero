@@ -7,6 +7,7 @@ import {
   describeRosterImportCandidate,
   leagueHomeNextStep,
   leagueLifecyclePhaseIndex,
+  missingMembersLabel,
   orderLeagueSetupBlockers,
   rosterImportAmbiguousCount,
   type LeagueLifecycle,
@@ -125,6 +126,17 @@ describe("orderLeagueSetupBlockers", () => {
         ["calendar_not_configured", false],
       ],
     );
+  });
+});
+
+describe("missingMembersLabel", () => {
+  it("con un solo iscritto mancante usa il singolare (QA notturna 23→24/11)", () => {
+    assert.equal(missingMembersLabel(1), "Serve ancora 1 iscritto");
+  });
+
+  it("da due in su resta il plurale", () => {
+    assert.equal(missingMembersLabel(2), "Servono ancora 2 iscritti");
+    assert.equal(missingMembersLabel(5), "Servono ancora 5 iscritti");
   });
 });
 

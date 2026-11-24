@@ -231,6 +231,16 @@ export function orderLeagueSetupBlockers(
   }));
 }
 
+/**
+ * «Serve ancora 1 iscritto», «Servono ancora 3 iscritti»: quanti partecipanti mancano a
+ * «Partecipanti» del regolamento (avviso «Numero partecipanti non allineato», web e app).
+ * Senza punto finale: il chiamante aggiunge «.» o «, oppure abbassa…». Prima diceva
+ * «Servono ancora 1 iscritti» (QA notturna 23→24/11).
+ */
+export function missingMembersLabel(missing: number): string {
+  return missing === 1 ? "Serve ancora 1 iscritto" : `Servono ancora ${missing} iscritti`;
+}
+
 /** Competition available in the MVP catalog. */
 export interface CompetitionSummary {
   id: string;

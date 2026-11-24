@@ -63,8 +63,13 @@ describe("LeagueMembersPanel — numero partecipanti non allineato", () => {
   it("sotto il minimo non suggerisce di abbassare «Partecipanti»", () => {
     // 3 iscritti, minimo 4: il server rifiuterebbe 3 con invalid_participant_count.
     const message = mismatchMessage(renderPanel({ participantCount: 4, participantMin: 4 }));
-    expect(message).toContain("Servono ancora 1 iscritti.");
+    expect(message).toContain("Serve ancora 1 iscritto.");
     expect(message).not.toContain("abbassa");
+  });
+
+  it("da due iscritti mancanti in su resta il plurale (QA notturna 23→24/11)", () => {
+    const message = mismatchMessage(renderPanel({ participantCount: 5, participantMin: 5 }));
+    expect(message).toContain("Servono ancora 2 iscritti.");
   });
 
   it("dal minimo in su propone ancora di abbassare agli iscritti", () => {
@@ -82,7 +87,7 @@ describe("LeagueMembersPanel — numero partecipanti non allineato", () => {
       renderPanel({ participantCount: 4, participantMin: null }),
     ]) {
       expect(mismatchMessage(html)).toContain(
-        "Servono ancora 1 iscritti, oppure abbassa «Partecipanti» nel regolamento a 3 e salva.",
+        "Serve ancora 1 iscritto, oppure abbassa «Partecipanti» nel regolamento a 3 e salva.",
       );
     }
   });
