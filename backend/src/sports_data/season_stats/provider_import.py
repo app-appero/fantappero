@@ -20,7 +20,14 @@ idempotente; le stagioni passate non cambiano). Le righe vanno in ``athlete_seas
 
 Il ritmo è quello del client (``MinuteRateLimiter`` e pause sul 429). In più l'import si ferma
 da solo quando: ha fatto ``max_calls`` chiamate, oppure la quota giornaliera rimasta scende
-sotto ``QUOTA_RESERVE_FRACTION`` (resta margine per i giri live). Si riprende rilanciandolo.
+sotto ``QUOTA_RESERVE_FRACTION`` (resta margine per i giri live), oppure il fornitore dice che
+la quota del giorno è finita. Si riprende rilanciandolo.
+
+La quota rimasta si legge da ``/status`` (non consuma quota) prima della prima chiamata e poi
+ogni ``QUOTA_PROBE_EVERY_CALLS``: conta tutte le chiamate dell'account, anche quelle degli altri
+ambienti sulla stessa chiave e dei giri live. Gli header ``x-ratelimit-requests-*`` di ogni
+risposta, se ci sono, restano un controllo in più. Il 23/11 due import (dev e pilota, stessa
+chiave) hanno finito la quota del giorno e l'omologazione del turno è slittata di due ore.
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NoReturn
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -43,14 +50,16 @@ from sports_data.catalog.models import Club
 from sports_data.listone.models import RoleAssignment
 from sports_data.provider.client import ApiFootballClient
 from sports_data.provider.constants import MVP_LEAGUE_IDS
+from sports_data.provider.envelope import STATUS_ENDPOINT, daily_quota_from_status
 from sports_data.provider.errors import (
     ProviderAuthError,
     ProviderConfigError,
+    ProviderDailyLimitError,
     ProviderError,
     ProviderRateLimitError,
 )
 from sports_data.provider.snapshots import store_provider_snapshot
-from sports_data.provider.types import ProviderEnvelope
+from sports_data.provider.types import ProviderEnvelope, ProviderRateLimit
 from sports_data.roster.models import Athlete
 from sports_data.scheduler.quota import DEGRADE_REMAINING_FRACTION
 from sports_data.season_stats.competition_types import (
@@ -86,6 +95,8 @@ ESTIMATED_FILL_SHARE = 0.25
 DEFAULT_MAX_CALLS = 2000
 #: Ci si ferma quando la quota giornaliera rimasta scende sotto questa frazione del limite.
 QUOTA_RESERVE_FRACTION = DEGRADE_REMAINING_FRACTION
+#: Ogni quante chiamate si rilegge la quota dell'account da ``/status`` (prima della prima).
+QUOTA_PROBE_EVERY_CALLS = 25
 #: Errori di fila (non di quota/autenticazione) dopo cui l'import si ferma.
 MAX_CONSECUTIVE_ERRORS = 10
 
@@ -587,9 +598,13 @@ class _Runner:
     ) -> ProviderEnvelope | None:
         if self.counters.calls >= self.max_calls:
             raise _Stop(STOP_MAX_CALLS)
+        if self.counters.calls % QUOTA_PROBE_EVERY_CALLS == 0:
+            self._probe_quota()
         self.counters.calls += 1
         try:
             envelope = self.client.get(endpoint, params, fetch_all_pages=False)
+        except ProviderDailyLimitError:
+            self._stop_daily_limit(endpoint)
         except (ProviderRateLimitError, ProviderAuthError, ProviderConfigError):
             raise
         except ProviderError:
@@ -680,11 +695,52 @@ class _Runner:
         self._check_quota(envelope)
 
     def _check_quota(self, envelope: ProviderEnvelope) -> None:
-        rate = envelope.rate_limit
+        self._stop_below_reserve(envelope.rate_limit, source="headers")
+
+    def _probe_quota(self) -> None:
+        """Quota dell'account da ``/status``. Se la sonda non risponde restano gli header."""
+        try:
+            rate = daily_quota_from_status(self.client.get(STATUS_ENDPOINT, fetch_all_pages=False))
+        except ProviderDailyLimitError:
+            self._stop_daily_limit(STATUS_ENDPOINT)
+        except (ProviderRateLimitError, ProviderAuthError, ProviderConfigError):
+            raise
+        except Exception as exc:  # noqa: BLE001 — sonda facoltativa: si prosegue con gli header
+            logger.warning(
+                f"season_history_import_quota_probe_failed error={type(exc).__name__}",
+                extra={"error_type": type(exc).__name__, "calls": self.counters.calls},
+            )
+            return
+        self._stop_below_reserve(rate, source="status")
+
+    def _stop_below_reserve(self, rate: ProviderRateLimit | None, *, source: str) -> None:
         if rate is None or rate.remaining is None or not rate.limit:
             return
         if rate.remaining <= rate.limit * QUOTA_RESERVE_FRACTION:
+            logger.info(
+                f"season_history_import_quota_reserve remaining={rate.remaining} "
+                f"limit={rate.limit} source={source}",
+                extra={
+                    "remaining": rate.remaining,
+                    "limit": rate.limit,
+                    "source": source,
+                    "calls": self.counters.calls,
+                },
+            )
             raise _Stop(STOP_QUOTA_RESERVE)
+
+    def _stop_daily_limit(self, endpoint: str) -> NoReturn:
+        """Quota del giorno già finita: ci si ferma come sotto la riserva (si rilancia domani)."""
+        logger.warning(
+            f"season_history_import_daily_limit endpoint={endpoint} "
+            f"code={ProviderDailyLimitError.code}",
+            extra={
+                "endpoint": endpoint,
+                "code": ProviderDailyLimitError.code,
+                "calls": self.counters.calls,
+            },
+        )
+        raise _Stop(STOP_QUOTA_RESERVE) from None
 
 
 def _competition_types(runner: _Runner, *, current_season_year: int) -> None:

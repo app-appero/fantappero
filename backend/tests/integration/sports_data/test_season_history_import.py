@@ -22,6 +22,7 @@ from sports_data.provider.client import ApiFootballClient
 from sports_data.provider.models import ProviderSnapshot
 from sports_data.provider.throttle import MinuteRateLimiter
 from sports_data.roster.models import Athlete
+from sports_data.season_stats import provider_import
 from sports_data.season_stats.competition_types import load_competition_types
 from sports_data.season_stats.models import (
     AthleteSeasonImportFetch,
@@ -137,20 +138,55 @@ def _leagues_envelope(competitions: tuple[tuple[int, str, str], ...]) -> dict:
     }
 
 
+def _status_envelope(*, current: int, limit_day: int) -> dict:
+    """Risposta di ``/status`` (API-Football v3): ``response`` è un oggetto, non una lista."""
+    return {
+        "get": "status",
+        "parameters": [],
+        "errors": [],
+        "results": 1,
+        "paging": {"current": 1, "total": 1},
+        "response": {
+            "account": {"firstname": "Test", "lastname": "Test", "email": "test@example.com"},
+            "subscription": {"plan": "Pro", "end": "2027-06-30T00:00:00+00:00", "active": True},
+            "requests": {"current": current, "limit_day": limit_day},
+        },
+    }
+
+
+DAILY_LIMIT_ERRORS = {
+    "requests": (
+        "You have reached the request limit for the day, Go to "
+        "https://dashboard.api-football.com to upgrade your plan."
+    )
+}
+
+
 class FakeProvider:
-    """Risponde a ``/leagues`` e ``/players`` come API-Football; conta le chiamate."""
+    """Risponde a ``/status``, ``/leagues`` e ``/players`` come API-Football.
+
+    ``calls`` e ``paths`` contano solo le chiamate che consumano quota (non ``/status``).
+    Con ``daily_remaining`` la quota del giorno scende di uno a chiamata: gli header
+    ``x-ratelimit-requests-*`` (se ``send_headers``) e ``/status`` dicono quanto resta, e a
+    quota finita il fornitore risponde con l'errore della quota giornaliera.
+    """
 
     def __init__(
         self,
         *,
         daily_remaining: int | None = None,
         daily_limit: int = 7500,
+        send_headers: bool = True,
+        status_available: bool = True,
         competitions: tuple[tuple[int, str, str], ...] = PROVIDER_COMPETITIONS,
     ) -> None:
         self.calls: list[dict[str, str]] = []
         self.paths: list[str] = []
+        self.status_calls = 0
         self.daily_remaining = daily_remaining
         self.daily_limit = daily_limit
+        self.send_headers = send_headers
+        self.status_available = status_available
         self.competitions = competitions
 
     def league_page(self, league: int, season: int, page: int) -> tuple[list[Any], int]:
@@ -263,10 +299,28 @@ class FakeProvider:
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         params = dict(request.url.params)
+        if request.url.path == "/status":
+            self.status_calls += 1
+            if not self.status_available:
+                return httpx.Response(503, json={"message": "unavailable"})
+            remaining = self.daily_limit if self.daily_remaining is None else self.daily_remaining
+            return httpx.Response(
+                200,
+                json=_status_envelope(
+                    current=self.daily_limit - remaining, limit_day=self.daily_limit
+                ),
+            )
         self.calls.append(params)
         self.paths.append(request.url.path)
-        headers = {}
         if self.daily_remaining is not None:
+            if self.daily_remaining <= 0:
+                body = _envelope(params, [], page=1, total=1)
+                body["get"] = request.url.path.lstrip("/")
+                body["errors"] = DAILY_LIMIT_ERRORS
+                return httpx.Response(200, json=body)
+            self.daily_remaining -= 1
+        headers = {}
+        if self.daily_remaining is not None and self.send_headers:
             headers = {
                 "x-ratelimit-requests-limit": str(self.daily_limit),
                 "x-ratelimit-requests-remaining": str(self.daily_remaining),
@@ -490,16 +544,73 @@ def test_stops_at_max_calls_and_resumes_where_it_left_off(session: Session) -> N
     assert len(_rows(session, ROSSI, 2024)) == 1
 
 
-def test_stops_when_daily_quota_reaches_the_reserve(session: Session) -> None:
+def test_does_not_start_when_the_account_quota_is_already_under_the_reserve(
+    session: Session,
+) -> None:
+    """23/11: due import (dev e pilota, stessa chiave) hanno finito la quota del giorno. La
+    quota si legge da ``/status`` prima della prima chiamata: sotto il 15% non si parte."""
     provider = FakeProvider(daily_remaining=500, daily_limit=7500)  # 6,7% < 15%
     result = run_provider_import(
         session, provider.client(), current_season_year=2026, competitions=COMPETITIONS
     )
     assert result.stopped_reason == STOP_QUOTA_RESERVE
-    assert len(provider.calls) == 1
-    # L'elenco dei tipi scaricato è salvato: rilanciando si riparte dalle pagine.
-    assert _count(session, AthleteSeasonImportFetch) == 1
+    assert provider.status_calls == 1
+    assert provider.calls == []
+    assert _count(session, AthleteSeasonImportFetch) == 0
+
+
+def test_stops_when_daily_quota_reaches_the_reserve(session: Session) -> None:
+    # Riserva: 15% di 7500 = 1125. /status all'inizio dice 1127 (si parte), poi gli header.
+    provider = FakeProvider(daily_remaining=1127, daily_limit=7500)
+    result = run_provider_import(
+        session, provider.client(), current_season_year=2026, competitions=COMPETITIONS
+    )
+    assert result.stopped_reason == STOP_QUOTA_RESERVE
+    assert len(provider.calls) == 2  # dopo la seconda ne restano 1125
+    # Le chiamate fatte sono salvate: rilanciando si riparte da lì.
+    assert _count(session, AthleteSeasonImportFetch) == 2
     assert _count(session, ProviderCompetitionType) == len(PROVIDER_COMPETITIONS)
+
+
+def test_reads_the_reserve_from_status_when_responses_have_no_quota_headers(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(provider_import, "QUOTA_PROBE_EVERY_CALLS", 1)
+    provider = FakeProvider(daily_remaining=1127, daily_limit=7500, send_headers=False)
+    result = run_provider_import(
+        session, provider.client(), current_season_year=2026, competitions=COMPETITIONS
+    )
+    assert result.stopped_reason == STOP_QUOTA_RESERVE
+    assert len(provider.calls) == 2
+    assert provider.status_calls == 3  # prima di ogni chiamata; la terza ferma l'import
+
+
+def test_probes_status_again_every_few_calls(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(provider_import, "QUOTA_PROBE_EVERY_CALLS", 4)
+    provider = FakeProvider()
+    result = run_provider_import(
+        session, provider.client(), current_season_year=2026, competitions=COMPETITIONS
+    )
+    assert result.completed
+    assert len(provider.calls) == 11
+    assert provider.status_calls == 3  # prima delle chiamate 1, 5 e 9
+
+
+def test_stops_on_the_daily_limit_error_and_keeps_the_work_done(session: Session) -> None:
+    """Senza sonda né header la quota finita arriva come errore del fornitore: l'import si
+    ferma subito (prima contava 10 errori di fila), come sotto la riserva."""
+    provider = FakeProvider(
+        daily_remaining=2, daily_limit=7500, send_headers=False, status_available=False
+    )
+    result = run_provider_import(
+        session, provider.client(), current_season_year=2026, competitions=COMPETITIONS
+    )
+    assert result.stopped_reason == STOP_QUOTA_RESERVE
+    assert len(provider.calls) == 3  # due riuscite, la terza rifiutata
+    assert result.counters.errors == 0
+    assert _count(session, AthleteSeasonImportFetch) == 2
 
 
 def test_competition_types_are_stored_once_per_current_season(session: Session) -> None:

@@ -201,11 +201,12 @@ def test_auction_bid_rejects_release_athlete_id(
     assert rejected.json()["code"] == "release_athlete_not_allowed"
 
 
-def test_waiver_resolution_swaps_players_with_no_refund(
+def test_waiver_resolution_swaps_players_and_a_free_release_refunds_nothing(
     client: TestClient,
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
+    """Il calciatore che esce era costato 0 crediti: il rimborso (KI-23) è 0, nessun movimento."""
     admin_token, admin_id = _register_and_login(client, "waiver.swap.admin@example.com")
     league_id = _create_league(client, admin_token, competition_ids, "Lega Scambio Svincoli")
     free_agent = _seed_athlete(db_session, 9305, "Nuovo Acquisto", role=FantasyRole.D)
@@ -247,7 +248,7 @@ def test_waiver_resolution_swaps_players_with_no_refund(
         select(CreditAccount).where(CreditAccount.fantasy_team_id == slot.fantasy_team_id)
     )
     assert account is not None
-    assert account.balance == 1000 - 80  # no refund for the released player (EP08-04 scope)
+    assert account.balance == 1000 - 80  # svincolato pagato 0: 50% di 0 = 0
 
     ledger_entry = db_session.scalar(
         select(CreditLedgerEntry).where(
@@ -257,6 +258,229 @@ def test_waiver_resolution_swaps_players_with_no_refund(
     )
     assert ledger_entry is not None
     assert ledger_entry.amount == -80
+    refunds = db_session.scalars(
+        select(CreditLedgerEntry).where(
+            CreditLedgerEntry.account_id == account.id,
+            CreditLedgerEntry.reason == CreditLedgerReason.MARKET_RELEASE_REFUND,
+        )
+    ).all()
+    assert refunds == []
+
+
+def _set_voluntary_refund_percent(
+    client: TestClient, league_id: str, admin_token: str, percent: int
+) -> None:
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    current = client.get(f"/leagues/{league_id}/amministrazione", headers=headers)
+    assert current.status_code == 200, current.text
+    body = current.json()["rules"]
+    body["voluntaryReleaseRefundPercent"] = percent
+    saved = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento", headers=headers, json=body
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["voluntaryReleaseRefundPercent"] == percent
+
+
+def _member_with_priced_player_bids_on_free_agent(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    prefix: str,
+    purchase_credits: int,
+    bid_amount: int,
+    refund_percent: int | None = None,
+) -> dict:
+    """Un allenatore (non admin) ha un difensore pagato ``purchase_credits`` e lo offre in cambio
+    di uno svincolato. Restituisce i dati per chiudere e risolvere la sessione."""
+    import random
+
+    admin_token, _ = _register_and_login(client, f"{prefix}.admin@example.com")
+    member_token, member_id = _register_and_login(client, f"{prefix}.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, f"Lega {prefix}")
+    _add_league_member(db_session, league_id, member_id)
+    if refund_percent is not None:
+        _set_voluntary_refund_percent(client, league_id, admin_token, refund_percent)
+
+    base = random.randint(100_000_000, 2_000_000_000)
+    free_agent = _seed_athlete(db_session, base, "Svincolato Nuovo", role=FantasyRole.D)
+    owned = _seed_athlete(db_session, base + 1, "Ceduto Pagato", role=FantasyRole.D)
+    member_headers = {"Authorization": f"Bearer {member_token}"}
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=member_headers).json()["id"]
+    placed = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+        headers=_owner_headers(league_id, admin_token),
+        json={"athleteId": str(owned.id), "purchaseCredits": purchase_credits},
+    )
+    assert placed.status_code == 200, placed.text
+
+    session_id = _create_open_waiver_session(client, admin_token, league_id)
+    bid = client.put(
+        f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte/{free_agent.id}",
+        headers=member_headers,
+        json={"amountCredits": bid_amount, "releaseAthleteId": str(owned.id)},
+    )
+    assert bid.status_code == 200, bid.text
+    return {
+        "league_id": league_id,
+        "admin_token": admin_token,
+        "member_headers": member_headers,
+        "team_id": UUID(team_id),
+        "session_id": session_id,
+        "free_agent": free_agent,
+        "owned": owned,
+    }
+
+
+def _close_and_resolve_waiver(client: TestClient, run: dict) -> dict:
+    admin_headers = {"Authorization": f"Bearer {run['admin_token']}"}
+    base = f"/leagues/{run['league_id']}/mercato/svincoli/sessioni/{run['session_id']}"
+    client.post(f"{base}/chiudi", headers=admin_headers)
+    resolution = client.post(f"{base}/risolvi", headers=admin_headers)
+    assert resolution.status_code == 200, resolution.text
+    return resolution.json()["outcomes"][0]
+
+
+def _team_ledger(db_session: Session, team_id: UUID) -> tuple[CreditAccount, list]:
+    db_session.expire_all()
+    account = db_session.scalar(
+        select(CreditAccount).where(CreditAccount.fantasy_team_id == team_id)
+    )
+    assert account is not None
+    entries = db_session.scalars(
+        select(CreditLedgerEntry)
+        .where(CreditLedgerEntry.account_id == account.id)
+        .order_by(CreditLedgerEntry.created_at.asc(), CreditLedgerEntry.id.asc())
+    ).all()
+    return account, list(entries)
+
+
+@pytest.mark.parametrize(
+    ("refund_percent", "expected_percent", "expected_refund"),
+    [
+        (None, 50, 12),  # regola standard della lega: 50% di 25, per difetto
+        (30, 30, 7),  # lega con un'altra percentuale: 30% di 25 = 7,5 → 7
+    ],
+)
+def test_waiver_refunds_the_released_player_like_a_voluntary_release(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    refund_percent: int | None,
+    expected_percent: int,
+    expected_refund: int,
+) -> None:
+    """KI-23 (Rosario 24/11): chi esce per fare posto a uno svincolato rende la percentuale
+    «Rimborso svincolo volontario» della lega, come lo svincolo volontario: stessa cifra,
+    stesso arrotondamento, stessa causale e nota nel registro dei crediti."""
+    run = _member_with_priced_player_bids_on_free_agent(
+        client,
+        db_session,
+        competition_ids,
+        prefix=f"waiver.refund.{expected_percent}",
+        purchase_credits=25,
+        bid_amount=40,
+        refund_percent=refund_percent,
+    )
+    league_id = run["league_id"]
+    # Quanto renderebbe lo svincolo volontario dello stesso calciatore, chiesto all'API.
+    preview = client.get(
+        f"/leagues/{league_id}/mercato/svincolo/0/anteprima",
+        headers=run["member_headers"],
+        params={"causa": "voluntary"},
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["refundPercent"] == expected_percent
+    assert preview.json()["refundCredits"] == expected_refund
+    account, before = _team_ledger(db_session, run["team_id"])
+    balance_before = account.balance
+    assert balance_before == 1000 - 25
+
+    outcome = _close_and_resolve_waiver(client, run)
+    assert outcome["outcome"] == "assigned"
+    assert outcome["amountCredits"] == 40
+
+    account, entries = _team_ledger(db_session, run["team_id"])
+    assert account.balance == balance_before + expected_refund - 40
+    assert account.balance == sum(entry.amount for entry in entries)
+    new_entries = entries[len(before) :]
+    # Prima il rimborso di chi esce, poi l'addebito di chi entra (come nell'asta a rilanci).
+    assert [(entry.reason, entry.amount) for entry in new_entries] == [
+        (CreditLedgerReason.MARKET_RELEASE_REFUND, expected_refund),
+        (CreditLedgerReason.MARKET_WAIVER_ACQUISITION, -40),
+    ]
+    refund = new_entries[0]
+    assert refund.note == f"Svincolo Ceduto Pagato (voluntary, {expected_percent}%)"
+    assert refund.transaction_id.startswith(f"release:{run['team_id']}:0:{run['owned'].id}:v")
+    assert refund.balance_after == balance_before + expected_refund
+
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(
+            FantasyRosterSlot.fantasy_team_id == run["team_id"],
+            FantasyRosterSlot.slot_index == 0,
+        )
+    )
+    assert slot is not None
+    assert slot.athlete_id == run["free_agent"].id
+    assert slot.purchase_credits == 40
+
+    # Lo stesso saldo che vede l'allenatore, e il movimento con la sua etichetta nell'elenco.
+    credits = client.get(f"/leagues/{league_id}/crediti", headers=run["member_headers"])
+    assert credits.status_code == 200, credits.text
+    assert credits.json()["balance"] == balance_before + expected_refund - 40
+
+    # Una seconda risoluzione restituisce l'esito salvato e non rimborsa due volte.
+    again = _close_and_resolve_waiver(client, run)
+    assert again["outcome"] == "assigned"
+    account, replayed = _team_ledger(db_session, run["team_id"])
+    assert len(replayed) == len(entries)
+    assert account.balance == balance_before + expected_refund - 40
+
+
+def test_waiver_refund_is_not_kept_when_the_swap_fails(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Se il cambio non si può fare (qui crediti finiti prima della risoluzione) non resta
+    nemmeno il rimborso: il calciatore offerto in cambio rimane in rosa al suo prezzo."""
+    run = _member_with_priced_player_bids_on_free_agent(
+        client,
+        db_session,
+        competition_ids,
+        prefix="waiver.refund.fail",
+        purchase_credits=25,
+        bid_amount=40,
+    )
+    # Dopo l'offerta l'allenatore resta con 20 crediti: 20 + 12 di rimborso non bastano per 40.
+    spend = client.post(
+        f"/leagues/{run['league_id']}/amministrazione/crediti/movimenti",
+        headers={"Authorization": f"Bearer {run['admin_token']}"},
+        json={
+            "fantasyTeamId": str(run["team_id"]),
+            "amount": -(1000 - 25 - 20),
+            "transactionId": "waiver-refund-fail-spend",
+        },
+    )
+    assert spend.status_code == 200, spend.text
+    _, before = _team_ledger(db_session, run["team_id"])
+
+    outcome = _close_and_resolve_waiver(client, run)
+    assert outcome["outcome"] == "unassigned"
+
+    account, entries = _team_ledger(db_session, run["team_id"])
+    assert account.balance == 20
+    assert len(entries) == len(before)
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(
+            FantasyRosterSlot.fantasy_team_id == run["team_id"],
+            FantasyRosterSlot.slot_index == 0,
+        )
+    )
+    assert slot is not None
+    assert slot.athlete_id == run["owned"].id
+    assert slot.purchase_credits == 25
 
 
 def test_waiver_bid_lost_when_release_athlete_no_longer_owned(

@@ -86,7 +86,10 @@ def _run_window(window: PollWindow) -> dict[str, object]:
         engine.dispose()
     payload = _as_dict(result)
     if pipeline is not None:
-        payload["fantasy_pipeline"] = pipeline.as_dict()
+        pipeline_payload = pipeline.as_dict()
+        # Testo, non dizionari: il log di Celery li mostrava come `errors: [{...}]`.
+        pipeline_payload["errors"] = pipeline.error_lines()
+        payload["fantasy_pipeline"] = pipeline_payload
     return payload
 
 

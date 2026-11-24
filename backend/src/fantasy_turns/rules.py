@@ -74,6 +74,15 @@ def ensure_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def started_before_league_creation(window_start_at: datetime, league_created_at: datetime) -> bool:
+    """Turno europeo iniziato prima della creazione della lega.
+
+    Non può avere scontri diretti: il calendario H2H lo salta e l'interfaccia lo mostra come
+    segnaposto «Lega creata dopo questo turno» (``LeagueCalendarService.build_windows``).
+    """
+    return ensure_utc(window_start_at) < ensure_utc(league_created_at)
+
+
 def resolve_zone(tz_name: str = "Europe/Rome") -> ZoneInfo:
     return ZoneInfo(tz_name)
 

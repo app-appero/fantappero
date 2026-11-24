@@ -438,6 +438,27 @@ def _render_risultati_omologazione(params: NotificationParams) -> NotificationCo
     )
 
 
+@register_template("risultati.omologazione", 2)
+def _render_risultati_omologazione_v2(params: NotificationParams) -> NotificationContent:
+    """Come la v1, più il turno iniziato prima della creazione della lega (24/11).
+
+    Quel turno non ha scontri diretti: «il risultato è definitivo» e il link alla classifica
+    non dicevano nulla.
+    """
+    if not params.get("before_league_creation"):
+        return _render_risultati_omologazione(params)
+    round_number = params.get("round_number")
+    return NotificationContent(
+        title="Turno concluso",
+        body=_league_body(
+            f"Il turno {round_number} è concluso. La lega è nata a turno già iniziato: "
+            "nessuno scontro diretto, la classifica non cambia.",
+            params,
+        ),
+        deep_link=_league_link("/turni", params),
+    )
+
+
 @register_template("risultati.correzione", 1)
 def _render_risultati_correzione(params: NotificationParams) -> NotificationContent:
     round_number = params.get("round_number")

@@ -91,7 +91,7 @@ Serve il permesso **`global:operate`** (operatore di piattaforma). A chiunque al
 3. **Segui** — `GET /admin/listone/storico/{jobId}` (percentuale, fase, messaggio e alla fine il risultato); `GET /admin/listone/storico` dà l'import in corso a qualunque operatore, anche a chi non l'ha avviato.
 4. **Riprendi** — se il risultato ha `stoppedReason`, rilancia il punto 2: riparte da dove si era fermato.
    - `max_calls`: raggiunto il tetto di chiamate di questa esecuzione;
-   - `quota_reserve`: la quota giornaliera del fornitore è scesa sotto il **15%** del limite (margine per i giri live); rilanciare il giorno dopo;
+   - `quota_reserve`: la quota giornaliera del fornitore è scesa sotto il **15%** del limite (margine per i giri live), oppure il fornitore ha detto che la quota del giorno è finita; rilanciare il giorno dopo. Dal 24/11 la quota si legge da `GET /status` (non consuma quota) prima della prima chiamata e poi ogni 25. Conta tutte le chiamate dell'account, anche quelle dell'altro ambiente sulla stessa chiave e dei giri live: se all'avvio è già sotto il 15%, l'import non parte. Gli header di ogni risposta restano un controllo in più. Il 23/11 due import, su dev e sul pilota, hanno finito la quota del giorno;
    - `too_many_errors`: 10 errori di fila del fornitore; riprovare più tardi.
 
 Il ritmo delle chiamate è quello del client del fornitore (limite al minuto delle impostazioni, default 300, e pausa automatica su 429). Alla fine dell'import si ricalcolano subito medie e Valore (`marketValues` nel risultato) e il risultato dice cosa resta (`remaining`).

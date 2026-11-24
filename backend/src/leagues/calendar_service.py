@@ -21,7 +21,7 @@ from database.enums import (
 )
 from fantasy_teams.composition_service import TeamRosterProblems, league_roster_problems
 from fantasy_turns.models import FantasyRound
-from fantasy_turns.rules import DEFAULT_LEAGUE_TZ
+from fantasy_turns.rules import DEFAULT_LEAGUE_TZ, started_before_league_creation
 from leagues.calendar_planning import (
     CalendarPlan,
     WindowCandidate,
@@ -416,11 +416,11 @@ class LeagueCalendarService:
                 timezone=str(DEFAULT_LEAGUE_TZ),
                 fixture_count=0,
                 min_required=0,
-                eligible=row.window_start_at >= league.created_at,
+                eligible=not started_before_league_creation(row.window_start_at, league.created_at),
                 reason=(
-                    None
-                    if row.window_start_at >= league.created_at
-                    else "Lega creata dopo questo turno."
+                    "Lega creata dopo questo turno."
+                    if started_before_league_creation(row.window_start_at, league.created_at)
+                    else None
                 ),
             )
             for row in rounds

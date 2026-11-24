@@ -24,8 +24,8 @@ vuole dare risalto esplicito (invio manuale).
 | 3 | Notifica generica (`sistema.generico`) | `notifications/service.py:143-154` → `notifications/email_dispatch.py:25` | DISATTIVATA (routine) |
 | 4 | Invito nominativo a una lega | `leagues/named_invite_service.py:363-376` (`sistema.invito_lega`) | DISATTIVATA (routine) |
 | 5 | Esito di un invito nominativo (a chi ha invitato) | `leagues/named_invite_service.py:579-590` (`sistema.invito_lega_esito`) | DISATTIVATA (routine) |
-| 6 | Omologazione turno | `fantasy_turns/homologation_service.py:103-113` (`risultati.omologazione`) | DISATTIVATA (routine) |
-| 7 | Correzione di un turno già omologato | `fantasy_turns/homologation_service.py:215-225` (`risultati.correzione`) | DISATTIVATA (routine) |
+| 6 | Omologazione turno | `fantasy_turns/homologation_service.py:114-127` (`risultati.omologazione`) | DISATTIVATA (routine) |
+| 7 | Correzione di un turno già omologato | `fantasy_turns/homologation_service.py:230-242` (`risultati.correzione`) | DISATTIVATA (routine) |
 | 8 | Esito busta di mercato (asta assegnata/persa) | `market/service.py:384-397` (`mercato.esito_busta`) | DISATTIVATA (routine) |
 | 9 | Apertura asta live | `market/live_service.py:1309-1319` (`mercato.asta_live_iniziata`) | DISATTIVATA (routine) |
 | 10 | Lotto aggiudicato in asta live | `market/live_service.py:1322-1334` (`mercato.asta_live_aggiudicato`) | DISATTIVATA (routine) |

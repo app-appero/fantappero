@@ -5,6 +5,7 @@ from __future__ import annotations
 from sports_data.provider.errors import (
     ProviderAuthError,
     ProviderConfigError,
+    ProviderDailyLimitError,
     ProviderHttpError,
     ProviderRateLimitError,
 )
@@ -59,6 +60,14 @@ def test_provider_errors_get_a_readable_reason() -> None:
     assert "chiave mancante" in reason_from_exception(ProviderConfigError("missing"))
     assert "chiave non accettata" in reason_from_exception(ProviderAuthError("401"))
     assert "non raggiungibile" in reason_from_exception(ProviderHttpError("down", status_code=503))
+
+
+def test_daily_quota_exhausted_is_not_called_too_many_requests() -> None:
+    reason = reason_from_exception(ProviderDailyLimitError("quota", remaining=0))
+    assert reason == (
+        "Fornitore sportivo: quota giornaliera finita, riprende dopo la mezzanotte UTC "
+        "(ProviderDailyLimitError)."
+    )
 
 
 def test_other_errors_keep_type_and_message() -> None:

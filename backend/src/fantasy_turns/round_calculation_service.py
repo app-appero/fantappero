@@ -11,6 +11,13 @@ garantisce una formazione per ogni squadra (bozza / ultima valida / 0 punti,
 vedi `fantasy_lineups.fallback_service`) -> formazioni effettive -> risultati
 H2H (che aggiornano la classifica in modo incondizionato, già così) ->
 omologazione condizionale.
+
+Un turno iniziato prima della creazione della lega (segnaposto «Lega creata dopo
+questo turno», `leagues.calendar_round_mapping.is_pre_creation_placeholder`) non
+ospita scontri diretti e la lega può non avere ancora un calendario: salta i
+risultati H2H e si omologa appena i dati delle partite sono definitivi. Prima
+restava provvisorio per sempre e teneva chiuso il mercato (pilota, turno 11 del
+20/11).
 """
 
 from __future__ import annotations
@@ -31,6 +38,7 @@ from fantasy_ratings.service import compute_fixture_ratings
 from fantasy_turns.homologation_service import homologate_round
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.readiness import evaluate_round_readiness
+from leagues.calendar_round_mapping import is_pre_creation_placeholder
 from leagues.scoring_service import compute_round_results
 from sports_data.fixtures.models import PlayerMatchStat
 
@@ -44,6 +52,8 @@ class RoundCalculationResult:
     fallback: LineupFallbackResult | None
     result_final: bool
     homologated: bool
+    #: Turno iniziato prima della creazione della lega: nessuno scontro diretto calcolato.
+    before_league_creation: bool = False
 
 
 def calculate_league_round(
@@ -95,11 +105,27 @@ def calculate_league_round(
         )
 
     compute_round_effective_lineups(session, round_id=round_id)
-    scoring = compute_round_results(session, round_id=round_id)
+
+    before_league_creation = is_pre_creation_placeholder(session, fantasy_round=fantasy_round)
+    if before_league_creation:
+        # Nessuno scontro da calcolare (né, a volte, un calendario): conta solo che i dati
+        # delle partite siano definitivi, come per `homologate_round`.
+        result_final = readiness.final_data_ready
+        can_homologate = result_final
+    else:
+        scoring = compute_round_results(session, round_id=round_id)
+        result_final = scoring.result_final
+        can_homologate = scoring.result_final and scoring.counters.skipped == 0
 
     homologated = False
-    if scoring.result_final and scoring.counters.skipped == 0:
-        homologate_round(session, round_id=round_id, actor_id=actor_id, automatic=automatic)
+    if can_homologate:
+        homologate_round(
+            session,
+            round_id=round_id,
+            actor_id=actor_id,
+            automatic=automatic,
+            before_league_creation=before_league_creation,
+        )
         homologated = True
 
     return RoundCalculationResult(
@@ -108,8 +134,9 @@ def calculate_league_round(
         round_number=fantasy_round.number,
         fixtures_scored=fixtures_scored,
         fallback=fallback_result,
-        result_final=scoring.result_final,
+        result_final=result_final,
         homologated=homologated,
+        before_league_creation=before_league_creation,
     )
 
 

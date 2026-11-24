@@ -21,6 +21,7 @@ from database.enums import FantasyRoundHomologationStatus, LeagueAuditAction, No
 from fantasy_ratings.config import default_formula_config
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.readiness import evaluate_round_readiness
+from leagues.calendar_round_mapping import is_pre_creation_placeholder
 from leagues.models.league_audit_event import LeagueAuditEvent
 from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_league
@@ -42,6 +43,7 @@ def homologate_round(
     round_id: UUID,
     actor_id: UUID | None,
     automatic: bool = False,
+    before_league_creation: bool | None = None,
 ) -> HomologationResult:
     """Omologa un turno: richiede tutte le partite terminate (dato reale finale).
 
@@ -49,10 +51,16 @@ def homologate_round(
     concorrenza, un solo chiamante la vede applicata (``rowcount == 1``); gli
     altri ricevono ``round_already_homologated`` invece di sovrascriversi a
     vicenda o duplicare l'evento di audit.
+
+    ``before_league_creation``: turno segnaposto iniziato prima della creazione della lega
+    (nessuno scontro diretto). ``None`` = da ricavare qui. Cambia solo il testo della
+    notifica (niente «risultato definitivo» né link alla classifica) e annota l'audit.
     """
     fantasy_round = session.get(FantasyRound, round_id)
     if fantasy_round is None:
         raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
+    if before_league_creation is None:
+        before_league_creation = is_pre_creation_placeholder(session, fantasy_round=fantasy_round)
 
     readiness = evaluate_round_readiness(session, round_id=round_id)
     if not readiness.all_fixtures_finished:
@@ -99,6 +107,7 @@ def homologate_round(
                 "roundId": str(round_id),
                 "formulaVersion": formula_version,
                 "source": "automatic_live_pipeline" if automatic else "manual_operator",
+                **({"beforeLeagueCreation": True} if before_league_creation else {}),
             },
         )
     )
@@ -108,9 +117,10 @@ def homologate_round(
             user_id=user_id,
             category=NotificationCategory.RISULTATI,
             template_key="risultati.omologazione",
-            template_version=1,
+            template_version=2,
             params={
                 "round_number": fantasy_round.number,
+                **({"before_league_creation": True} if before_league_creation else {}),
                 **league_params(session, fantasy_round.league_id),
             },
             dedup_key=f"round_homologated:{round_id}:{now.isoformat()}:{user_id}",

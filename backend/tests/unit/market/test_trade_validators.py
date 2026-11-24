@@ -15,6 +15,7 @@ from market.trade_validators import (
     validate_distinct_teams,
     validate_no_athlete_overlap,
     validate_offered_credits_within_balance,
+    validate_trade_credits_available,
     validate_trade_expiry,
     validate_trade_sides_not_empty,
     validate_trades_enabled,
@@ -121,3 +122,29 @@ def test_validate_active_proposal_limit_rejects_at_or_above_limit() -> None:
         validate_active_proposal_limit(active_count=5, limit=5)
     assert exc.value.code == "trade_active_limit_reached"
     validate_active_proposal_limit(active_count=4, limit=5)
+
+
+@pytest.mark.parametrize(
+    ("proposer_balance", "recipient_balance", "message"),
+    [
+        (9, 100, "Il proponente non ha più crediti sufficienti per lo scambio."),
+        (None, 100, "Il proponente non ha più crediti sufficienti per lo scambio."),
+        (100, 19, "Il destinatario non ha più crediti sufficienti per lo scambio."),
+        (100, None, "Il destinatario non ha più crediti sufficienti per lo scambio."),
+    ],
+)
+def test_validate_trade_credits_available_names_the_side_without_credits(
+    proposer_balance: int | None, recipient_balance: int | None, message: str
+) -> None:
+    with pytest.raises(ValidationAuthError) as exc:
+        validate_trade_credits_available(
+            offered_credits=10,
+            proposer_balance=proposer_balance,
+            requested_credits=20,
+            recipient_balance=recipient_balance,
+        )
+    assert exc.value.code == "insufficient_credits"
+    assert exc.value.message == message
+    validate_trade_credits_available(
+        offered_credits=10, proposer_balance=10, requested_credits=20, recipient_balance=20
+    )

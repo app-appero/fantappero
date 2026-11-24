@@ -12,16 +12,19 @@ from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
 from sports_data.provider.constants import AUTH_HEADER, DEFAULT_BASE_URL, PROVIDER_NAME
 from sports_data.provider.envelope import (
+    errors_indicate_daily_limit,
     errors_indicate_rate_limit,
     merge_envelopes,
     parse_envelope,
     parse_rate_limit_headers,
 )
 from sports_data.provider.errors import (
+    PROVIDER_DAILY_LIMIT_USER_MESSAGE,
     PROVIDER_RATE_LIMITED_USER_MESSAGE,
     PROVIDER_UNAVAILABLE_USER_MESSAGE,
     ProviderAuthError,
     ProviderConfigError,
+    ProviderDailyLimitError,
     ProviderHttpError,
     ProviderRateLimitError,
     ProviderResponseError,
@@ -261,6 +264,29 @@ class ApiFootballClient:
                 raise ProviderResponseError(
                     "Risposta provider non è un oggetto",
                     endpoint=endpoint,
+                )
+
+            if errors_indicate_daily_limit(payload.get("errors")):
+                # Quota del giorno finita: una pausa di un minuto non serve (riparte alla
+                # mezzanotte UTC), quindi niente attese né nuovi tentativi.
+                metrics.incr(
+                    PROVIDER_REQUEST_ERRORS_TOTAL,
+                    labels={**labels, "error_type": "daily_limit"},
+                )
+                logger.warning(
+                    f"provider_daily_limit_reached endpoint={endpoint} "
+                    f"code={ProviderDailyLimitError.code}",
+                    extra={
+                        "provider": PROVIDER_NAME,
+                        "endpoint": endpoint,
+                        "status": status,
+                        "code": ProviderDailyLimitError.code,
+                    },
+                )
+                raise ProviderDailyLimitError(
+                    PROVIDER_DAILY_LIMIT_USER_MESSAGE,
+                    endpoint=endpoint,
+                    remaining=0,
                 )
 
             if errors_indicate_rate_limit(payload.get("errors")):

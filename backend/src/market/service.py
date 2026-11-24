@@ -9,11 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
-from app.text_folding import repair_provider_text
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from database.enums import (
-    CreditLedgerReason,
     LeagueAuditAction,
     LeagueMemberRole,
     MarketBidStatus,
@@ -29,7 +27,7 @@ from fantasy_teams.composition_service import (
     sync_team_composition_status,
 )
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
-from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
+from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_release
 from leagues.capacity import assert_league_full_for_market
@@ -37,8 +35,12 @@ from leagues.market_open import write_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
-from leagues.models.league_rules import LeagueRules
-from market.assignment import assign_winning_bid, assign_winning_waiver_bid
+from market.assignment import (
+    apply_release_refund,
+    assign_winning_bid,
+    assign_winning_waiver_bid,
+    release_refund_percent,
+)
 from market.gate import assert_market_open, market_status
 from market.models import MarketBid, MarketSession
 from market.schemas import (
@@ -1072,7 +1074,6 @@ class MarketService:
         athlete = self._session.get(Athlete, athlete_id)
         assert athlete is not None
         purchase_credits = slot.purchase_credits or 0
-        refund = compute_release_refund(purchase_credits=purchase_credits, refund_percent=percent)
 
         account = find_account_for_team(self._session, team.id, for_update=True)
         if account is None:
@@ -1088,18 +1089,19 @@ class MarketService:
             athlete_id=athlete_id,
             actor_id=league_access.user.id,
         )
-        if refund > 0:
-            # Il nome come arriva dal fornitore può avere la codifica rovinata (QA 21-22/11).
-            athlete_name = repair_provider_text(athlete.canonical_name)
-            apply_ledger_movement(
-                self._session,
-                account,
-                amount=refund,
-                reason=CreditLedgerReason.MARKET_RELEASE_REFUND,
-                transaction_id=f"release:{team.id}:{slot_index}:{athlete_id}:v{account.version}",
-                actor_id=league_access.user.id,
-                note=f"Svincolo {athlete_name} ({reason.value}, {percent}%)",
-            )
+        # Stessa regola del calciatore che esce con un'offerta degli svincolati (KI-23).
+        refund = apply_release_refund(
+            self._session,
+            account,
+            team_id=team.id,
+            slot_index=slot_index,
+            athlete_id=athlete_id,
+            athlete_name=athlete.canonical_name,
+            purchase_credits=purchase_credits,
+            reason=reason,
+            percent=percent,
+            actor_id=league_access.user.id,
+        )
         # Chi era in esubero (di ruolo o di rosa) può rientrare: ripulisce i flag e gli slot extra.
         reconcile_roster_overflow(self._session, league=league, team=team)
         sync_team_composition_status(self._session, team, league=league)
@@ -1157,12 +1159,7 @@ class MarketService:
                 "Solo l'amministratore può svincolare per uscita dai 5 campionati.",
                 code="release_reason_forbidden",
             )
-        rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
-        if reason == MarketReleaseReason.LEAGUE_EXIT:
-            percent = rules.league_exit_refund_percent if rules else 100
-        else:
-            percent = rules.voluntary_release_refund_percent if rules else 50
-        return reason, percent
+        return reason, release_refund_percent(self._session, league_id=league_id, reason=reason)
 
     # -- helpers --------------------------------------------------------------
 

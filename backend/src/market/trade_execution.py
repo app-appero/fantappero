@@ -26,6 +26,7 @@ from fantasy_teams.ownership import sync_ownership_on_assign, sync_ownership_on_
 from leagues.models.league import League
 from market.assignment import next_free_slot_or_overflow
 from market.models import TradeProposal
+from market.trade_validators import validate_trade_credits_available
 
 
 def _locked_slots_for_athletes(
@@ -84,16 +85,13 @@ def execute_trade(
     proposer_out_slots = slots_by_team[proposer_team.id]
     recipient_out_slots = slots_by_team[recipient_team.id]
 
-    if proposer_account is None or proposer_account.balance < proposal.offered_credits:
-        raise ValidationAuthError(
-            "Il proponente non ha più crediti sufficienti per lo scambio.",
-            code="insufficient_credits",
-        )
-    if recipient_account is None or recipient_account.balance < proposal.requested_credits:
-        raise ValidationAuthError(
-            "Il destinatario non ha più crediti sufficienti per lo scambio.",
-            code="insufficient_credits",
-        )
+    validate_trade_credits_available(
+        offered_credits=proposal.offered_credits,
+        proposer_balance=proposer_account.balance if proposer_account is not None else None,
+        requested_credits=proposal.requested_credits,
+        recipient_balance=recipient_account.balance if recipient_account is not None else None,
+    )
+    assert proposer_account is not None and recipient_account is not None
 
     # Everything below actually mutates state. It runs inside a savepoint so that a
     # mid-sequence failure (e.g. role quota on a later incoming player) rolls back
