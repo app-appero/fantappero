@@ -8,8 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.text_folding import repair_provider_text
 from auth.exceptions import ValidationAuthError
-from database.enums import CreditLedgerReason, RosterOwnershipSource
+from database.enums import CreditLedgerReason, MarketReleaseReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     assign_allowing_role_quota_overflow,
@@ -17,16 +18,69 @@ from fantasy_teams.composition_service import (
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
-from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.models import CreditAccount, FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign
 from leagues.models.league import League
 from leagues.models.league_rules import LeagueRules
 from market.validators import compute_release_refund
+from sports_data.roster.models import Athlete
 
 # Note dei movimenti di crediti per un calciatore vinto all'asta: le due modalità hanno la
 # stessa causale (``market_auction_win``), la nota dice da quale asta arriva l'addebito.
 SEALED_AUCTION_WIN_NOTE = "Assegnazione da asta a buste"
 LIVE_AUCTION_WIN_NOTE = "Assegnazione da asta a rilanci"
+
+
+def release_refund_percent(
+    session: Session,
+    *,
+    league_id: UUID,
+    reason: MarketReleaseReason = MarketReleaseReason.VOLUNTARY,
+) -> int:
+    """Percentuale del prezzo d'acquisto che torna con uno svincolo (EP08-04 / FR-MKT-02).
+
+    «Uscita dai 5 campionati» usa ``league_exit_refund_percent`` (100 senza regolamento), ogni
+    altro svincolo ``voluntary_release_refund_percent`` (50 senza regolamento).
+    """
+    rules = session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
+    if reason == MarketReleaseReason.LEAGUE_EXIT:
+        return rules.league_exit_refund_percent if rules else 100
+    return rules.voluntary_release_refund_percent if rules else 50
+
+
+def apply_release_refund(
+    session: Session,
+    account: CreditAccount,
+    *,
+    team_id: UUID,
+    slot_index: int,
+    athlete_id: UUID,
+    athlete_name: str,
+    purchase_credits: int,
+    reason: MarketReleaseReason,
+    percent: int,
+    actor_id: UUID | None,
+) -> int:
+    """Accredita il rimborso di uno svincolo del mercato e restituisce quanti crediti tornano.
+
+    Stessa regola per lo svincolo volontario e per chi esce dalla rosa con un'offerta degli
+    svincolati: ``percent`` del prezzo d'acquisto per difetto (``compute_release_refund``),
+    causale ``market_release_refund``, nota «Svincolo <nome> (<causa>, <percentuale>%)».
+    Un rimborso di 0 crediti non scrive nessun movimento. Il chiamante tiene il blocco sul conto.
+    """
+    refund = compute_release_refund(purchase_credits=purchase_credits, refund_percent=percent)
+    if refund > 0:
+        apply_ledger_movement(
+            session,
+            account,
+            amount=refund,
+            reason=CreditLedgerReason.MARKET_RELEASE_REFUND,
+            transaction_id=f"release:{team_id}:{slot_index}:{athlete_id}:v{account.version}",
+            actor_id=actor_id,
+            # Il nome come arriva dal fornitore può avere la codifica rovinata (QA 21-22/11).
+            note=f"Svincolo {repair_provider_text(athlete_name)} ({reason.value}, {percent}%)",
+        )
+    return refund
 
 
 def next_free_slot_or_overflow(
@@ -329,8 +383,13 @@ def assign_winning_waiver_bid(
     if the swap would leave an invalid roster (role quota) or the declared
     player is no longer on the team's roster, nothing is changed and the bid
     is a legitimate loss ("cambio annullato se crea rosa invalida" / FR-MKT-01),
-    not a fatal error. No credit refund is applied for the released player —
-    that is EP08-04's scope.
+    not a fatal error.
+
+    Il calciatore che esce è rimborsato come uno svincolo volontario (KI-23, Rosario 24/11):
+    percentuale «Rimborso svincolo volontario» della lega sul suo prezzo d'acquisto, per
+    difetto, con causale e nota dello svincolo volontario (``apply_release_refund``). Come
+    nello scambio dell'asta a rilanci il rimborso entra prima dell'addebito e sta nello stesso
+    savepoint: se il cambio non riesce non resta nemmeno il rimborso.
     """
     slot = session.scalar(
         select(FantasyRosterSlot)
@@ -342,16 +401,40 @@ def assign_winning_waiver_bid(
     )
     if slot is None:
         return None
-    return _finalize_slot_assignment(
-        session,
-        league=league,
-        team=team,
-        slot=slot,
-        acquire_athlete_id=acquire_athlete_id,
-        previous_athlete_id=release_athlete_id,
-        amount_credits=amount_credits,
-        reason=CreditLedgerReason.MARKET_WAIVER_ACQUISITION,
-        transaction_id=transaction_id,
-        actor_id=actor_id,
-        note="Acquisizione da mercato svincolati",
-    )
+    account = find_account_for_team(session, team.id, for_update=True)
+    if account is None:
+        return None
+    released = session.get(Athlete, release_athlete_id)
+    percent = release_refund_percent(session, league_id=league.id)
+    try:
+        with session.begin_nested():
+            apply_release_refund(
+                session,
+                account,
+                team_id=team.id,
+                slot_index=slot.slot_index,
+                athlete_id=release_athlete_id,
+                athlete_name=released.canonical_name if released is not None else "Calciatore",
+                purchase_credits=slot.purchase_credits or 0,
+                reason=MarketReleaseReason.VOLUNTARY,
+                percent=percent,
+                actor_id=actor_id,
+            )
+            updated = _finalize_slot_assignment(
+                session,
+                league=league,
+                team=team,
+                slot=slot,
+                acquire_athlete_id=acquire_athlete_id,
+                previous_athlete_id=release_athlete_id,
+                amount_credits=amount_credits,
+                reason=CreditLedgerReason.MARKET_WAIVER_ACQUISITION,
+                transaction_id=transaction_id,
+                actor_id=actor_id,
+                note="Acquisizione da mercato svincolati",
+            )
+            if updated is None:
+                raise _SwapNotHonored
+    except _SwapNotHonored:
+        return None
+    return updated
