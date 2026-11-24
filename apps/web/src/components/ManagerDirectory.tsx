@@ -597,8 +597,10 @@ export function ManagerDirectory({
       if (inviteErrorMeansStaleRow(error)) {
         // La riga era vecchia (es. invito già inviato da un'altra scheda o da un altro
         // admin): si ricarica dal server, così non offre più «Invita». `load` azzera i
-        // messaggi, quindi l'errore si mostra dopo.
+        // messaggi, quindi l'errore si mostra dopo. Anche gli inviti in attesa accanto al
+        // conto e il banner del mercato sono vecchi: si rileggono (QA notturna 23→24/11).
         await load();
+        onInvitesChanged?.();
       }
       setInviteError(inviteErrorMessage(error));
     } finally {
@@ -656,8 +658,10 @@ export function ManagerDirectory({
         error instanceof ApiError &&
         (error.code === "named_invite_not_pending" || error.code === "named_invite_not_found")
       ) {
-        // Il fantallenatore ha già risposto (o l'invito è scaduto): riallinea la riga.
+        // Il fantallenatore ha già risposto (o l'invito è scaduto): riallinea la riga e il
+        // conto degli inviti in attesa (QA notturna 23→24/11).
         await load();
+        onInvitesChanged?.();
       }
       setRevokeError(revokeErrorMessage(error));
     } finally {

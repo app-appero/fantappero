@@ -19,6 +19,7 @@ import { leagueOccupancyLabel } from "../market/marketGateNotice";
 import {
   inviteErrorRefreshesRow,
   revocableInviteId,
+  revokeErrorRefreshesRow,
   revokeInviteConfirmMessage,
   revokeInviteErrorMessage,
 } from "../leagues/namedInviteHelpers";
@@ -230,8 +231,10 @@ export function CoachDirectoryPanel({
       }
       if (error instanceof ApiError && inviteErrorRefreshesRow(error)) {
         // Riga vecchia (es. «Invito già inviato»): si ricarica dal server, così non offre
-        // più «Invita».
+        // più «Invita». Anche gli inviti in attesa accanto al conto e il banner del mercato
+        // sono vecchi: si rileggono (QA notturna 23→24/11).
         await load({ silent: true });
+        onInvitesChanged?.();
       }
       setInviteError(getApiErrorMessage(error, "Impossibile inviare l'invito."));
     } finally {
@@ -274,12 +277,11 @@ export function CoachDirectoryPanel({
       });
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null;
-      if (
-        apiError?.code === "named_invite_not_pending" ||
-        apiError?.code === "named_invite_not_found"
-      ) {
-        // Il fantallenatore ha già risposto (o l'invito è scaduto): riallinea la riga.
+      if (revokeErrorRefreshesRow(apiError)) {
+        // Il fantallenatore ha già risposto (o l'invito è scaduto): riallinea la riga e il
+        // conto degli inviti in attesa (QA notturna 23→24/11).
         await load({ silent: true });
+        onInvitesChanged?.();
       }
       setRevokeError(
         revokeInviteErrorMessage(apiError) ??

@@ -9,7 +9,7 @@ import type {
   LeagueRules,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
-import { orderLeagueSetupBlockers } from "@fantappero/contracts";
+import { missingMembersLabel, orderLeagueSetupBlockers } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -856,8 +856,8 @@ export function LeagueAdminScreen() {
                   ? // Sotto il minimo il server rifiuta «Partecipanti»
                     // (invalid_participant_count): niente suggerimento di abbassarlo.
                     rules.participantMin == null || members.length >= rules.participantMin
-                    ? `Servono ancora ${rules.participantCount - members.length} iscritti, oppure abbassa «Partecipanti» a ${members.length} e salva.`
-                    : `Servono ancora ${rules.participantCount - members.length} iscritti.`
+                    ? `${missingMembersLabel(rules.participantCount - members.length)}, oppure abbassa «Partecipanti» a ${members.length} e salva.`
+                    : `${missingMembersLabel(rules.participantCount - members.length)}.`
                   : `Ci sono più iscritti del previsto: alza «Partecipanti» a ${members.length} e salva.`
               }
               testID="league-members-mismatch"

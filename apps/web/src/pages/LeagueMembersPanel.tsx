@@ -1,5 +1,5 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
-import { avatarInitials, pendingInvitesLabel } from "@fantappero/contracts";
+import { avatarInitials, missingMembersLabel, pendingInvitesLabel } from "@fantappero/contracts";
 import { AvatarWithFallback, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -411,8 +411,8 @@ export function LeagueMembersPanel({
           message={
             members.length < participantCount
               ? canLowerToMembers
-                ? `Servono ancora ${participantCount - members.length} iscritti, oppure abbassa «Partecipanti» nel regolamento a ${members.length} e salva.`
-                : `Servono ancora ${participantCount - members.length} iscritti.`
+                ? `${missingMembersLabel(participantCount - members.length)}, oppure abbassa «Partecipanti» nel regolamento a ${members.length} e salva.`
+                : `${missingMembersLabel(participantCount - members.length)}.`
               : `Ci sono più iscritti del previsto: alza «Partecipanti» a ${members.length} e salva, oppure rimuovi i membri in eccesso.`
           }
           testId="league-members-mismatch"
