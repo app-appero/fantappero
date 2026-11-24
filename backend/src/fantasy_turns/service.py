@@ -1753,7 +1753,15 @@ class FantasyTurnService:
         è già passato; un turno già aperto, saltato o inesistente è un no-op
         silenzioso (non è un errore: capita per l'ultimo turno di stagione, o
         se il successivo non è ancora stato materializzato).
+
+        Come il giro automatico, apre solo nelle leghe attive. Dal 24/11 si omologa anche il
+        turno iniziato prima della creazione della lega, e la lega può non essere ancora attiva
+        (per esempio senza calendario): senza questa guardia il turno dopo si apriva con
+        l'avviso «Schiera la formazione» in una lega che non può ancora giocare.
         """
+        league = self._session.get(League, league_id)
+        if league is None or league.state != LeagueState.ACTIVE:
+            return False
         next_round = self._session.scalars(
             select(FantasyRound)
             .where(

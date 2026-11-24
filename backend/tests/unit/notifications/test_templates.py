@@ -201,6 +201,22 @@ def test_render_risultati_templates_include_round_number() -> None:
     assert "7" in correction.body
 
 
+def test_homologation_v2_speaks_of_no_match_for_a_round_before_the_league() -> None:
+    params = {"round_number": 11, "league_id": "lega-x", "league_name": "Lega X"}
+    normal = render_notification("risultati.omologazione", 2, params)
+    assert normal == render_notification("risultati.omologazione", 1, params)
+
+    placeholder = render_notification(
+        "risultati.omologazione", 2, {**params, "before_league_creation": True}
+    )
+    assert placeholder.title == "Turno concluso"
+    assert placeholder.body == (
+        "«Lega X» · Il turno 11 è concluso. La lega è nata a turno già iniziato: "
+        "nessuno scontro diretto, la classifica non cambia."
+    )
+    assert placeholder.deep_link == "/turni?lega=lega-x"
+
+
 def test_render_lega_eliminata_names_who_deleted_the_league() -> None:
     """QA 19/11: l'eliminazione da parte dell'amministratore di lega ha un testo suo."""
     by_operator = render_notification("lega.eliminata", 1, {"league_name": "Lega Amici"})

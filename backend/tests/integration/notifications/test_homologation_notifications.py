@@ -11,10 +11,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from database.enums import FantasyTurnKind, FantasyTurnStatus, NotificationCategory
+from database.enums import (
+    FantasyTurnKind,
+    FantasyTurnStatus,
+    LeagueAuditAction,
+    NotificationCategory,
+)
 from fantasy_turns.homologation_service import apply_round_correction, homologate_round
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
+from leagues.models.league import League
+from leagues.models.league_audit_event import LeagueAuditEvent
 from mail.capture import get_captured_emails
 from notifications.models import Notification
 from sports_data.catalog.models import Club, SportSeason
@@ -52,9 +59,21 @@ def _create_league(client: TestClient, token: str, competition_ids: list[str], n
 
 
 def _create_finished_round(
-    db_session: Session, league_id: str, competition_ids: list[str], *, id_offset: int
+    db_session: Session,
+    league_id: str,
+    competition_ids: list[str],
+    *,
+    id_offset: int,
+    league_created_before_round: bool = True,
 ) -> FantasyRound:
+    """Turno finito di due giorni. Di norma la lega esiste già da prima che inizi: con
+    ``league_created_before_round=False`` è un segnaposto «Lega creata dopo questo turno»."""
     now = datetime.now(UTC)
+    if league_created_before_round:
+        league = db_session.get(League, UUID(league_id))
+        assert league is not None
+        league.created_at = now - timedelta(days=3)
+        db_session.flush()
     fantasy_round = FantasyRound(
         league_id=UUID(league_id),
         number=1,
@@ -162,3 +181,43 @@ def test_homologation_and_correction_notify_league_members(
         )
     ).all()
     assert len(all_risultati) == 2
+
+
+def test_round_started_before_the_league_notifies_without_a_match_result(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Pilota 24/11: un turno iniziato prima della creazione della lega non ha scontri diretti.
+    All'omologazione niente «il risultato è definitivo» né link alla classifica."""
+    token, owner_id = _register_and_login(client, "homolog-placeholder@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Nata Dopo")
+    fantasy_round = _create_finished_round(
+        db_session,
+        league_id,
+        competition_ids,
+        id_offset=970101,
+        league_created_before_round=False,
+    )
+
+    homologate_round(db_session, round_id=fantasy_round.id, actor_id=owner_id)
+    db_session.commit()
+
+    notification = db_session.scalar(
+        select(Notification).where(
+            Notification.user_id == owner_id,
+            Notification.template_key == "risultati.omologazione",
+        )
+    )
+    assert notification is not None
+    assert notification.title == "Turno concluso"
+    assert "nessuno scontro diretto" in notification.body
+    assert "definitivo" not in notification.body
+    assert notification.deep_link.startswith("/turni?lega=")
+
+    audit = db_session.scalar(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
+        )
+    )
+    assert audit is not None
+    assert audit.details["beforeLeagueCreation"] is True
