@@ -474,3 +474,183 @@ def test_pending_approval_trade_with_moved_player_reads_as_expired(
     listed = client.get(base, headers={"Authorization": f"Bearer {admin_token}"}).json()
     rows = listed if isinstance(listed, list) else listed.get("proposals", listed.get("items", []))
     assert all(row["status"] != "pending_approval" for row in rows)
+
+
+def _three_team_league_with_approval(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    prefix: str,
+    limit: int,
+    recipient_athletes: int,
+) -> dict:
+    """Admin che approva, allenatore A che propone, allenatore B con ``recipient_athletes``
+    difensori in rosa. Scambi con approvazione dell'admin e limite ``limit``."""
+    import random
+
+    admin_token, _ = _register_and_login(client, f"{prefix}.admin@example.com")
+    a_token, a_id = _register_and_login(client, f"{prefix}.a@example.com")
+    b_token, b_id = _register_and_login(client, f"{prefix}.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, f"Lega {prefix}")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    base = random.randint(100_000_000, 2_000_000_000)
+    a_athlete = _seed_athlete(db_session, base, f"{prefix} Offerto")
+    team_a = _own_athlete_at_slot(client, league_id, a_token, 0, a_athlete)
+    b_athletes = [
+        _seed_athlete(db_session, base + 1 + index, f"{prefix} Richiesto {index}")
+        for index in range(recipient_athletes)
+    ]
+    team_b = ""
+    for index, athlete in enumerate(b_athletes):
+        team_b = _own_athlete_at_slot(client, league_id, b_token, index, athlete)
+    rules = _set_league_rules(
+        client,
+        league_id,
+        admin_token,
+        require_trade_approval=True,
+        max_active_trade_proposals_per_team=limit,
+    )
+    assert rules["options"]["requireTradeApproval"] is True
+    assert rules["maxActiveTradeProposalsPerTeam"] == limit
+    return {
+        "league_id": league_id,
+        "admin": {"Authorization": f"Bearer {admin_token}"},
+        "a": {"Authorization": f"Bearer {a_token}"},
+        "b": {"Authorization": f"Bearer {b_token}"},
+        "team_a": team_a,
+        "team_b": team_b,
+        "a_athlete": a_athlete,
+        "b_athletes": b_athletes,
+        "base": f"/leagues/{league_id}/mercato/scambi/proposte",
+    }
+
+
+def test_trades_awaiting_admin_approval_count_towards_the_active_limit(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """KI-21 (Rosario 24/11): lo scambio accettato e in attesa dell'admin è ancora una proposta
+    attiva di chi l'ha fatta. Prima usciva dal conteggio e si potevano mandare altre proposte
+    oltre il limite; ora la proposta in più è rifiutata finché l'admin non decide."""
+    run = _three_team_league_with_approval(
+        client, db_session, competition_ids, prefix="ki21.pending", limit=2, recipient_athletes=4
+    )
+    base = run["base"]
+
+    def propose(athlete_index: int):
+        return client.post(
+            base,
+            headers=run["a"],
+            json={
+                "recipientTeamId": run["team_b"],
+                "offeredCredits": 5,
+                "requestedAthleteIds": [str(run["b_athletes"][athlete_index].id)],
+                "expiresAt": _future_iso(),
+            },
+        )
+
+    first, second = propose(0), propose(1)
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    accepted = client.post(f"{base}/{first.json()['id']}/accetta", headers=run["b"])
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["status"] == "pending_approval"
+
+    # Una proposta ancora da decidere + una in attesa dell'admin = limite raggiunto.
+    over_limit = propose(2)
+    assert over_limit.status_code == 400
+    assert over_limit.json()["code"] == "trade_active_limit_reached"
+    assert over_limit.json()["message"] == (
+        "Hai raggiunto il limite di 2 proposte di scambio attive."
+    )
+
+    # In attesa dell'admin non scade con l'orario della proposta: continua a contare.
+    row = db_session.get(TradeProposal, UUID(first.json()["id"]))
+    assert row is not None
+    row.expires_at = datetime.now(UTC) - timedelta(hours=1)
+    db_session.commit()
+    still_over = propose(2)
+    assert still_over.status_code == 400
+    assert still_over.json()["code"] == "trade_active_limit_reached"
+
+    # L'approvazione esegue lo scambio e libera il posto: si può proporre di nuovo, una volta.
+    approved = client.post(
+        f"{base}/{first.json()['id']}/amministrazione/approva", headers=run["admin"]
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["status"] == "executed"
+    third = propose(2)
+    assert third.status_code == 201, third.text
+    assert propose(3).json()["code"] == "trade_active_limit_reached"
+
+    # Anche il rifiuto dell'admin libera il posto.
+    accepted_second = client.post(f"{base}/{second.json()['id']}/accetta", headers=run["b"])
+    assert accepted_second.json()["status"] == "pending_approval"
+    assert propose(3).json()["code"] == "trade_active_limit_reached"
+    rejected = client.post(
+        f"{base}/{second.json()['id']}/amministrazione/rifiuta", headers=run["admin"]
+    )
+    assert rejected.status_code == 200, rejected.text
+    fourth = propose(3)
+    assert fourth.status_code == 201, fourth.text
+
+
+def test_trade_awaiting_credits_cannot_be_accepted_into_admin_approval(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """KI-21: la proposta «in attesa di crediti» non conta nel limite (decisione del 14/11).
+    Con l'approvazione dell'admin il destinatario non può accettarla finché i crediti non
+    bastano, come senza approvazione: altrimenti, in attesa dell'admin, tornerebbe a contare e
+    chi l'ha proposta supererebbe il limite."""
+    run = _three_team_league_with_approval(
+        client, db_session, competition_ids, prefix="ki21.credits", limit=1, recipient_athletes=1
+    )
+    base = run["base"]
+
+    def propose(requested_credits: int):
+        return client.post(
+            base,
+            headers=run["a"],
+            json={
+                "recipientTeamId": run["team_b"],
+                "offeredAthleteIds": [str(run["a_athlete"].id)],
+                "requestedCredits": requested_credits,
+                "expiresAt": _future_iso(),
+            },
+        )
+
+    waiting = propose(100)
+    assert waiting.status_code == 201, waiting.text
+    # B spende i crediti: la proposta resta aperta ma «in attesa di crediti» e libera il posto.
+    spend = client.post(
+        f"/leagues/{run['league_id']}/amministrazione/crediti/movimenti",
+        headers=run["admin"],
+        json={"fantasyTeamId": run["team_b"], "amount": -950, "transactionId": "ki21-spend"},
+    )
+    assert spend.status_code == 200, spend.text
+    shown = client.get(f"{base}/{waiting.json()['id']}", headers=run["a"]).json()
+    assert shown["status"] == "proposed"
+    assert shown["awaitingCredits"] is True
+    other = propose(5)
+    assert other.status_code == 201, other.text
+
+    blocked = client.post(f"{base}/{waiting.json()['id']}/accetta", headers=run["b"])
+    assert blocked.status_code == 400
+    assert blocked.json()["code"] == "insufficient_credits"
+    assert blocked.json()["message"] == (
+        "Il destinatario non ha più crediti sufficienti per lo scambio."
+    )
+    after = client.get(f"{base}/{waiting.json()['id']}", headers=run["a"]).json()
+    assert after["status"] == "proposed"
+    assert after["awaitingCredits"] is True
+
+    # La proposta con i crediti coperti si accetta normalmente e va all'admin; A resta al limite.
+    accepted = client.post(f"{base}/{other.json()['id']}/accetta", headers=run["b"])
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["status"] == "pending_approval"
+    assert propose(5).json()["code"] == "trade_active_limit_reached"

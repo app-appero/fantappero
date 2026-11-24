@@ -117,6 +117,26 @@ def validate_active_proposal_limit(*, active_count: int, limit: int) -> None:
         )
 
 
+def validate_trade_credits_available(
+    *,
+    offered_credits: int,
+    proposer_balance: int | None,
+    requested_credits: int,
+    recipient_balance: int | None,
+) -> None:
+    """All'accettazione i crediti dello scambio devono esserci ancora (``None``: nessun conto)."""
+    if proposer_balance is None or proposer_balance < offered_credits:
+        raise ValidationAuthError(
+            "Il proponente non ha più crediti sufficienti per lo scambio.",
+            code="insufficient_credits",
+        )
+    if recipient_balance is None or recipient_balance < requested_credits:
+        raise ValidationAuthError(
+            "Il destinatario non ha più crediti sufficienti per lo scambio.",
+            code="insufficient_credits",
+        )
+
+
 def validate_offered_credits_within_balance(*, offered_credits: int, balance: int) -> None:
     if offered_credits > balance:
         raise ValidationAuthError(

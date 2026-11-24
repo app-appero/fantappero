@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
@@ -46,6 +46,7 @@ from market.trade_validators import (
     validate_no_athlete_overlap,
     validate_offered_credits_within_balance,
     validate_requested_credits_within_balance,
+    validate_trade_credits_available,
     validate_trade_expiry,
     validate_trade_involves_athletes,
     validate_trade_sides_not_empty,
@@ -320,9 +321,20 @@ class TradeService:
             select(LeagueRules).where(LeagueRules.league_id == league_access.league.id)
         )
         if rules is not None and rules.require_trade_approval:
-            # Deferred to admin approval (EP08-07): nothing is moved yet, so no
-            # re-validation is needed here — execute_trade re-validates everything
-            # fresh at approval time, when the assets actually get swapped.
+            # Deferred to admin approval (EP08-07): nothing is moved yet — execute_trade
+            # re-validates everything fresh at approval time, when the assets get swapped.
+            # I crediti però si guardano già ora, come nell'accettazione senza approvazione
+            # (KI-21, 24/11): una proposta "in attesa di crediti" non conta nel limite delle
+            # proposte attive, in attesa dell'amministratore conterebbe e farebbe superare il
+            # limite a chi l'ha proposta. Resta aperta e si accetta quando i crediti tornano.
+            proposer_account = find_account_for_team(self._session, proposal.proposer_team_id)
+            recipient_account = find_account_for_team(self._session, proposal.recipient_team_id)
+            validate_trade_credits_available(
+                offered_credits=proposal.offered_credits,
+                proposer_balance=proposer_account.balance if proposer_account else None,
+                requested_credits=proposal.requested_credits,
+                recipient_balance=recipient_account.balance if recipient_account else None,
+            )
             proposal.status = TradeStatus.PENDING_APPROVAL
             proposal.decided_at = datetime.now(UTC)
             self._session.flush()
@@ -664,9 +676,16 @@ class TradeService:
         rows = self._session.scalars(
             select(TradeProposal).where(
                 TradeProposal.proposer_team_id == proposer_team_id,
-                TradeProposal.status == TradeStatus.PROPOSED,
-                # No expiry means the proposal never expires on its own — still active.
-                or_(TradeProposal.expires_at.is_(None), TradeProposal.expires_at > now),
+                or_(
+                    and_(
+                        TradeProposal.status == TradeStatus.PROPOSED,
+                        # No expiry means the proposal never expires on its own — still active.
+                        or_(TradeProposal.expires_at.is_(None), TradeProposal.expires_at > now),
+                    ),
+                    # KI-21 (Rosario 24/11): accettata e in attesa dell'amministratore è ancora
+                    # attiva fino alla sua decisione (e non scade con l'orario della proposta).
+                    TradeProposal.status == TradeStatus.PENDING_APPROVAL,
+                ),
             )
         ).all()
         # Non occupano il limite né le proposte in attesa di crediti né quelle non più eseguibili.
