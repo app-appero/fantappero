@@ -477,6 +477,12 @@ class H2HPlayerScoreResponse(ApiModel):
     substituted_in_minute: int | None = Field(default=None, alias="substitutedInMinute")
     is_effective_starter: bool = Field(alias="isEffectiveStarter")
     is_bench: bool = Field(alias="isBench")
+    # Sostituzioni automatiche a turno concluso: sul titolare uscito chi è
+    # entrato al suo posto, sul panchinaro entrato il titolare che sostituisce.
+    replaced_by_athlete_id: str | None = Field(default=None, alias="replacedByAthleteId")
+    replaced_by_name: str | None = Field(default=None, alias="replacedByName")
+    entered_for_athlete_id: str | None = Field(default=None, alias="enteredForAthleteId")
+    entered_for_name: str | None = Field(default=None, alias="enteredForName")
     probable_hint: Literal["starter", "bench", "unavailable"] | None = Field(
         default=None,
         alias="probableHint",

@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   H2H_VALUE_UNAVAILABLE,
+  autoSubstitutionNote,
   describeH2HResult,
+  enteredFromBench,
   formatFantasyGoals,
   formatFantasyPoints,
   playerVoteState,
   h2hResultAriaLabel,
 } from "./h2hScore.ts";
 import type { H2HMatchupScore } from "./leagues.ts";
+import { substitutionBadges } from "./pitch.ts";
 
 function score(overrides: Partial<H2HMatchupScore> = {}): H2HMatchupScore {
   return {
@@ -163,5 +166,31 @@ describe("playerVoteState", () => {
     assert.deepEqual(playerVoteState({ fantasyScore: null, fixtureStatusLabel: "LIVE" }), { kind: "provisional", label: "6 LIVE", live: true });
     assert.deepEqual(playerVoteState({ fantasyScore: null, fixtureStatusLabel: "Terminata" }), { kind: "sv", label: "S.V.", live: false });
     assert.deepEqual(playerVoteState({ fantasyScore: null, fixtureStatusLabel: "Da giocare" }), { kind: "pending", label: null, live: false });
+  });
+});
+
+describe("sostituzioni automatiche nello scontro (QA 24-25/11)", () => {
+  const out = { athleteId: "out", replacedByAthleteId: "in", replacedByName: "N&apos;Diaye" };
+  const entered = { athleteId: "in", enteredForAthleteId: "out", enteredForName: "Bastoni" };
+  const unused = { athleteId: "unused" };
+
+  it("dice chi è entrato per chi", () => {
+    assert.equal(autoSubstitutionNote(entered), "Entrato per Bastoni");
+    assert.equal(autoSubstitutionNote(out), "Uscito (S.V.) · entra N'Diaye");
+    assert.equal(autoSubstitutionNote(unused), null);
+  });
+
+  it("elenca solo i panchinari entrati, nell'ordine della panchina", () => {
+    assert.deepEqual(enteredFromBench([unused, entered]), [entered]);
+    assert.deepEqual(enteredFromBench([unused]), []);
+  });
+
+  it("aggiunge le frecce entrato/uscito anche alla sostituzione automatica", () => {
+    assert.deepEqual(substitutionBadges(entered), [{ kind: "substitutionIn", count: 1 }]);
+    assert.deepEqual(substitutionBadges(out), [{ kind: "substitutionOut", count: 1 }]);
+    assert.deepEqual(substitutionBadges({ substitutedInMinute: 60, enteredForAthleteId: "x" }), [
+      { kind: "substitutionIn", count: 1 },
+    ]);
+    assert.deepEqual(substitutionBadges(unused), []);
   });
 });

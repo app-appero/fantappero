@@ -4,6 +4,7 @@ import type { H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
   BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
+  autoSubstitutionNote,
   cleanDisplayName,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
@@ -101,6 +102,7 @@ export function MatchupPlayerRow({
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
   const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
+  const subNote = autoSubstitutionNote(player);
   const tone = probableTone(player);
   return (
     <View
@@ -136,6 +138,11 @@ export function MatchupPlayerRow({
             {player.realTeamName ?? "Squadra reale non associata"}
           </Text>
         )}
+        {subNote ? (
+          <Text style={styles.subNote} testID={`${testIDPrefix}-sub-${player.athleteId}`}>
+            {subNote}
+          </Text>
+        ) : null}
         {countdown ? (
           <Text style={styles.countdown} testID={`${testIDPrefix}-countdown-${player.athleteId}`}>
             {countdown}
@@ -230,6 +237,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
   const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
+  const subNote = autoSubstitutionNote(player);
   const tone = probableTone(player);
   return (
     <View
@@ -262,6 +270,11 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
         <View style={styles.badgeLine}>
           <EventBadges badges={badges} size={11} />
         </View>
+      ) : null}
+      {subNote ? (
+        <Text style={styles.subNote} testID={`matchup-versus-sub-${player.athleteId}`}>
+          {subNote}
+        </Text>
       ) : null}
       {vote.label ? (
         <Text
@@ -390,6 +403,8 @@ const styles = lazyStyles(() =>
     name: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
     nameCompact: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm, flexShrink: 1 },
     team: { color: colors.foregroundMuted, fontSize: typography.fontSize.xs },
+    // Sostituzione automatica a turno concluso: «Entrato per …» / «Uscito (S.V.) · entra …».
+    subNote: { color: colors.accent, fontSize: 11, fontWeight: "700" },
     countdown: { color: colors.foregroundMuted, fontSize: 11, fontWeight: "700" },
     vote: {
       color: colors.foreground,

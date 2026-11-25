@@ -59,6 +59,33 @@ export function cleanDisplayName(name: string): string {
     .replace(/&gt;/g, ">");
 }
 
+/**
+ * Nota della sostituzione automatica a turno concluso: «Entrato per Rossi» sul
+ * panchinaro subentrato, «Uscito (S.V.) · entra Bianchi» sul titolare sostituito;
+ * `null` se il giocatore non è coinvolto (o il turno è ancora in corso).
+ */
+export function autoSubstitutionNote(player: {
+  replacedByAthleteId?: string | null;
+  replacedByName?: string | null;
+  enteredForAthleteId?: string | null;
+  enteredForName?: string | null;
+}): string | null {
+  if (player.enteredForAthleteId != null) {
+    return `Entrato per ${cleanDisplayName(player.enteredForName ?? "un titolare")}`;
+  }
+  if (player.replacedByAthleteId != null) {
+    return `Uscito (S.V.) · entra ${cleanDisplayName(player.replacedByName ?? "un panchinaro")}`;
+  }
+  return null;
+}
+
+/** Panchinari entrati al posto di un titolare, nell'ordine della panchina. */
+export function enteredFromBench<T extends { enteredForAthleteId?: string | null }>(
+  bench: readonly T[],
+): T[] {
+  return bench.filter((player) => player.enteredForAthleteId != null);
+}
+
 /** Voto provvisorio mostrato mentre il provider non ha ancora un voto per chi sta giocando. */
 export const PROVISIONAL_LIVE_SCORE = 6;
 

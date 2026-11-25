@@ -4,6 +4,7 @@ import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
   describeH2HResult,
+  enteredFromBench,
   fantasyBadgesFromBonusMalus,
   substitutionBadges,
   playerVoteState,
@@ -19,7 +20,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAthleteCard } from "../athletes/AthleteCard";
-import { BenchTabs, RosterVersus, kickoffCountdown, useNow } from "../components/match/MatchupLists";
+import { BenchTabs, MatchupPlayerRow, RosterVersus, kickoffCountdown, useNow } from "../components/match/MatchupLists";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
 import { probableTone } from "./formation/FormationParts";
@@ -77,6 +78,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
   const athleteCard = useAthleteCard();
   const now = useNow();
   const teamLabel = side.teamName ?? side.displayName;
+  const entered = enteredFromBench(side.bench);
   return (
     <View style={styles.side} testID={`matchup-side-${title}`}>
       <Text style={styles.heading}>
@@ -114,6 +116,16 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
             testID={`matchup-pitch-${title}`}
             onAthletePress={athleteCard?.open}
           />
+          {entered.length > 0 ? (
+            <>
+              <Text style={styles.subheading}>Entrati dalla panchina</Text>
+              <View style={styles.lineupGroup} testID={`matchup-auto-subs-${title}`}>
+                {entered.map((player) => (
+                  <MatchupPlayerRow key={player.athleteId} player={player} now={now} testIDPrefix="matchup-auto-sub" />
+                ))}
+              </View>
+            </>
+          ) : null}
           {side.bench.length > 0 ? (
             <>
               <Text style={styles.subheading}>Panchina e tribuna</Text>

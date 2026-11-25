@@ -720,6 +720,15 @@ export interface H2HPlayerScore {
   kickoffAt?: string | null;
   isEffectiveStarter: boolean;
   isBench: boolean;
+  /**
+   * Sostituzione automatica a turno concluso (tutte le partite finite): sul titolare
+   * S.V. uscito chi è entrato al suo posto, sul panchinaro entrato il titolare che
+   * sostituisce. Assenti finché il turno è in corso o da un backend più vecchio.
+   */
+  replacedByAthleteId?: string | null;
+  replacedByName?: string | null;
+  enteredForAthleteId?: string | null;
+  enteredForName?: string | null;
   /** Minuto in cui il calciatore è uscito / entrato nella partita reale. */
   substitutedOutMinute?: number | null;
   substitutedInMinute?: number | null;

@@ -360,6 +360,8 @@ export {
   cleanDisplayName,
   PROVISIONAL_LIVE_SCORE,
   h2hResultAriaLabel,
+  autoSubstitutionNote,
+  enteredFromBench,
 } from "./h2hScore.js";
 export type { H2HResultDisplay, H2HResultStatus } from "./h2hScore.js";
 

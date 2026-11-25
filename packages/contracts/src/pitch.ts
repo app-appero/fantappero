@@ -560,16 +560,22 @@ const FANTASY_BONUS_BADGE: Record<string, MatchBadgeKind> = {
   red_card: "redCard",
 };
 
-/** Badge "uscito/entrato" di un giocatore dai minuti di sostituzione (come gol e assist). */
+/**
+ * Badge "uscito/entrato" di un giocatore dai minuti di sostituzione (come gol e assist),
+ * e dalla sostituzione automatica dello scontro a turno concluso (titolare S.V. uscito,
+ * panchinaro entrato al suo posto).
+ */
 export function substitutionBadges(player: {
   substitutedOutMinute?: number | null;
   substitutedInMinute?: number | null;
+  replacedByAthleteId?: string | null;
+  enteredForAthleteId?: string | null;
 }): MatchBadge[] {
   const out: MatchBadge[] = [];
-  if (player.substitutedInMinute != null) {
+  if (player.substitutedInMinute != null || player.enteredForAthleteId != null) {
     out.push({ kind: "substitutionIn", count: 1 });
   }
-  if (player.substitutedOutMinute != null) {
+  if (player.substitutedOutMinute != null || player.replacedByAthleteId != null) {
     out.push({ kind: "substitutionOut", count: 1 });
   }
   return out;
