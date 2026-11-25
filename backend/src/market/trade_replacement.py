@@ -29,6 +29,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from database.enums import (
@@ -139,10 +140,37 @@ def plan_replacement_roles(
     return chosen
 
 
+_TABLE_READY_KEY = "trade_replacements_ready"
+
+
+def replacements_table_ready(session: Session) -> bool:
+    """La tabella ``trade_replacements`` c'è (migrazione ``c3e8a5f17b24`` applicata).
+
+    Il codice nuovo può girare un momento prima della migrazione (deploy a rotazione) o su un
+    database più vecchio (il test delle migrazioni popola il database un passo prima della
+    testa): allora non ci sono sostituti e tutto il resto (scambi, rose, formazioni) va avanti
+    come prima. La prova gira in un savepoint, così un errore non rovina la transazione, e il
+    risultato resta in memoria per la sessione.
+    """
+    cached = session.info.get(_TABLE_READY_KEY)
+    if cached is not None:
+        return bool(cached)
+    try:
+        with session.begin_nested():
+            session.execute(select(TradeReplacement.id).limit(0))
+        ready = True
+    except ProgrammingError:
+        ready = False
+    session.info[_TABLE_READY_KEY] = ready
+    return ready
+
+
 def open_replacements(
     session: Session, team_id: UUID, *, for_update: bool = False
 ) -> list[TradeReplacement]:
     """I sostituti ancora da scegliere della squadra, dal più vecchio."""
+    if not replacements_table_ready(session):
+        return []
     stmt = (
         select(TradeReplacement)
         .where(
@@ -157,6 +185,8 @@ def open_replacements(
 
 
 def has_open_replacements(session: Session, team_id: UUID) -> bool:
+    if not replacements_table_ready(session):
+        return False
     return (
         session.scalar(
             select(TradeReplacement.id)
@@ -222,6 +252,8 @@ def reconcile_trade_replacements(
     from fantasy_teams.composition_service import resolve_league_rules_limits
 
     session.flush()  # la sessione non fa autoflush: le letture sotto devono vedere la rosa nuova
+    if not replacements_table_ready(session):
+        return []
     existing = open_replacements(session, team.id, for_update=True)
     if not existing and (trade is None or new_allowance <= 0):
         return []
