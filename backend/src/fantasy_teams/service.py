@@ -27,7 +27,12 @@ from database.enums import (
     RosterOwnershipSource,
     UserType,
 )
-from fantasy_teams.composition import ROLE_LABEL_IT, RosterCompositionReport, role_quota_overflow
+from fantasy_teams.composition import (
+    ROLE_LABEL_IT,
+    RosterCompositionReport,
+    role_quota_overflow,
+    under_quota_roles,
+)
 from fantasy_teams.composition_service import (
     STORED_STATUS_REQUIRES_COMPLETE,
     assert_assignment_respects_role_quota,
@@ -119,6 +124,7 @@ from fantasy_teams.schemas import (
     RosterTurnSnapshotDetailResponse,
     RosterTurnSnapshotEntryResponse,
     RosterTurnSnapshotSummaryResponse,
+    RosterUnderQuotaRoleResponse,
     TeamRosterPlayerResponse,
 )
 from fantasy_teams.validators import (
@@ -2142,6 +2148,12 @@ class FantasyTeamService:
             issues=[
                 RosterCompositionIssueResponse(code=issue.code, message=issue.message)
                 for issue in report.issues
+            ],
+            underQuotaRoles=[
+                RosterUnderQuotaRoleResponse(
+                    role=item.role.value, count=item.count, quota=item.quota
+                )
+                for item in under_quota_roles(report.limits, report.counts)
             ],
         )
 

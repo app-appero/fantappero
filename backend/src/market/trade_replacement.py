@@ -18,6 +18,11 @@ La verità è qui, lato server:
 - le righe aperte seguono la rosa: ogni scrittura dello stato della rosa
   (`sync_team_composition_status`) le riallinea, così se la squadra torna alla misura in altro
   modo (scambio 1 per 2, assegnazione dell'admin) si chiudono da sole (``cancelled``).
+
+Avvisi in più (suggerimenti della corsa Mercato, 25/11), senza cambiare nessuna regola: i crediti
+dopo lo scambio confrontati con il libero più economico del ruolo che manca (stesso prezzo e
+stessi liberi dell'acquisto) e i ruoli che restano sotto la quota della lega anche a rosa alla
+misura.
 """
 
 from __future__ import annotations
@@ -39,10 +44,11 @@ from database.enums import (
     MarketSessionStatus,
     TradeReplacementStatus,
 )
-from fantasy_teams.composition import RosterCompositionLimits
+from fantasy_teams.composition import RosterCompositionLimits, UnderQuotaRole, under_quota_roles
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from leagues.models.league import League
 from market.models import MarketBid, MarketSession, TradeProposal, TradeReplacement
+from market.valuation import MIN_LEAGUE_CREDITS
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 
@@ -229,6 +235,16 @@ def _roles_of(
     return {athlete_id: item.role for athlete_id, item in resolved.items()}
 
 
+def team_under_quota_roles(session: Session, league: League, team_id: UUID) -> list[UnderQuotaRole]:
+    """I ruoli sotto la quota della lega nella rosa di adesso (avviso, nessuna regola)."""
+    from fantasy_teams.composition_service import resolve_league_rules_limits
+
+    occupied = _occupied_athlete_ids(session, team_id)
+    roles = _roles_of(session, league, occupied)
+    counts = Counter(roles[athlete_id] for athlete_id in occupied if athlete_id in roles)
+    return under_quota_roles(resolve_league_rules_limits(session, league.id), counts)
+
+
 def reconcile_trade_replacements(
     session: Session,
     *,
@@ -321,6 +337,137 @@ def reconcile_trade_replacements(
     return created
 
 
+def replacement_price(market_value: int | None) -> int:
+    """Prezzo del sostituto: il Valore del calciatore in questa lega, il minimo se manca."""
+    return market_value if market_value is not None and market_value > 0 else MIN_LEAGUE_CREDITS
+
+
+@dataclass(frozen=True)
+class FreeAthlete:
+    """Un calciatore libero che si può scegliere come sostituto."""
+
+    athlete_id: UUID
+    club_id: UUID | None
+    role: FantasyRole
+
+
+def free_athletes_for_roles(
+    session: Session, league: League, roles: Iterable[FantasyRole]
+) -> list[FreeAthlete]:
+    """I liberi dei ruoli dati, nell'ordine del listone.
+
+    Liberi = nel listone della stagione e dei campionati della lega, in nessuna rosa della lega e
+    non impegnati in un'asta o negli svincolati ancora da risolvere. È l'elenco della finestra
+    «Scegli il sostituto» e la base dei prezzi più bassi degli avvisi: stesse regole, così un
+    avviso non conta un calciatore che poi non si può prendere.
+    """
+    from fantasy_teams.composition_service import resolve_effective_athlete_roles
+    from sports_data.listone.generate import list_role_assignments
+
+    wanted = set(roles)
+    if not wanted:
+        return []
+    assignments = list_role_assignments(
+        session,
+        season_year=league.season_year,
+        competition_ids={competition.id for competition in league.competitions},
+    )
+    resolved = resolve_effective_athlete_roles(
+        session,
+        league_id=league.id,
+        athlete_ids=[row.athlete_id for row in assignments],
+        season_year=league.season_year,
+    )
+    owned = set(
+        session.scalars(
+            select(FantasyRosterSlot.athlete_id).where(
+                FantasyRosterSlot.league_id == league.id,
+                FantasyRosterSlot.athlete_id.is_not(None),
+            )
+        ).all()
+    )
+    busy = committed_athlete_ids(session, league.id)
+    result: list[FreeAthlete] = []
+    for row in assignments:
+        item = resolved.get(row.athlete_id)
+        if item is None or item.role not in wanted:
+            continue
+        if row.athlete_id in owned or row.athlete_id in busy:
+            continue
+        result.append(FreeAthlete(athlete_id=row.athlete_id, club_id=row.club_id, role=item.role))
+    return result
+
+
+def free_replacement_prices(
+    session: Session, league: League, roles: Iterable[FantasyRole]
+) -> dict[FantasyRole, list[int]]:
+    """I prezzi dei liberi di ogni ruolo dato, dal più basso (Valore, il minimo se manca)."""
+    from market.valuation_service import load_market_info
+
+    wanted = set(roles)
+    prices: dict[FantasyRole, list[int]] = {role: [] for role in wanted}
+    free = free_athletes_for_roles(session, league, wanted)
+    if not free:
+        return prices
+    market = load_market_info(
+        session,
+        league_id=league.id,
+        athlete_ids=[item.athlete_id for item in free],
+        league=league,
+    )
+    for item in free:
+        info = market.get(item.athlete_id)
+        prices[item.role].append(replacement_price(info.market_value if info is not None else None))
+    for values in prices.values():
+        values.sort()
+    return prices
+
+
+@dataclass(frozen=True)
+class ReplacementCost:
+    """Quanto costano i sostituti di un ruolo che manca, ai prezzi dei liberi di adesso."""
+
+    role: FantasyRole
+    #: Quanti sostituti di questo ruolo.
+    count: int
+    #: Il libero più economico del ruolo; ``None`` se non ce n'è nessuno.
+    cheapest_price: int | None
+    #: I ``count`` liberi più economici insieme; ``None`` se non ce ne sono abbastanza.
+    total_price: int | None
+
+
+def replacement_costs(
+    missing: Iterable[FantasyRole], prices: dict[FantasyRole, list[int]]
+) -> tuple[ReplacementCost, ...]:
+    """Il costo più basso dei sostituti da scegliere, ruolo per ruolo (ordine P, D, C, A)."""
+    costs: list[ReplacementCost] = []
+    for role, count in role_counts(missing):
+        values = prices.get(role, [])
+        costs.append(
+            ReplacementCost(
+                role=role,
+                count=count,
+                cheapest_price=values[0] if values else None,
+                total_price=sum(values[:count]) if len(values) >= count else None,
+            )
+        )
+    return tuple(costs)
+
+
+def can_afford_replacements(balance: int, costs: Sequence[ReplacementCost]) -> bool:
+    """La squadra può prendere da sola tutti i sostituti con i suoi crediti.
+
+    Vero senza sostituti da scegliere; falso se per un ruolo non ci sono abbastanza liberi o se i
+    più economici insieme costano più dei crediti. Solo un avviso: l'acquisto controlla da sé.
+    """
+    total = 0
+    for cost in costs:
+        if cost.total_price is None:
+            return False
+        total += cost.total_price
+    return total <= balance
+
+
 @dataclass(frozen=True)
 class RosterAfterTrade:
     """Come resterebbe la rosa di una squadra dopo uno scambio (avviso prima di accettare)."""
@@ -332,6 +479,15 @@ class RosterAfterTrade:
     #: che lo scambio crea. Vuoto se la rosa resta alla misura (o se manca qualcuno per altri
     #: motivi, che non danno diritto al sostituto).
     missing_roles: tuple[FantasyRole, ...] = field(default_factory=tuple)
+    #: Crediti dopo lo scambio, con i crediti offerti o chiesti nella proposta.
+    balance_after: int = 0
+    #: Il prezzo più basso dei sostituti, ruolo per ruolo (vuoto senza sostituti).
+    replacement_costs: tuple[ReplacementCost, ...] = field(default_factory=tuple)
+    #: ``False`` se con i crediti di dopo lo scambio non può prendere da sola i sostituti.
+    can_afford_replacement: bool = True
+    #: Ruoli sotto la quota della lega subito dopo lo scambio (prima dei sostituti), anche a
+    #: rosa alla misura: solo un avviso.
+    under_quota: tuple[UnderQuotaRole, ...] = field(default_factory=tuple)
 
 
 class RosterAfterTradeCalculator:
@@ -346,6 +502,8 @@ class RosterAfterTradeCalculator:
         self._occupied: dict[UUID, list[UUID]] = {}
         self._open_roles: dict[UUID, list[FantasyRole]] = {}
         self._roles: dict[UUID, FantasyRole | None] = {}
+        self._balances: dict[UUID, int] = {}
+        self._prices: dict[FantasyRole, list[int]] = {}
 
     def _team_roster(self, team_id: UUID) -> list[UUID]:
         if team_id not in self._occupied:
@@ -359,6 +517,21 @@ class RosterAfterTradeCalculator:
             ]
         return self._open_roles[team_id]
 
+    def _team_balance(self, team_id: UUID) -> int:
+        if team_id not in self._balances:
+            from fantasy_teams.ledger import find_account_for_team
+
+            account = find_account_for_team(self._session, team_id)
+            self._balances[team_id] = account.balance if account is not None else 0
+        return self._balances[team_id]
+
+    def _role_prices(self, roles: Iterable[FantasyRole]) -> dict[FantasyRole, list[int]]:
+        """Prezzi dei liberi, letti una volta per ruolo: lo scambio non cambia i liberi."""
+        missing = {role for role in roles if role not in self._prices}
+        if missing:
+            self._prices.update(free_replacement_prices(self._session, self._league, missing))
+        return self._prices
+
     def _resolve(self, athlete_ids: Iterable[UUID]) -> None:
         missing = [athlete_id for athlete_id in athlete_ids if athlete_id not in self._roles]
         if not missing:
@@ -368,8 +541,16 @@ class RosterAfterTradeCalculator:
             self._roles[athlete_id] = resolved.get(athlete_id)
 
     def after(
-        self, team_id: UUID, *, outgoing: Sequence[UUID], incoming: Sequence[UUID]
+        self,
+        team_id: UUID,
+        *,
+        outgoing: Sequence[UUID],
+        incoming: Sequence[UUID],
+        credits_out: int = 0,
+        credits_in: int = 0,
     ) -> RosterAfterTrade:
+        """La rosa di ``team_id`` se cede ``outgoing`` e ``credits_out`` e riceve ``incoming`` e
+        ``credits_in``."""
         roster = self._team_roster(team_id)
         leaving = set(outgoing)
         present = set(roster)
@@ -378,9 +559,10 @@ class RosterAfterTradeCalculator:
         self._resolve([*after, *outgoing, *incoming])
         open_roles = self._team_open_roles(team_id)
         gone = [athlete_id for athlete_id in outgoing if athlete_id in present]
+        after_roles = [self._roles.get(athlete_id) for athlete_id in after]
         missing = plan_replacement_roles(
             limits=self._limits,
-            roster_roles=[self._roles.get(athlete_id) for athlete_id in after],
+            roster_roles=after_roles,
             roster_count=len(after),
             cap=len(open_roles) + max(0, len(gone) - len(incoming)),
             preferred=[
@@ -391,11 +573,18 @@ class RosterAfterTradeCalculator:
                 ),
             ],
         )
+        balance_after = self._team_balance(team_id) - max(0, credits_out) + max(0, credits_in)
+        costs = replacement_costs(missing, self._role_prices(missing)) if missing else ()
+        counts = Counter(role for role in after_roles if role is not None)
         return RosterAfterTrade(
             team_id=team_id,
             size_after=len(after),
             roster_size=self._limits.roster_size,
             missing_roles=tuple(sorted(missing, key=ROLE_ORDER.index)),
+            balance_after=balance_after,
+            replacement_costs=costs,
+            can_afford_replacement=can_afford_replacements(balance_after, costs),
+            under_quota=tuple(under_quota_roles(self._limits, counts)),
         )
 
 

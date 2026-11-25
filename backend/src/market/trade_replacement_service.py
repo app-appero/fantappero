@@ -41,6 +41,7 @@ from fantasy_teams.factory import find_team_for_membership, resolve_roster_size
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign
+from fantasy_teams.schemas import RosterUnderQuotaRoleResponse
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -49,9 +50,15 @@ from market.models import TradeProposal, TradeReplacement
 from market.round_freeze import ROUND_IN_PROGRESS_CODE, league_round_in_progress
 from market.trade_replacement import (
     ROLE_NOUN_IT,
+    can_afford_replacements,
     committed_athlete_ids,
+    free_athletes_for_roles,
+    free_replacement_prices,
     open_replacements,
+    replacement_costs,
+    replacement_price,
     role_counts,
+    team_under_quota_roles,
 )
 from market.trade_replacement_schemas import (
     TradeReplacementCandidateListResponse,
@@ -61,8 +68,7 @@ from market.trade_replacement_schemas import (
     TradeReplacementPurchaseResponse,
     TradeReplacementStatusResponse,
 )
-from market.trade_schemas import TradeMissingRoleResponse
-from market.valuation import MIN_LEAGUE_CREDITS
+from market.trade_schemas import TradeMissingRoleResponse, TradeReplacementCostResponse
 from market.valuation_service import load_market_info
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -140,34 +146,7 @@ class TradeReplacementService:
                 code="invalid_replacement_order",
             )
 
-        assignments = list_role_assignments(
-            self._session,
-            season_year=league.season_year,
-            competition_ids={competition.id for competition in league.competitions},
-        )
-        roles = resolve_effective_athlete_roles(
-            self._session,
-            league_id=league.id,
-            athlete_ids=[row.athlete_id for row in assignments],
-            season_year=league.season_year,
-        )
-        owned = set(
-            self._session.scalars(
-                select(FantasyRosterSlot.athlete_id).where(
-                    FantasyRosterSlot.league_id == league.id,
-                    FantasyRosterSlot.athlete_id.is_not(None),
-                )
-            ).all()
-        )
-        busy = committed_athlete_ids(self._session, league.id)
-        free = [
-            row
-            for row in assignments
-            if (resolved := roles.get(row.athlete_id)) is not None
-            and resolved.role == wanted
-            and row.athlete_id not in owned
-            and row.athlete_id not in busy
-        ]
+        free = free_athletes_for_roles(self._session, league, {wanted})
         athletes = (
             {
                 athlete.id: athlete
@@ -476,11 +455,19 @@ class TradeReplacementService:
             )
             other_name = other.name if other is not None else None
         block = league_round_in_progress(self._session, league.id) if pending else None
+        balance = self._balance(team.id)
+        missing = [row.role for row in pending]
+        costs = (
+            replacement_costs(missing, free_replacement_prices(self._session, league, set(missing)))
+            if missing
+            else ()
+        )
+        cheapest = [cost.cheapest_price for cost in costs if cost.cheapest_price is not None]
         return TradeReplacementStatusResponse(
             teamId=str(team.id),
             rosterSize=resolve_roster_size(self._session, league.id),
             filledSlots=filled,
-            balance=self._balance(team.id),
+            balance=balance,
             pending=[
                 TradeReplacementPendingResponse(
                     id=str(row.id),
@@ -502,6 +489,23 @@ class TradeReplacementService:
             blockedMessage=(
                 replacement_round_block_message(block.number) if block is not None else None
             ),
+            canAffordReplacement=can_afford_replacements(balance, costs),
+            cheapestReplacementPrice=min(cheapest) if cheapest else None,
+            replacementCosts=[
+                TradeReplacementCostResponse(
+                    role=cost.role.value,
+                    count=cost.count,
+                    cheapestPrice=cost.cheapest_price,
+                    totalPrice=cost.total_price,
+                )
+                for cost in costs
+            ],
+            underQuotaRoles=[
+                RosterUnderQuotaRoleResponse(
+                    role=item.role.value, count=item.count, quota=item.quota
+                )
+                for item in team_under_quota_roles(self._session, league, team.id)
+            ],
         )
 
     def _my_team(self, league_access: LeagueAccess, *, for_update: bool = False) -> FantasyTeam:
@@ -542,7 +546,7 @@ class TradeReplacementService:
 
     @staticmethod
     def _price(market_value: int | None) -> int:
-        return market_value if market_value is not None and market_value > 0 else MIN_LEAGUE_CREDITS
+        return replacement_price(market_value)
 
     @staticmethod
     def _parse_role(raw: str) -> FantasyRole:

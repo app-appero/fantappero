@@ -41,6 +41,14 @@ class RosterCompositionIssueResponse(ApiModel):
     message: str
 
 
+class RosterUnderQuotaRoleResponse(ApiModel):
+    """Un ruolo sotto la quota della lega: quanti calciatori ci sono e quanti ne prevede (1.5)."""
+
+    role: str
+    count: int
+    quota: int
+
+
 class RosterCompositionResponse(ApiModel):
     status: str
     filled_slots: int = Field(alias="filledSlots")
@@ -50,6 +58,12 @@ class RosterCompositionResponse(ApiModel):
     limits: RosterCompositionLimitsResponse
     counts: RosterCompositionCountsResponse
     issues: list[RosterCompositionIssueResponse] = Field(default_factory=list)
+    #: 1.5: ruoli sotto la quota della lega (es. 9 Centrocampisti su 11), anche a rosa alla
+    #: misura. Solo un avviso in Rosa: non cambia formazione, esubero né sostituti. Campo in più,
+    #: le app già installate lo ignorano.
+    under_quota_roles: list[RosterUnderQuotaRoleResponse] = Field(
+        default_factory=list, alias="underQuotaRoles"
+    )
 
 
 class FantasyTeamResponse(ApiModel):

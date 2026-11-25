@@ -6,6 +6,7 @@ from pydantic import Field
 
 from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
+from fantasy_teams.schemas import RosterUnderQuotaRoleResponse
 from market.valuation_schemas import AthleteSeasonAverageResponse
 
 # Tetto tecnico (colonne a 32 bit): oltre, la richiesta è respinta con 422.
@@ -49,12 +50,31 @@ class TradeMissingRoleResponse(ApiModel):
     count: int
 
 
+class TradeReplacementCostResponse(ApiModel):
+    """Quanto costano i sostituti di un ruolo che manca, ai prezzi dei liberi di adesso.
+
+    Stesso prezzo dell'acquisto (il Valore, il minimo dove manca) e stessi liberi (non in rosa, non
+    impegnati in aste o svincolati aperti).
+    """
+
+    role: str
+    count: int
+    #: Il libero più economico del ruolo; ``None`` se non c'è nessun libero.
+    cheapest_price: int | None = Field(default=None, alias="cheapestPrice")
+    #: I ``count`` liberi più economici insieme; ``None`` se non ce ne sono abbastanza.
+    total_price: int | None = Field(default=None, alias="totalPrice")
+
+
 class TradeRosterAfterResponse(ApiModel):
     """Come resterebbe la rosa di una squadra dopo lo scambio (1.5, avviso prima di accettare).
 
     ``missingRoles`` sono i sostituti che la squadra dovrà scegliere subito dagli svincolati, al
     loro Valore: vuoto se la rosa resta alla misura. Sito e app mostrano l'avviso da qui, senza
     calcolarlo da soli.
+
+    Campi aggiunti dopo la corsa Mercato del 25/11 (solo avvisi, le app già installate li
+    ignorano): i crediti dopo lo scambio, il prezzo più basso dei sostituti e se bastano, i ruoli
+    che resterebbero sotto quota anche a rosa alla misura.
     """
 
     team_id: str = Field(alias="teamId")
@@ -64,6 +84,17 @@ class TradeRosterAfterResponse(ApiModel):
     missing_roles: list[TradeMissingRoleResponse] = Field(
         default_factory=list, alias="missingRoles"
     )
+    balance_after: int = Field(default=0, alias="balanceAfter")
+    replacement_costs: list[TradeReplacementCostResponse] = Field(
+        default_factory=list, alias="replacementCosts"
+    )
+    #: ``False`` se con i crediti di dopo lo scambio non potrà prendere da sola i sostituti
+    #: (dovrà assegnarli l'admin). Lo scambio non si blocca: è solo un avviso.
+    can_afford_replacement: bool = Field(default=True, alias="canAffordReplacement")
+    #: Ruoli sotto la quota della lega subito dopo lo scambio (prima dei sostituti).
+    under_quota_roles: list[RosterUnderQuotaRoleResponse] = Field(
+        default_factory=list, alias="underQuotaRoles"
+    )
 
 
 class TradePreviewRequest(ApiModel):
@@ -72,6 +103,9 @@ class TradePreviewRequest(ApiModel):
     recipient_team_id: str = Field(alias="recipientTeamId", min_length=1)
     offered_athlete_ids: list[str] = Field(default_factory=list, alias="offeredAthleteIds")
     requested_athlete_ids: list[str] = Field(default_factory=list, alias="requestedAthleteIds")
+    # Facoltativi (le app 1.4 non li mandano): servono ai crediti dopo lo scambio.
+    offered_credits: int = Field(default=0, alias="offeredCredits", ge=0, le=MAX_TRADE_CREDITS)
+    requested_credits: int = Field(default=0, alias="requestedCredits", ge=0, le=MAX_TRADE_CREDITS)
 
 
 class TradePreviewResponse(ApiModel):

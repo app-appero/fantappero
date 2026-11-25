@@ -24,6 +24,7 @@ from fantasy_teams.factory import (
 )
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.schemas import RosterUnderQuotaRoleResponse
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -46,6 +47,7 @@ from market.trade_schemas import (
     TradePreviewResponse,
     TradeProposalListResponse,
     TradeProposalResponse,
+    TradeReplacementCostResponse,
     TradeRosterAfterResponse,
 )
 from market.trade_validators import (
@@ -601,10 +603,24 @@ class TradeService:
         calculator = RosterAfterTradeCalculator(self._session, league_access.league)
         return TradePreviewResponse(
             proposerRosterAfter=self._roster_after_response(
-                calculator.after(proposer.id, outgoing=offered, incoming=requested), proposer
+                calculator.after(
+                    proposer.id,
+                    outgoing=offered,
+                    incoming=requested,
+                    credits_out=payload.offered_credits,
+                    credits_in=payload.requested_credits,
+                ),
+                proposer,
             ),
             recipientRosterAfter=self._roster_after_response(
-                calculator.after(recipient.id, outgoing=requested, incoming=offered), recipient
+                calculator.after(
+                    recipient.id,
+                    outgoing=requested,
+                    incoming=offered,
+                    credits_out=payload.requested_credits,
+                    credits_in=payload.offered_credits,
+                ),
+                recipient,
             ),
         )
 
@@ -620,6 +636,23 @@ class TradeService:
             missingRoles=[
                 TradeMissingRoleResponse(role=role.value, count=count)
                 for role, count in role_counts(after.missing_roles)
+            ],
+            balanceAfter=after.balance_after,
+            replacementCosts=[
+                TradeReplacementCostResponse(
+                    role=cost.role.value,
+                    count=cost.count,
+                    cheapestPrice=cost.cheapest_price,
+                    totalPrice=cost.total_price,
+                )
+                for cost in after.replacement_costs
+            ],
+            canAffordReplacement=after.can_afford_replacement,
+            underQuotaRoles=[
+                RosterUnderQuotaRoleResponse(
+                    role=item.role.value, count=item.count, quota=item.quota
+                )
+                for item in after.under_quota
             ],
         )
 
@@ -1085,13 +1118,21 @@ class TradeService:
                 requested_ids = [UUID(value) for value in proposal.requested_athlete_ids]
                 proposer_after = self._roster_after_response(
                     calculator.after(
-                        proposal.proposer_team_id, outgoing=offered_ids, incoming=requested_ids
+                        proposal.proposer_team_id,
+                        outgoing=offered_ids,
+                        incoming=requested_ids,
+                        credits_out=proposal.offered_credits,
+                        credits_in=proposal.requested_credits,
                     ),
                     self._session.get(FantasyTeam, proposal.proposer_team_id),
                 )
                 recipient_after = self._roster_after_response(
                     calculator.after(
-                        proposal.recipient_team_id, outgoing=requested_ids, incoming=offered_ids
+                        proposal.recipient_team_id,
+                        outgoing=requested_ids,
+                        incoming=offered_ids,
+                        credits_out=proposal.requested_credits,
+                        credits_in=proposal.offered_credits,
                     ),
                     self._session.get(FantasyTeam, proposal.recipient_team_id),
                 )

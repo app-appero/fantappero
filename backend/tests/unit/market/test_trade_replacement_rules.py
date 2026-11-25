@@ -5,11 +5,15 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlsplit
 
 from database.enums import FantasyRole
-from fantasy_teams.composition import limits_from_rules
+from fantasy_teams.composition import UnderQuotaRole, limits_from_rules, under_quota_roles
 from market.trade_replacement import (
+    ReplacementCost,
+    can_afford_replacements,
     missing_roles_label,
     net_outgoing_roles,
     plan_replacement_roles,
+    replacement_costs,
+    replacement_price,
     role_count_label,
 )
 from notifications.templates import render_notification
@@ -84,6 +88,56 @@ def test_labels_count_and_plural() -> None:
     assert missing_roles_label([C, D]) == "1 Difensore e 1 Centrocampista"
     assert missing_roles_label([A, C, D]) == "1 Difensore, 1 Centrocampista e 1 Attaccante"
     assert missing_roles_label([]) == ""
+
+
+def test_roles_under_quota_even_with_the_roster_at_full_size() -> None:
+    # 35/35 dopo uno scambio 1 per 1 tra ruoli diversi: 10 C su 11, un D in esubero.
+    counts = {P: 3, D: 12, C: 10, A: 10}
+    assert under_quota_roles(LIMITS, counts) == [UnderQuotaRole(role=C, count=10, quota=11)]
+    # Le chiavi possono essere anche le lettere (i conteggi della composizione).
+    assert under_quota_roles(LIMITS, {"P": 2, "D": 11, "C": 9, "A": 10}) == [
+        UnderQuotaRole(role=P, count=2, quota=3),
+        UnderQuotaRole(role=C, count=9, quota=11),
+    ]
+    assert under_quota_roles(LIMITS, {P: 3, D: 11, C: 11, A: 10}) == []
+    # Un ruolo assente conta zero.
+    assert under_quota_roles(LIMITS, {P: 3, D: 11, C: 11}) == [
+        UnderQuotaRole(role=A, count=0, quota=10)
+    ]
+
+
+def test_replacement_costs_take_the_cheapest_free_players_of_each_missing_role() -> None:
+    prices = {D: [1, 4, 9], C: [7]}
+    assert replacement_costs([D], prices) == (
+        ReplacementCost(role=D, count=1, cheapest_price=1, total_price=1),
+    )
+    # Due D: i due più economici insieme; un C senza liberi abbastanza.
+    assert replacement_costs([C, D, D], {**prices, C: []}) == (
+        ReplacementCost(role=D, count=2, cheapest_price=1, total_price=5),
+        ReplacementCost(role=C, count=1, cheapest_price=None, total_price=None),
+    )
+    assert replacement_costs([], prices) == ()
+
+
+def test_can_afford_compares_the_credits_with_the_cheapest_total() -> None:
+    one = (ReplacementCost(role=D, count=1, cheapest_price=8, total_price=8),)
+    assert can_afford_replacements(8, one) is True
+    assert can_afford_replacements(7, one) is False
+    assert can_afford_replacements(0, one) is False
+    two = (*one, ReplacementCost(role=C, count=1, cheapest_price=3, total_price=3))
+    assert can_afford_replacements(10, two) is False
+    assert can_afford_replacements(11, two) is True
+    # Senza liberi del ruolo non può prenderlo da sola, quali che siano i crediti.
+    none = (ReplacementCost(role=D, count=1, cheapest_price=None, total_price=None),)
+    assert can_afford_replacements(1_000, none) is False
+    # Senza sostituti da scegliere non c'è niente da pagare.
+    assert can_afford_replacements(0, ()) is True
+
+
+def test_replacement_price_is_the_value_or_the_minimum() -> None:
+    assert replacement_price(12) == 12
+    assert replacement_price(None) == 1
+    assert replacement_price(0) == 1
 
 
 def test_replacement_notification_says_what_is_missing_and_opens_the_choice() -> None:

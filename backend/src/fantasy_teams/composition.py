@@ -206,6 +206,46 @@ def evaluate_roster_composition(
     )
 
 
+@dataclass(frozen=True)
+class UnderQuotaRole:
+    """Un ruolo con meno calciatori della quota della lega (es. 9 Centrocampisti su 11)."""
+
+    role: FantasyRole
+    count: int
+    quota: int
+
+
+#: Ordine dei ruoli negli avvisi (P, D, C, A).
+_UNDER_QUOTA_ORDER: tuple[FantasyRole, ...] = (
+    FantasyRole.P,
+    FantasyRole.D,
+    FantasyRole.C,
+    FantasyRole.A,
+)
+
+
+def under_quota_roles(
+    limits: RosterCompositionLimits,
+    counts: Mapping[FantasyRole, int] | Mapping[str, int],
+) -> list[UnderQuotaRole]:
+    """I ruoli sotto la quota della lega, nell'ordine P, D, C, A (1.5, solo avviso).
+
+    ``counts`` sono i calciatori per ruolo come in `count_roles` (anche quelli in esubero; chi non
+    ha un ruolo listone non conta), con chiavi ``FantasyRole`` o lettere («P», «D», …). Non cambia
+    nessuna regola: formazione, esubero e diritto al sostituto restano quelli di sempre; sito e
+    app mostrano solo un avviso (es. rosa 35/35 con 9 Centrocampisti su 11 dopo uno scambio 1 per
+    1 tra ruoli diversi).
+    """
+    by_letter = {str(getattr(key, "value", key)): int(value or 0) for key, value in counts.items()}
+    result: list[UnderQuotaRole] = []
+    for role in _UNDER_QUOTA_ORDER:
+        count = by_letter.get(role.value, 0)
+        quota = limits.for_role(role)
+        if count < quota:
+            result.append(UnderQuotaRole(role=role, count=count, quota=quota))
+    return result
+
+
 def role_quota_overflow[K](
     *,
     limits: RosterCompositionLimits,
