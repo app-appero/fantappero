@@ -4,7 +4,10 @@ import {
   H2H_VALUE_UNAVAILABLE,
   autoSubstitutionNote,
   describeH2HResult,
+  emptyLineupMessage,
   enteredFromBench,
+  isMatchupRoundConcluded,
+  sideModuleLabel,
   formatFantasyGoals,
   formatFantasyPoints,
   playerVoteState,
@@ -192,5 +195,25 @@ describe("sostituzioni automatiche nello scontro (QA 24-25/11)", () => {
       { kind: "substitutionIn", count: 1 },
     ]);
     assert.deepEqual(substitutionBadges(unused), []);
+  });
+});
+
+describe("squadra senza formazione nello scontro (QA 24-25/11)", () => {
+  it("mostra il modulo solo con dei titolari", () => {
+    assert.equal(sideModuleLabel({ module: "4-3-3", starters: [] }), null);
+    assert.equal(sideModuleLabel({ module: null, starters: [] }), null);
+    assert.equal(sideModuleLabel({ module: "3-5-2", starters: [{} as never] }), "3-5-2");
+  });
+
+  it("a turno concluso dice 0 punti, prima che la formazione manca ancora", () => {
+    assert.equal(emptyLineupMessage(true), "Nessuna formazione schierata: 0 punti.");
+    assert.equal(emptyLineupMessage(false), "Questa squadra non ha ancora una formazione per il turno.");
+  });
+
+  it("il turno è concluso a partite finite o se omologato", () => {
+    assert.equal(isMatchupRoundConcluded({ roundConcluded: true, homologationStatus: "provisional" }), true);
+    assert.equal(isMatchupRoundConcluded({ homologationStatus: "homologated" }), true);
+    assert.equal(isMatchupRoundConcluded({ roundConcluded: false, homologationStatus: "provisional" }), false);
+    assert.equal(isMatchupRoundConcluded({ homologationStatus: null }), false);
   });
 });

@@ -15,7 +15,7 @@
  * del backend e non va mai ricalcolata nel client.
  */
 
-import type { H2HMatchupScore } from "./leagues.js";
+import type { H2HMatchupDetail, H2HMatchupScore, H2HSideLineup } from "./leagues.js";
 
 export const H2H_POINTS_LABEL = "Punti";
 export const H2H_GOALS_LABEL = "Gol fantasy";
@@ -84,6 +84,25 @@ export function enteredFromBench<T extends { enteredForAthleteId?: string | null
   bench: readonly T[],
 ): T[] {
   return bench.filter((player) => player.enteredForAthleteId != null);
+}
+
+/** Turno dello scontro concluso: tutte le partite finite oppure già omologato. */
+export function isMatchupRoundConcluded(
+  detail: Pick<H2HMatchupDetail, "roundConcluded" | "homologationStatus">,
+): boolean {
+  return detail.roundConcluded === true || detail.homologationStatus === "homologated";
+}
+
+/** Modulo accanto al nome della squadra: solo se ha titolari schierati (mai un «4-3-3» vuoto). */
+export function sideModuleLabel(side: Pick<H2HSideLineup, "module" | "starters">): string | null {
+  return side.starters.length > 0 && side.module ? side.module : null;
+}
+
+/** Testo per la squadra senza formazione nello scontro. */
+export function emptyLineupMessage(roundConcluded: boolean): string {
+  return roundConcluded
+    ? "Nessuna formazione schierata: 0 punti."
+    : "Questa squadra non ha ancora una formazione per il turno.";
 }
 
 /** Voto provvisorio mostrato mentre il provider non ha ancora un voto per chi sta giocando. */

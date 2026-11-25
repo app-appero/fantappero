@@ -73,6 +73,21 @@ describe("Scontro: sostituzioni automatiche a turno concluso (QA 24-25/11)", () 
     expect(html).not.toContain("Entrato per");
   });
 
+  it("squadra senza formazione: niente modulo, e a turno concluso 0 punti", () => {
+    const empty = side({ module: "4-3-3", starters: [], bench: [], totalScore: null, lineupSource: "submitted" });
+    const concluded = renderToStaticMarkup(createElement(SideBlock, { side: empty, title: "away", roundConcluded: true }));
+    expect(concluded).not.toContain("4-3-3");
+    expect(concluded).toContain("Nessuna formazione schierata: 0 punti.");
+    expect(concluded).not.toContain("non ha ancora una formazione");
+
+    const open = renderToStaticMarkup(createElement(SideBlock, { side: empty, title: "away" }));
+    expect(open).toContain("Questa squadra non ha ancora una formazione per il turno.");
+
+    const versus = renderToStaticMarkup(createElement(RosterVersus, { home: side(), away: empty }));
+    expect(versus).toContain("4-3-3"); // il modulo di chi ha schierato resta
+    expect(versus.match(/4-3-3/g)).toHaveLength(1);
+  });
+
   it("nella vista affiancata il titolare resta S.V. «uscito» e il panchinaro «entrato per»", () => {
     const html = renderToStaticMarkup(createElement(RosterVersus, { home: side(), away: side({ teamName: "Ospiti" }) }));
     expect(html).toContain("Uscito (S.V.) · entra Darmian");

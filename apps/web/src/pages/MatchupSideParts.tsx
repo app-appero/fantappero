@@ -11,6 +11,7 @@ import {
   formatCountdown,
   playerVoteState,
   probableToneOf,
+  sideModuleLabel,
 } from "@fantappero/contracts";
 import { EventBadges } from "@fantappero/ui";
 import { useEffect, useState, type ReactElement } from "react";
@@ -237,7 +238,7 @@ function TeamHead({ side }: { side: H2HSideLineup }) {
     <div className="fa-versus__head">
       <div className="fa-versus__head-name">
         <strong>{side.teamName ?? side.displayName}</strong>
-        <span>{side.module ?? ""}</span>
+        <span>{sideModuleLabel(side) ?? ""}</span>
       </div>
       <span className="fa-versus__head-score">{formatFantasyPoints(side.totalScore)}</span>
     </div>

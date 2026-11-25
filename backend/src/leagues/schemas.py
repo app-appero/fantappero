@@ -521,6 +521,9 @@ class H2HMatchupDetailResponse(ApiModel):
     )
     live: bool
     is_bye: bool = Field(alias="isBye")
+    # Tutte le partite del turno finite (sostituzioni automatiche applicate):
+    # una squadra senza formazione fa 0 punti, non «deve ancora schierarla».
+    round_concluded: bool = Field(default=False, alias="roundConcluded")
     home: H2HSideLineupResponse
     away: H2HSideLineupResponse | None = None
     result: H2HMatchupScoreResponse | None = None

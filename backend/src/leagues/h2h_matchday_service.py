@@ -295,6 +295,7 @@ def get_h2h_matchup_detail(
         europeanTurnStatus=european_status,
         live=live,
         isBye=slot.is_bye,
+        roundConcluded=substitutions_applied,
         home=home_side,
         away=away_side,
         result=_score_payload(slot),

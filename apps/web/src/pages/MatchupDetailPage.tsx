@@ -3,7 +3,10 @@ import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
   describeH2HResult,
+  emptyLineupMessage,
   enteredFromBench,
+  isMatchupRoundConcluded,
+  sideModuleLabel,
   fantasyBadgesFromBonusMalus,
   substitutionBadges,
   playerVoteState,
@@ -150,16 +153,26 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number):
 
 type MatchupView = "campo" | "affiancata";
 
-export function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+export function SideBlock({
+  side,
+  title,
+  roundConcluded = false,
+}: {
+  side: H2HSideLineup;
+  title: string;
+  /** Turno concluso: la squadra senza formazione fa 0 punti. */
+  roundConcluded?: boolean;
+}) {
   const athleteCard = useAthleteCard();
   const now = useNow();
   const teamLabel = side.teamName ?? side.displayName;
   const entered = enteredFromBench(side.bench);
+  const module = sideModuleLabel(side);
   return (
     <section data-testid={`matchup-side-${title}`}>
       <h2>
         {teamLabel}
-        {side.module ? ` · ${side.module}` : ""}
+        {module ? ` · ${module}` : ""}
       </h2>
       <p>
         {H2H_POINTS_LABEL}: <strong>{formatFantasyPoints(side.totalScore)}</strong>
@@ -177,7 +190,7 @@ export function SideBlock({ side, title }: { side: H2HSideLineup; title: string 
         <UiStatePanel
           state="empty"
           title="Formazione assente"
-          message="Questa squadra non ha ancora una formazione per il turno."
+          message={emptyLineupMessage(roundConcluded)}
           testId={`matchup-lineup-empty-${title}`}
         />
       ) : (
@@ -480,8 +493,10 @@ export function MatchupDetailPage() {
                 <RosterVersus home={detail.home} away={detail.away} />
               ) : (
                 <div className="fa-pitch-row">
-                  <SideBlock side={detail.home} title="home" />
-                  {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
+                  <SideBlock side={detail.home} title="home" roundConcluded={isMatchupRoundConcluded(detail)} />
+                  {detail.away ? (
+                    <SideBlock side={detail.away} title="away" roundConcluded={isMatchupRoundConcluded(detail)} />
+                  ) : null}
                 </div>
               )}
             </>

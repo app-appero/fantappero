@@ -761,6 +761,11 @@ export interface H2HMatchupDetail {
   europeanTurnStatus: "scheduled" | "open" | "locked" | "skipped" | null;
   live: boolean;
   isBye: boolean;
+  /**
+   * Tutte le partite del turno finite (sostituzioni automatiche applicate); assente da
+   * un backend più vecchio.
+   */
+  roundConcluded?: boolean;
   home: H2HSideLineup;
   away: H2HSideLineup | null;
   result: H2HMatchupScore | null;

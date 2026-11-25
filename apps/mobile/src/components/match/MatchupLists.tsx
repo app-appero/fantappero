@@ -13,6 +13,7 @@ import {
   formatCountdown,
   playerVoteState,
   playerAvatarUrl,
+  sideModuleLabel,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useRef, useState, type ReactElement } from "react";
@@ -306,7 +307,7 @@ function TeamHead({ side }: { side: H2HSideLineup }) {
         <Text style={styles.headTitle} numberOfLines={1}>
           {side.teamName ?? side.displayName}
         </Text>
-        <Text style={styles.headModule}>{side.module ?? ""}</Text>
+        <Text style={styles.headModule}>{sideModuleLabel(side) ?? ""}</Text>
       </View>
       <Text style={styles.headScore}>{formatFantasyPoints(side.totalScore)}</Text>
     </View>
