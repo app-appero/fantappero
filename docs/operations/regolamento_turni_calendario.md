@@ -51,7 +51,16 @@ Le regole qui sotto descrivono il comportamento del codice; dove il codice cambi
 **Rose non in regola, cosa succede ai giocatori:**
 - i giocatori **in esubero** (oltre la quota del ruolo) restano in rosa, ma **non si possono schierare**, né titolari né tra i primi 10 della panchina, finché la rosa non torna in regola. In tribuna vengono tolti senza errore;
 - il resto della squadra schiera normalmente;
-- una rosa **incompleta**, o con meno di 3 campionati, non può schierare la formazione finché non viene sistemata.
+- una rosa **incompleta**, o con meno di 3 campionati, non può schierare la formazione finché non viene sistemata. Al blocco del turno gioca la formazione automatica.
+
+**Sostituto dopo uno scambio sbilanciato** (dalla 1.5, decisione di Rosario del 25/11):
+- chi accetta uno scambio che lo lascerà sotto la misura della rosa (per esempio un 2 per 1: 34/35) lo vede prima, nella finestra di conferma: «Dopo lo scambio avrai 34/35», con il ruolo che mancherà. Lo stesso avviso lo vedono chi propone lo scambio e l'admin che lo approva (con il nome della squadra);
+- appena lo scambio è effettivo (accettato, o approvato dall'admin se la lega lo richiede) la squadra rimasta corta sceglie il **sostituto**: un calciatore **libero** del ruolo che manca, pagato il suo **Valore** (il «Valore» del listone; il minimo se manca). Se mancano due giocatori si sceglie uno alla volta. I crediti si scalano subito, con la voce «Sostituto dopo lo scambio» nello storico dei crediti;
+- vale **anche a mercato chiuso**: è solo un completamento della rosa, non un'asta. Non vale **a turno in corso** (le rose sono ferme come per ogni altra operazione): si sceglie appena il turno è calcolato;
+- il ruolo è quello che manca secondo le quote della lega; se le quote non bastano a deciderlo, quello del giocatore ceduto in più. Non si può prendere chi è già in una rosa della lega o è in un'asta o negli svincolati ancora aperti, né chi costa più dei crediti rimasti;
+- il diritto nasce **solo da uno scambio**. Una rosa incompleta per altri motivi (asta, svincolo, rimozione dell'admin) non lo dà. Se la rosa torna alla misura in altro modo (uno scambio 1 per 2, un'assegnazione dell'admin) il sostituto non serve più e il diritto si chiude da solo;
+- finché non sceglie, la formazione resta bloccata (Rosa e Formazione lo dicono, con il pulsante «Scegli il sostituto»); al blocco gioca la formazione automatica. Chi non c'era quando lo scambio è diventato effettivo riceve una notifica che porta alla scelta;
+- l'altra squadra, che sale a 36/35, segue la regola dell'esubero qui sopra.
 
 ## 4. Ruoli del listone
 
