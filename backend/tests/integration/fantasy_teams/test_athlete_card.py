@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -18,6 +18,7 @@ from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
 from sports_data.catalog.models import Club, SportSeason
+from sports_data.listone.generate import pick_active_memberships
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
 
@@ -199,3 +200,88 @@ def test_athlete_card_requires_league_membership(
         select(LeagueMembership).where(LeagueMembership.user_id == outsider_id)
     )
     assert membership is None or membership.role != LeagueMemberRole.OWNER
+
+
+def test_athlete_card_club_matches_the_listone_with_several_active_memberships(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA notte 24-25/11: Aitor Fernández «Villarreal» nella scheda e «Osasuna» nel listone.
+    Con più membership attive la scheda sceglie come il listone: vince il club d'arrivo
+    dell'ultimo trasferimento, anche se l'altra membership è della rosa del fornitore e più
+    recente."""
+    token, _user_id = _register_and_login(client, "card.club@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "Lega Scheda Club", "seasonYear": 2026, "competitionIds": competition_ids},
+    )
+    assert created.status_code == 201
+    league_id = created.json()["id"]
+
+    villarreal = Club(provider_id=880451, name="Villarreal")
+    osasuna = Club(provider_id=880452, name="Osasuna")
+    db_session.add_all([villarreal, osasuna])
+    db_session.flush()
+    competition_id = UUID(competition_ids[0])
+    season = db_session.scalars(
+        select(SportSeason).where(
+            SportSeason.competition_id == competition_id, SportSeason.year == 2026
+        )
+    ).first()
+    if season is None:
+        season = SportSeason(competition_id=competition_id, year=2026, is_current=True)
+        db_session.add(season)
+        db_session.flush()
+
+    athlete = Athlete(provider_id=880453, canonical_name="Aitor Fernández")
+    db_session.add(athlete)
+    db_session.flush()
+    now = datetime.now(UTC)
+    # Prima la membership sbagliata: è quella che la scheda prendeva (la prima attiva).
+    db_session.add(
+        SquadMembership(
+            athlete_id=athlete.id,
+            club_id=villarreal.id,
+            sport_season_id=season.id,
+            shirt_number=13,
+            provider_position_raw="Goalkeeper",
+            is_active=True,
+            source="squads",
+            updated_at=now,
+        )
+    )
+    db_session.flush()
+    db_session.add(
+        SquadMembership(
+            athlete_id=athlete.id,
+            club_id=osasuna.id,
+            sport_season_id=season.id,
+            shirt_number=1,
+            provider_position_raw="Goalkeeper",
+            is_active=True,
+            source="players",
+            updated_at=now - timedelta(days=1),
+        )
+    )
+    db_session.add(
+        Transfer(
+            athlete_id=athlete.id,
+            transfer_date=date(2025, 7, 1),
+            from_club_id=villarreal.id,
+            to_club_id=osasuna.id,
+            transfer_type="Loan",
+            provider_key="athlete-card-aitor-2025",
+        )
+    )
+    db_session.commit()
+
+    assert pick_active_memberships(db_session, 2026)[athlete.id].club_id == osasuna.id
+    card = client.get(
+        f"/leagues/{league_id}/calciatori/{athlete.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert card.status_code == 200
+    assert card.json()["clubName"] == "Osasuna"
+    assert card.json()["shirtNumber"] == 1

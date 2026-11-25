@@ -23,6 +23,10 @@ from fantasy_turns.readiness import FINISHED_FIXTURE_STATUSES, LIVE_FIXTURE_STAT
 from market.valuation_service import build_career, load_market_info
 from sports_data.catalog.models import Club
 from sports_data.fixtures.models import Fixture, PlayerMatchStat
+from sports_data.listone.generate import (
+    _pick_membership_per_athlete,
+    latest_transfer_destinations,
+)
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
 
@@ -95,10 +99,7 @@ def get_athlete_card(
         .options(selectinload(FantasyRosterSlot.fantasy_team))
     )
 
-    current = next(
-        (row for row in memberships if row.is_active),
-        memberships[0] if memberships else None,
-    )
+    current = _current_membership(session, athlete.id, memberships, season_year)
     official_role = role_row.role.value if role_row is not None else None
     effective_role = override.role.value if override is not None else official_role
     position_raw = (
@@ -178,6 +179,43 @@ def get_athlete_card(
             for row in transfers
         ],
     )
+
+
+def _current_membership(
+    session: Session,
+    athlete_id: UUID,
+    memberships: list[SquadMembership],
+    season_year: int,
+) -> SquadMembership | None:
+    """La membership della scheda (club, numero, statistiche): la stessa scelta del listone.
+
+    QA notte 24-25/11: con più membership attive (prestito, rientro, cessione) la scheda
+    prendeva la prima in ordine casuale e mostrava un altro club (Aitor Fernández «Villarreal»
+    nella scheda, «Osasuna» nel listone). Come ``pick_active_memberships``: fra le attive della
+    stagione della lega vince il club d'arrivo dell'ultimo trasferimento, poi la rosa del
+    fornitore, poi una posizione con ruolo, a parità la più recente. Senza attive in quella
+    stagione si guarda l'ultima stagione con membership attive, come prima.
+    """
+    active = [row for row in memberships if row.is_active]
+    if not active:
+        return memberships[0] if memberships else None
+    candidates = [
+        row
+        for row in active
+        if row.sport_season is not None and row.sport_season.year == season_year
+    ]
+    if not candidates:
+        latest_year = max(row.sport_season.year if row.sport_season else 0 for row in active)
+        candidates = [
+            row
+            for row in active
+            if (row.sport_season.year if row.sport_season else 0) == latest_year
+        ]
+    candidates.sort(key=lambda row: row.updated_at, reverse=True)
+    current_clubs = (
+        latest_transfer_destinations(session, [athlete_id]) if len(candidates) > 1 else {}
+    )
+    return _pick_membership_per_athlete(candidates, current_clubs)[athlete_id]
 
 
 def _int(value: object) -> int:
