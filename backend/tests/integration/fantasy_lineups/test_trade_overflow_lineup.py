@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
+from unittest.mock import ANY
 from uuid import UUID
 
 import pytest
@@ -485,14 +486,27 @@ def test_excess_player_does_not_unblock_a_roster_with_an_empty_slot(
     )
     assert saved.status_code == 400
     assert saved.json()["code"] == "roster_not_validated"
+    incomplete = "Rosa incompleta: 34 giocatori su 35."
+    assert saved.json()["message"].startswith(incomplete)
     best = client.post(f"{_lineup_url(setup)}/migliore", headers=_headers(setup["token_a"]))
     assert best.status_code == 400
     assert best.json()["code"] == "roster_not_validated"
 
-    # B invece è a 36 con due D in esubero e nessuno slot vuoto: può schierare.
+    # QA 19/11 (resto della riga): GET formazione lo dice già, con lo stesso codice e motivo,
+    # invece di ``issues: []``. Cosa è permesso non cambia.
+    context = client.get(_lineup_url(setup), headers=_headers(setup["token_a"]))
+    assert context.status_code == 200
+    assert context.json()["issues"][0] == {"code": "roster_not_validated", "message": ANY}
+    assert context.json()["issues"][0]["message"] == saved.json()["message"]
+
+    # B invece è a 36 con due D in esubero e nessuno slot vuoto: può schierare, e GET
+    # formazione non segnala nulla sulla rosa.
     _assert_team_can_field_without_excess(
         client, db_session, setup, team_id=setup["team_b"], token=setup["token_b"]
     )
+    context_b = client.get(_lineup_url(setup), headers=_headers(setup["token_b"]))
+    assert context_b.status_code == 200
+    assert "roster_not_validated" not in {item["code"] for item in context_b.json()["issues"]}
 
 
 def test_roster_and_team_list_agree_on_composition_status_after_a_trade(

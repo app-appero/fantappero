@@ -200,6 +200,8 @@ export function LeagueAdminPage() {
   const refreshAfterInvitesChange = useCallback(() => {
     setInvitesReloadToken((current) => current + 1);
   }, []);
+  // «Salva regolamento» può cambiare i partecipanti: il banner del mercato («(1/8)») va riletto.
+  const [rulesReloadToken, setRulesReloadToken] = useState(0);
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const configurationSavedRef = useRef(configurationSaved);
   configurationSavedRef.current = configurationSaved;
@@ -389,6 +391,7 @@ export function LeagueAdminPage() {
         buildPayloadFromRules(rules),
       );
       setRules(saved);
+      setRulesReloadToken((current) => current + 1);
       setSaveSuccess(true);
       setConfigurationSaved(true);
       setSetupTab("invitati");
@@ -445,8 +448,9 @@ export function LeagueAdminPage() {
 
       {!loading && !loadError && rules ? (
         // Lo stato del mercato serve all'interruttore e al conto degli iscritti (inviti in attesa
-        // compresi, Rosario 20/11): si rilegge quando cambiano iscritti o inviti nominativi.
-        <MarketGateProvider reloadToken={membersReloadToken + invitesReloadToken}>
+        // compresi, Rosario 20/11): si rilegge quando cambiano iscritti, inviti nominativi o
+        // regolamento (numero di partecipanti, QA 24-25/11).
+        <MarketGateProvider reloadToken={membersReloadToken + invitesReloadToken + rulesReloadToken}>
           {lifecycle ? (
             <LeagueSeasonPanel
               leagueId={activeLeagueId}

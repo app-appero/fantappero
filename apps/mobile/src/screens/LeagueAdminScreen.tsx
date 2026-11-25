@@ -194,9 +194,11 @@ export function LeagueAdminScreen() {
 
   const { refreshing, onRefresh } = useScreenData(loadAll);
   // Lo stato del mercato serve all'interruttore e al conto degli iscritti, inviti nominativi in
-  // attesa compresi (Rosario, 20/11): si rilegge quando cambiano iscritti o inviti.
+  // attesa compresi (Rosario, 20/11): si rilegge quando cambiano iscritti, inviti o regolamento
+  // («Salva regolamento» può cambiare i partecipanti, QA 24-25/11).
   const [invitesReload, setInvitesReload] = useState(0);
-  const marketGate = useMarketGate({ reloadToken: members.length + invitesReload });
+  const [rulesReload, setRulesReload] = useState(0);
+  const marketGate = useMarketGate({ reloadToken: members.length + invitesReload + rulesReload });
   const pendingInviteCount = marketGate.pendingInviteCount;
 
   // Amministratori: passare il controllo, condividerlo (co-admin) o toglierlo a un co-admin.
@@ -277,6 +279,7 @@ export function LeagueAdminScreen() {
         buildPayloadFromRules(nextRules),
       );
       setRules(saved);
+      setRulesReload((current) => current + 1);
       // Si resta sul regolamento con la conferma, senza passare a «Invitati» (corsa M4, 22/11).
       setSaveSuccess(rulesSavedMessage(!configurationSaved));
       setConfigurationSaved(true);

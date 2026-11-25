@@ -15,6 +15,7 @@ from database.enums import (
     FantasyTurnKind,
     FantasyTurnStatus,
     LeagueAuditAction,
+    LeagueState,
     NotificationCategory,
 )
 from fantasy_turns.homologation_service import apply_round_correction, homologate_round
@@ -65,15 +66,19 @@ def _create_finished_round(
     *,
     id_offset: int,
     league_created_before_round: bool = True,
+    league_state: LeagueState = LeagueState.ACTIVE,
+    status: FantasyTurnStatus = FantasyTurnStatus.OPEN,
 ) -> FantasyRound:
-    """Turno finito di due giorni. Di norma la lega esiste già da prima che inizi: con
-    ``league_created_before_round=False`` è un segnaposto «Lega creata dopo questo turno»."""
+    """Turno finito di due giorni, in una lega di norma attiva e creata prima che il turno
+    inizi: con ``league_created_before_round=False`` è un segnaposto «Lega creata dopo questo
+    turno»."""
     now = datetime.now(UTC)
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    league.state = league_state
     if league_created_before_round:
-        league = db_session.get(League, UUID(league_id))
-        assert league is not None
         league.created_at = now - timedelta(days=3)
-        db_session.flush()
+    db_session.flush()
     fantasy_round = FantasyRound(
         league_id=UUID(league_id),
         number=1,
@@ -81,7 +86,7 @@ def _create_finished_round(
         window_start_at=now - timedelta(days=2),
         window_end_at=now,
         cutoff_at=now - timedelta(hours=1),
-        status=FantasyTurnStatus.OPEN,
+        status=status,
         generated_at=now,
         opens_at=now - timedelta(days=2),
     )
@@ -183,11 +188,32 @@ def test_homologation_and_correction_notify_league_members(
     assert len(all_risultati) == 2
 
 
-def test_round_started_before_the_league_notifies_without_a_match_result(
+def _homologation_notifications(db_session: Session, user_id: UUID) -> list[Notification]:
+    return list(
+        db_session.scalars(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.template_key == "risultati.omologazione",
+            )
+        ).all()
+    )
+
+
+def _homologation_audit(db_session: Session, league_id: str) -> LeagueAuditEvent | None:
+    return db_session.scalar(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
+        )
+    )
+
+
+def test_round_started_before_the_league_is_homologated_without_notifying(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:
-    """Pilota 24/11: un turno iniziato prima della creazione della lega non ha scontri diretti.
-    All'omologazione niente «il risultato è definitivo» né link alla classifica."""
+    """QA notte 24-25/11: un turno iniziato prima della creazione della lega non l'ha giocato
+    nessuno. Si omologa (audit con ``beforeLeagueCreation``) ma «Turno concluso» non parte,
+    nemmeno in una lega attiva."""
     token, owner_id = _register_and_login(client, "homolog-placeholder@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Nata Dopo")
     fantasy_round = _create_finished_round(
@@ -201,23 +227,73 @@ def test_round_started_before_the_league_notifies_without_a_match_result(
     homologate_round(db_session, round_id=fantasy_round.id, actor_id=owner_id)
     db_session.commit()
 
-    notification = db_session.scalar(
-        select(Notification).where(
-            Notification.user_id == owner_id,
-            Notification.template_key == "risultati.omologazione",
-        )
-    )
-    assert notification is not None
-    assert notification.title == "Turno concluso"
-    assert "nessuno scontro diretto" in notification.body
-    assert "definitivo" not in notification.body
-    assert notification.deep_link.startswith("/turni?lega=")
-
-    audit = db_session.scalar(
-        select(LeagueAuditEvent).where(
-            LeagueAuditEvent.league_id == UUID(league_id),
-            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
-        )
-    )
+    assert _homologation_notifications(db_session, owner_id) == []
+    audit = _homologation_audit(db_session, league_id)
     assert audit is not None
     assert audit.details["beforeLeagueCreation"] is True
+
+
+def test_round_of_a_league_still_in_setup_is_homologated_without_notifying(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Lega in configurazione (pilota, turno 11 di una lega nata il 24/11): il turno mai aperto
+    si omologa senza notifiche e in Turni risulta concluso, non «programmato»."""
+    token, owner_id = _register_and_login(client, "homolog-setup@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega In Configurazione")
+    fantasy_round = _create_finished_round(
+        db_session,
+        league_id,
+        competition_ids,
+        id_offset=970201,
+        league_created_before_round=False,
+        league_state=LeagueState.CONFIGURING,
+        status=FantasyTurnStatus.SCHEDULED,
+    )
+
+    headers = {"Authorization": f"Bearer {token}"}
+    before = client.get(f"/leagues/{league_id}/turni", headers=headers)
+    assert before.status_code == 200
+    [row] = [item for item in before.json() if item["id"] == str(fantasy_round.id)]
+    assert row["effectiveStatus"] == "scheduled"
+    assert row["homologationStatus"] == "provisional"
+
+    homologate_round(db_session, round_id=fantasy_round.id, actor_id=owner_id)
+    db_session.commit()
+
+    assert _homologation_notifications(db_session, owner_id) == []
+    assert _homologation_audit(db_session, league_id) is not None
+
+    listing = client.get(f"/leagues/{league_id}/turni", headers=headers)
+    [row] = [item for item in listing.json() if item["id"] == str(fantasy_round.id)]
+    assert row["status"] == "scheduled"  # stato memorizzato: il turno non è mai stato aperto
+    assert row["effectiveStatus"] == "locked"
+    assert row["homologationStatus"] == "homologated"
+    assert row["modificationAllowed"] is False
+    assert row["matchStatus"] == "completed"
+    detail = client.get(f"/leagues/{league_id}/turni/{fantasy_round.id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["effectiveStatus"] == "locked"
+    assert detail.json()["homologationStatus"] == "homologated"
+
+
+def test_round_of_a_league_created_before_it_in_setup_is_not_notified(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Anche un turno dopo la creazione non notifica finché la lega non è attiva."""
+    token, owner_id = _register_and_login(client, "homolog-auction@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega In Asta")
+    fantasy_round = _create_finished_round(
+        db_session,
+        league_id,
+        competition_ids,
+        id_offset=970301,
+        league_state=LeagueState.AUCTION,
+    )
+
+    homologate_round(db_session, round_id=fantasy_round.id, actor_id=owner_id)
+    db_session.commit()
+
+    assert _homologation_notifications(db_session, owner_id) == []
+    audit = _homologation_audit(db_session, league_id)
+    assert audit is not None
+    assert "beforeLeagueCreation" not in audit.details

@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -93,6 +93,7 @@ from fantasy_teams.composition_service import (
     flag_role_quota_overflow,
     reconcile_roster_overflow,
     resolve_effective_athlete_roles,
+    resolve_league_rules_limits,
     roster_allows_lineup,
 )
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
@@ -100,6 +101,7 @@ from fantasy_teams.models import FantasyRosterSlot, FantasyTeam, RosterOwnership
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.rules import derive_effective_status
 from fantasy_turns.service import FantasyTurnService
+from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
@@ -111,6 +113,11 @@ from sports_data.predicted.read import AthleteProbable
 from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
+
+#: Formazione rifiutata perché la rosa non la permette (`roster_allows_lineup`): incompleta,
+#: oltre quota senza esuberi segnati o con meno di 3 campionati. Anche in GET formazione.
+ROSTER_NOT_VALIDATED_CODE = "roster_not_validated"
+ROSTER_NOT_VALIDATED_MESSAGE = "La rosa deve essere convalidata prima di schierare la formazione."
 
 #: Alias storico: la definizione vive in fantasy_lineups.kickoffs (condivisa
 #: con LineupLockReminderService).
@@ -1591,6 +1598,10 @@ class FantasyLineupService:
                         LeftRosterRemoval(name=draft_names.get(str(item), ""))
                         for item in cleanup.removed_ids
                     )
+        if turn_editable:
+            roster_block = self._roster_block_issue(fantasy_team_id, league=league_access.league)
+            if roster_block is not None:
+                issues.insert(0, roster_block)
         if draft_response is not None and unresolved:
             # Come per la formazione salvata: chi non ha un ruolo in tribuna non si restituisce.
             kept_ids = drop_role_quota_excess_from_tribuna(
@@ -2361,8 +2372,49 @@ class FantasyLineupService:
         ):
             return
         raise ValidationAuthError(
-            "La rosa deve essere convalidata prima di schierare la formazione.",
-            code="roster_not_validated",
+            self._roster_block_message(team, league=league),
+            code=ROSTER_NOT_VALIDATED_CODE,
+        )
+
+    def _roster_block_message(self, team: FantasyTeam, *, league: League) -> str:
+        """Perché la rosa non può schierare: per una rosa incompleta lo si dice coi numeri.
+
+        Il caso tipico è lo scambio 2 per 1 o lo svincolo che lascia la squadra a 34/35 (QA del
+        19/11): il regolamento lo blocca finché la rosa non è completa, ma il messaggio parlava
+        solo di «convalida».
+        """
+        filled = (
+            self._session.scalar(
+                select(func.count(FantasyRosterSlot.id)).where(
+                    FantasyRosterSlot.fantasy_team_id == team.id,
+                    FantasyRosterSlot.athlete_id.is_not(None),
+                )
+            )
+            or 0
+        )
+        roster_size = resolve_league_rules_limits(self._session, league.id).roster_size
+        if filled < roster_size:
+            return (
+                f"Rosa incompleta: {filled} giocatori su {roster_size}. Completa la rosa "
+                "(mercato o scambio) per schierare la formazione."
+            )
+        return ROSTER_NOT_VALIDATED_MESSAGE
+
+    def _roster_block_issue(
+        self, fantasy_team_id: UUID, *, league: League
+    ) -> LineupIssueResponse | None:
+        """Lo stesso controllo di `_require_validated_roster`, in lettura (GET formazione).
+
+        Prima GET diceva ``issues: []`` e il salvataggio rispondeva 400 ``roster_not_validated``
+        (QA del 19/11, squadra rimasta a 34/35): ora il motivo arriva già con la formazione.
+        Non cambia cosa è permesso.
+        """
+        team = self._session.get(FantasyTeam, fantasy_team_id)
+        if team is None or roster_allows_lineup(self._session, team, league=league):
+            return None
+        return LineupIssueResponse(
+            code=ROSTER_NOT_VALIDATED_CODE,
+            message=self._roster_block_message(team, league=league),
         )
 
     def _upsert_draft(

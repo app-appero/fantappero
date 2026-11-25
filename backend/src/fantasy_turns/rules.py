@@ -342,7 +342,16 @@ def derive_effective_status(
     *,
     now: datetime,
     cutoff_at: datetime | None,
+    homologated: bool = False,
 ) -> FantasyTurnStatus:
+    """Stato effettivo del turno a ``now``.
+
+    ``homologated``: un turno omologato mai aperto (``scheduled``: lega non ancora attiva, o
+    turni nati dopo le loro partite) è concluso, non «programmato» (QA notte 24-25/11, turno 11
+    segnaposto di una lega in configurazione): vale ``locked``. Lo stato memorizzato non cambia.
+    """
+    if homologated and stored == FantasyTurnStatus.SCHEDULED:
+        return FantasyTurnStatus.LOCKED
     if stored in {FantasyTurnStatus.SKIPPED, FantasyTurnStatus.LOCKED, FantasyTurnStatus.SCHEDULED}:
         return stored
     if stored == FantasyTurnStatus.OPEN and cutoff_at is not None:
@@ -356,8 +365,11 @@ def is_modification_allowed(
     stored: FantasyTurnStatus,
     now: datetime,
     cutoff_at: datetime | None,
+    homologated: bool = False,
 ) -> bool:
-    effective = derive_effective_status(stored, now=now, cutoff_at=cutoff_at)
+    effective = derive_effective_status(
+        stored, now=now, cutoff_at=cutoff_at, homologated=homologated
+    )
     return effective == FantasyTurnStatus.SCHEDULED
 
 
@@ -366,9 +378,17 @@ def assert_modification_allowed(
     stored: FantasyTurnStatus,
     now: datetime,
     cutoff_at: datetime | None,
+    homologated: bool = False,
 ) -> None:
-    if is_modification_allowed(stored=stored, now=now, cutoff_at=cutoff_at):
+    if is_modification_allowed(
+        stored=stored, now=now, cutoff_at=cutoff_at, homologated=homologated
+    ):
         return
+    if homologated:
+        raise ValidationAuthError(
+            "Il turno è omologato: esclusione e rigenerazione non sono consentite.",
+            code="round_already_homologated",
+        )
     effective = derive_effective_status(stored, now=now, cutoff_at=cutoff_at)
     if effective == FantasyTurnStatus.SKIPPED:
         raise ValidationAuthError(

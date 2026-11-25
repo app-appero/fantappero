@@ -30,6 +30,8 @@ SERIE_B = 136
 CHAMPIONS_LEAGUE = 2
 COPPA_ITALIA = 137
 UNKNOWN_COMPETITION = 999  # non è nell'elenco dei tipi
+UEFA_YOUTH_LEAGUE = 14  # il fornitore la dà come campionato
+SERIE_C = 138
 
 LEAGUE_ONLY = 921_001  # 2025: Serie A
 LEAGUE_AND_CUPS = 921_002  # 2025: la stessa Serie A, più Champions League e Coppa Italia
@@ -44,6 +46,8 @@ NAMES = {
     CHAMPIONS_LEAGUE: "UEFA Champions League",
     COPPA_ITALIA: "Coppa Italia",
     UNKNOWN_COMPETITION: "Coppa Sconosciuta",
+    UEFA_YOUTH_LEAGUE: "UEFA Youth League",
+    SERIE_C: "Serie C",
 }
 
 
@@ -54,6 +58,7 @@ def _row(
     competition: int,
     rating: float,
     apps: int,
+    club: str = "Club Storico",
 ) -> AthleteSeasonStat:
     return AthleteSeasonStat(
         athlete_provider_id=athlete.provider_id,
@@ -61,7 +66,7 @@ def _row(
         season_year=season,
         source="provider",
         club_provider_id=921_500,
-        club_name="Club Storico",
+        club_name=club,
         competition_provider_id=competition,
         competition_name=NAMES[competition],
         appearances=apps,
@@ -301,3 +306,80 @@ def test_new_competition_types_trigger_a_recompute(
     again = refresh_market_values(session, season_year=SEASON)
     assert again.skipped is False
     assert _average(_values(session, athletes)[SERIE_B_PLAYER]) == (pytest.approx(7.0), 2025)
+
+
+def test_youth_and_reserve_rows_are_excluded_but_stay_in_the_career(
+    session: Session, athletes: dict[int, Athlete]
+) -> None:
+    """QA notte 24-25/11: K. Braithwaite con 7,3 di media dalla sola UEFA Youth League, che il
+    fornitore dà come campionato. Giovanili e seconde squadre non contano nella media né nel
+    Valore (righe ``youth``), ma restano nella carriera."""
+    _types(session)
+    session.add_all(
+        [
+            ProviderCompetitionType(
+                provider_id=provider_id,
+                type="league",
+                name=NAMES[provider_id],
+                fetched_at=datetime.now(UTC),
+            )
+            for provider_id in (UEFA_YOUTH_LEAGUE, SERIE_C)
+        ]
+    )
+    youth_only = Athlete(provider_id=921_007, canonical_name="K. Braithwaite")
+    with_reserves = Athlete(provider_id=921_008, canonical_name="Seconda Squadra")
+    session.add_all([youth_only, with_reserves])
+    session.flush()
+    for athlete in (youth_only, with_reserves):
+        session.add(
+            RoleAssignment(
+                athlete_id=athlete.id,
+                season_year=SEASON,
+                role=FantasyRole.A,
+                mapping_version="v1.0.0",
+            )
+        )
+    session.add_all(
+        [
+            _row(youth_only, season=2025, competition=UEFA_YOUTH_LEAGUE, rating=7.3, apps=6),
+            _row(with_reserves, season=2025, competition=SERIE_A, rating=6.5, apps=20),
+            _row(
+                with_reserves,
+                season=2025,
+                competition=SERIE_C,
+                rating=7.8,
+                apps=12,
+                club="Juventus Next Gen",
+            ),
+        ]
+    )
+    session.flush()
+    athletes = {**athletes, 921_007: youth_only, 921_008: with_reserves}
+
+    refresh_market_values(session, season_year=SEASON, force=True)
+    values = _values(session, athletes)
+
+    youth = values[921_007]
+    assert _average(youth) == (None, None)
+    assert youth.reference_value == pytest.approx(values[NO_HISTORY].reference_value)
+    previous = youth.components_json["seasons"]["previous"]
+    assert previous["rows"] == []
+    assert [(row["competition"], row["kind"]) for row in previous["excluded"]] == [
+        ("UEFA Youth League", "youth")
+    ]
+    reserves = values[921_008]
+    assert _average(reserves) == (pytest.approx(6.5), 2025)
+    assert reserves.value_index == pytest.approx(values[LEAGUE_ONLY].value_index)
+    assert [
+        (row["club"], row["kind"])
+        for row in reserves.components_json["seasons"]["previous"]["excluded"]
+    ] == [("Juventus Next Gen", "youth")]
+    assert (921_007, 2025) not in season_samples(session, current_season_year=SEASON)
+    assert reserves.components_json["version"] == "1.4.1"
+
+    career = build_career(session, athlete_provider_id=921_007, current_season_year=SEASON)
+    assert [(row.season_label, row.competition_name) for row in career] == [
+        ("25/26", "UEFA Youth League")
+    ]
+    career = build_career(session, athlete_provider_id=921_008, current_season_year=SEASON)
+    assert sorted(row.competition_name for row in career) == ["Serie A", "Serie C"]

@@ -37,6 +37,8 @@ import {
   fantasyBadgesFromBonusMalus,
   playerAvatarUrl,
   FAQ_HELP,
+  countWithNoun,
+  missingStartersLabel,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
@@ -57,7 +59,7 @@ import {
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
 import { formationRoundToLoad } from "./formation/roundSelection";
-import { rosterDepartureNotices, savedStarterSlotIds } from "./formation/savedLineup";
+import { rosterBlockNotice, rosterDepartureNotices, savedStarterSlotIds } from "./formation/savedLineup";
 import { withoutRoleQuotaExcess } from "./formation/roleQuotaExcess";
 import {
   benchAfterStarterPick,
@@ -675,6 +677,8 @@ export function FormationScreen() {
   }
   // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
   const rosterNotices = rosterDepartureNotices(context?.issues);
+  // Rosa che non può schierare (es. 34/35 dopo uno scambio 2 per 1): il server dice perché.
+  const rosterBlock = rosterBlockNotice(context?.issues);
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   const tacticalEvaluation = evaluateTacticalMove({
@@ -1757,6 +1761,12 @@ export function FormationScreen() {
             {actionError}
           </Text>
         ) : null}
+        {rosterBlock ? (
+          <View style={styles.banner} testID="formation-roster-blocked" accessibilityRole="alert">
+            <Text style={styles.error}>Non puoi ancora schierare la formazione</Text>
+            <Text style={styles.notice}>{rosterBlock}</Text>
+          </View>
+        ) : null}
         {rosterNotices.length > 0 ? (
           <View style={styles.bannerNotice} testID="formation-roster-notices">
             {rosterNotices.map((message) => (
@@ -1852,7 +1862,7 @@ export function FormationScreen() {
               </View>
             ) : (
               <Text style={styles.buttonLabel}>
-                {missing > 0 ? `Mancano ${missing} titolari` : "Salva formazione"}
+                {missing > 0 ? missingStartersLabel(missing) : "Salva formazione"}
               </Text>
             )}
           </Pressable>
@@ -2129,7 +2139,7 @@ export function FormationScreen() {
                     >
                       {team.fantasyTeamName || team.fantasyTeamId} —{" "}
                       {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
-                      {team.starters > 0 ? ` · ${team.starters} titolari` : ""}
+                      {team.starters > 0 ? ` · ${countWithNoun(team.starters, "titolare", "titolari")}` : ""}
                       {team.usedFallback ? " · fallback locale" : ""}
                       {team.message ? ` · ${team.message}` : ""}
                     </Text>

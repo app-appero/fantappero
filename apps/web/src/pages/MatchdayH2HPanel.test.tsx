@@ -2,7 +2,7 @@ import type { H2HCalendar, H2HMatchupScore } from "@fantappero/contracts";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MatchdayH2HPanel } from "./MatchdayH2HPanel";
+import { MatchdayH2HPanel, computedAtLabel } from "./MatchdayH2HPanel";
 import { MemoryRouter } from "../router/simpleRouter";
 
 const SLOT = "slot-1";
@@ -158,5 +158,14 @@ describe("MatchdayH2HPanel — Punti e Gol fantasy espliciti (EP13-P02)", () => 
   it("espone un'etichetta accessibile che nomina le grandezze", () => {
     const html = render(result());
     expect(html).toContain("Gol fantasy 2 – 1. Punti 72,5 – 68,0");
+  });
+});
+
+describe("«Calcolato il» in ora italiana (QA 24-25/11)", () => {
+  it("non dipende dal fuso del browser", () => {
+    // 18:30 UTC = 20:30 a Roma (ora legale); 23:30 UTC di novembre = 00:30 del giorno dopo a Roma.
+    expect(computedAtLabel("2026-08-20T18:30:00.000Z")).toBe("Calcolato il 20/08/26, 20:30");
+    expect(computedAtLabel("2026-11-24T23:30:00.000Z")).toBe("Calcolato il 25/11/26, 00:30");
+    expect(computedAtLabel(null)).toBe("Risultato non ancora calcolato");
   });
 });

@@ -2,6 +2,7 @@ import type { H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
   BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
+  autoSubstitutionNote,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
   substitutionBadges,
@@ -10,6 +11,7 @@ import {
   formatCountdown,
   playerVoteState,
   probableToneOf,
+  sideModuleLabel,
 } from "@fantappero/contracts";
 import { EventBadges } from "@fantappero/ui";
 import { useEffect, useState, type ReactElement } from "react";
@@ -57,6 +59,7 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
   const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
+  const subNote = autoSubstitutionNote(player);
   const className = [
     "fa-mrow",
     compact ? "fa-mrow--compact" : "",
@@ -78,6 +81,11 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
           <EventBadges badges={badges} size={12} />
         </span>
         <span className="fa-mrow__team">{player.realTeamName ?? "Squadra reale non associata"}</span>
+        {subNote ? (
+          <span className="fa-mrow__sub" data-testid={`${testIdPrefix}-sub-${player.athleteId}`}>
+            {subNote}
+          </span>
+        ) : null}
         {compact && countdown ? (
           <span className="fa-mrow__countdown fa-mrow__countdown--under" data-testid={`${testIdPrefix}-countdown-${player.athleteId}`}>
             {countdown}
@@ -176,6 +184,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
   const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
+  const subNote = autoSubstitutionNote(player);
   const className = [
     "fa-vcell",
     dim ? "fa-mrow--dim" : "",
@@ -194,6 +203,11 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
         <AthleteName athleteId={player.athleteId}>{cleanDisplayName(player.name)}</AthleteName>
         <EventBadges badges={badges} size={12} />
       </span>
+      {subNote ? (
+        <span className="fa-mrow__sub" data-testid={`matchup-versus-sub-${player.athleteId}`}>
+          {subNote}
+        </span>
+      ) : null}
       {vote.label ? (
         <span
           className={[
@@ -224,7 +238,7 @@ function TeamHead({ side }: { side: H2HSideLineup }) {
     <div className="fa-versus__head">
       <div className="fa-versus__head-name">
         <strong>{side.teamName ?? side.displayName}</strong>
-        <span>{side.module ?? ""}</span>
+        <span>{sideModuleLabel(side) ?? ""}</span>
       </div>
       <span className="fa-versus__head-score">{formatFantasyPoints(side.totalScore)}</span>
     </div>

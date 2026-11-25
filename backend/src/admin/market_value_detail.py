@@ -51,7 +51,7 @@ ATHLETE_NOT_FOUND_CODE = "market_value_athlete_not_found"
 LEAGUE_NOT_FOUND_CODE = "market_value_league_not_found"
 NOT_FOUND_CODES = frozenset({ATHLETE_NOT_FOUND_CODE, LEAGUE_NOT_FOUND_CODE})
 
-_ROW_KINDS = frozenset({"league", "cup", "unknown", "no_rating"})
+_ROW_KINDS = frozenset({"league", "cup", "youth", "unknown", "no_rating"})
 
 
 def _float(value: Any) -> float | None:

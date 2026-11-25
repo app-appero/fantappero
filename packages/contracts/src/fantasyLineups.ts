@@ -874,7 +874,11 @@ export function evaluateLineup(input: {
     issues.push(
       issue(
         "bench_incomplete",
-        `Tutti i calciatori in rosa devono essere schierati: mancano ${unusedRoster.length} in panchina.`,
+        // Con 1 «manca 1», non «mancano 1» (QA 24-25/11; `missingCount` di plural.ts, qui in
+        // linea perché i moduli dei contratti non si importano a runtime fra loro).
+        `Tutti i calciatori in rosa devono essere schierati: ${
+          unusedRoster.length === 1 ? "manca 1" : `mancano ${unusedRoster.length}`
+        } in panchina.`,
       ),
     );
   }
@@ -1224,6 +1228,18 @@ export function rosterDepartureNotices(issues: readonly LineupIssue[] | null | u
   return (issues ?? [])
     .filter((item) => item.code === LINEUP_ATHLETE_LEFT_ROSTER_CODE)
     .map((item) => item.message);
+}
+
+/**
+ * Rosa che non può schierare (es. 34/35 dopo uno scambio 2 per 1): il server la mette come primo
+ * elemento delle `issues` del contesto formazione, col motivo («Rosa incompleta: 34 giocatori su
+ * 35. Completa la rosa (mercato o scambio) per schierare la formazione.»).
+ */
+export const ROSTER_NOT_VALIDATED_CODE = "roster_not_validated";
+
+/** Messaggio del server sulla rosa che non può schierare, `null` se la rosa è a posto. */
+export function rosterBlockNotice(issues: readonly LineupIssue[] | null | undefined): string | null {
+  return (issues ?? []).find((item) => item.code === ROSTER_NOT_VALIDATED_CODE)?.message ?? null;
 }
 
 /**

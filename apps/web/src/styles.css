@@ -4355,6 +4355,8 @@ h2 {
 .fa-mrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .fa-mrow__name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fa-mrow__team { font-size: 12px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Sostituzione automatica a turno concluso: «Entrato per …» / «Uscito (S.V.) · entra …». */
+.fa-mrow__sub { font-size: 11px; font-weight: 600; color: var(--fa-color-accent); white-space: normal; overflow-wrap: anywhere; }
 .fa-mrow__countdown {
   padding: 2px 8px;
   border-radius: 999px;

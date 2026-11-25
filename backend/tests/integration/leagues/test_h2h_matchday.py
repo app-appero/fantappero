@@ -21,6 +21,7 @@ from database.enums import (
 from database.session import create_session_factory
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound
+from fantasy_turns.readiness import RoundReadiness
 from leagues.h2h_matchday_service import get_h2h_calendar, get_h2h_matchup_detail
 from leagues.models.league import League
 from leagues.models.league_calendar import (
@@ -55,7 +56,9 @@ def _make_user(session: Session, label: str) -> User:
     return user
 
 
-def test_h2h_calendar_and_matchup_detail_mapping(db_session: Session) -> None:
+def test_h2h_calendar_and_matchup_detail_mapping(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
     now = datetime.now(UTC)
     home_user = _make_user(db_session, "home")
     away_user = _make_user(db_session, "away")
@@ -173,6 +176,23 @@ def test_h2h_calendar_and_matchup_detail_mapping(db_session: Session) -> None:
     assert detail.away.team_name == "Trasferta FC"
     assert detail.result is not None
     assert detail.result.outcome == "home"
+    # Nessuna fixture finita: turno non concluso, nessuna sostituzione automatica.
+    assert detail.round_concluded is False
+
+    # Tutte le partite del turno finite: lo scontro lo dice (QA 24-25/11).
+    monkeypatch.setattr(
+        "leagues.h2h_matchday_service.evaluate_round_readiness",
+        lambda session, *, round_id: RoundReadiness(
+            fixture_ids=(uuid4(),), all_fixtures_finished=True, all_statistics_available=True
+        ),
+    )
+    concluded = get_h2h_matchup_detail(db_session, league_id=league.id, slot_id=match_slot.id)
+    assert concluded.round_concluded is True
+    assert concluded.model_dump(by_alias=True)["roundConcluded"] is True
+    # Squadra senza formazione: nessun modulo e nessun titolare.
+    assert concluded.home.lineup_source == "none"
+    assert concluded.home.module is None
+    assert concluded.home.starters == []
 
     assert get_h2h_calendar(db_session, league_id=uuid4()) is None
 

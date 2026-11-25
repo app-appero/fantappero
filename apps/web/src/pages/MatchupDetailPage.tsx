@@ -3,6 +3,10 @@ import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
   describeH2HResult,
+  emptyLineupMessage,
+  enteredFromBench,
+  isMatchupRoundConcluded,
+  sideModuleLabel,
   fantasyBadgesFromBonusMalus,
   substitutionBadges,
   playerVoteState,
@@ -28,7 +32,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveMatchupPolling } from "../matchday/useLiveMatchupPolling";
 import { Link, useLocation } from "../router/simpleRouter";
-import { BenchTabs, RosterVersus, kickoffCountdown, useNow } from "./MatchupSideParts";
+import { BenchTabs, MatchupPlayerRow, RosterVersus, kickoffCountdown, useNow } from "./MatchupSideParts";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
 const DEMO_DETAIL: H2HMatchupDetail = {
@@ -149,15 +153,26 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number):
 
 type MatchupView = "campo" | "affiancata";
 
-function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+export function SideBlock({
+  side,
+  title,
+  roundConcluded = false,
+}: {
+  side: H2HSideLineup;
+  title: string;
+  /** Turno concluso: la squadra senza formazione fa 0 punti. */
+  roundConcluded?: boolean;
+}) {
   const athleteCard = useAthleteCard();
   const now = useNow();
   const teamLabel = side.teamName ?? side.displayName;
+  const entered = enteredFromBench(side.bench);
+  const module = sideModuleLabel(side);
   return (
     <section data-testid={`matchup-side-${title}`}>
       <h2>
         {teamLabel}
-        {side.module ? ` · ${side.module}` : ""}
+        {module ? ` · ${module}` : ""}
       </h2>
       <p>
         {H2H_POINTS_LABEL}: <strong>{formatFantasyPoints(side.totalScore)}</strong>
@@ -175,7 +190,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         <UiStatePanel
           state="empty"
           title="Formazione assente"
-          message="Questa squadra non ha ancora una formazione per il turno."
+          message={emptyLineupMessage(roundConcluded)}
           testId={`matchup-lineup-empty-${title}`}
         />
       ) : (
@@ -193,6 +208,16 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
             )}
             pitchAriaLabel={`Titolari ${teamLabel}`}
           />
+          {entered.length > 0 ? (
+            <>
+              <h3>Entrati dalla panchina</h3>
+              <ul className="fa-mlist" data-testid={`matchup-auto-subs-${title}`}>
+                {entered.map((player) => (
+                  <MatchupPlayerRow key={player.athleteId} player={player} now={now} testIdPrefix="matchup-auto-sub" />
+                ))}
+              </ul>
+            </>
+          ) : null}
           {side.bench.length > 0 ? (
             <>
               <h3>Panchina e tribuna</h3>
@@ -468,8 +493,10 @@ export function MatchupDetailPage() {
                 <RosterVersus home={detail.home} away={detail.away} />
               ) : (
                 <div className="fa-pitch-row">
-                  <SideBlock side={detail.home} title="home" />
-                  {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
+                  <SideBlock side={detail.home} title="home" roundConcluded={isMatchupRoundConcluded(detail)} />
+                  {detail.away ? (
+                    <SideBlock side={detail.away} title="away" roundConcluded={isMatchupRoundConcluded(detail)} />
+                  ) : null}
                 </div>
               )}
             </>

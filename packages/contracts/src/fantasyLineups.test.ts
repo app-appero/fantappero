@@ -32,6 +32,7 @@ import {
   preserveLockedStarters,
   remainingRosterForBench,
   remainingTacticalMoves,
+  rosterBlockNotice,
   rosterDepartureNotices,
   savedStarterSlotIds,
   resolveAutomaticSubstitutions,
@@ -929,7 +930,7 @@ describe("formazione con chi non è più in rosa (QA 19/11)", () => {
     assert.deepEqual(
       rosterDepartureNotices([
         { code: "lineup_athlete_left_roster", message: notice },
-        { code: "bench_incomplete", message: "Tutti i calciatori in rosa devono essere schierati: mancano 1 in panchina." },
+        { code: "bench_incomplete", message: "Tutti i calciatori in rosa devono essere schierati: manca 1 in panchina." },
       ]),
       [notice],
     );
@@ -1057,5 +1058,24 @@ describe("conto alla rovescia senza blocchi da contare", () => {
     assert.equal(lockCountdownIdleLabel("turn_not_open"), "Turno non ancora aperto");
     assert.equal(lockCountdownIdleLabel("no_active_turn", "skipped"), "Nessun turno attivo");
     assert.equal(lockCountdownIdleLabel("counting_down"), "");
+  });
+});
+
+describe("rosa che non può schierare (roster_not_validated, QA 25/11)", () => {
+  const BLOCK = "Rosa incompleta: 34 giocatori su 35. Completa la rosa (mercato o scambio) per schierare la formazione.";
+
+  it("prende il messaggio del server", () => {
+    assert.equal(
+      rosterBlockNotice([
+        { code: "roster_not_validated", message: BLOCK },
+        { code: "lineup_athlete_left_roster", message: "X non è più nella tua rosa." },
+      ]),
+      BLOCK,
+    );
+  });
+
+  it("senza quell'avviso non c'è nulla", () => {
+    assert.equal(rosterBlockNotice([{ code: "lineup_athlete_left_roster", message: "X" }]), null);
+    assert.equal(rosterBlockNotice(undefined), null);
   });
 });

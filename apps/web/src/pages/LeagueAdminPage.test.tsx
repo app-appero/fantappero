@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
 import { AppRoutes } from "../routes";
 import { MemoryRouter } from "../router/simpleRouter";
+import leagueAdminSource from "./LeagueAdminPage.tsx?raw";
 
 vi.mock("../api/auth", () => ({
   login: vi.fn(),
@@ -222,6 +223,13 @@ describe("EP03-02 league admin page", () => {
     expect(html).not.toContain('data-testid="market-gate-not-full"');
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*data-testid="market-gate-switch"/);
   });
+
+  it("dopo «Salva regolamento» il banner del mercato si rilegge (partecipanti cambiati, QA 24-25/11)", () => {
+    const start = leagueAdminSource.indexOf("  async function onSubmit(");
+    const end = leagueAdminSource.indexOf("\n  }\n", start);
+    const onSubmit = leagueAdminSource.slice(start, end);
+    const afterSave = onSubmit.slice(onSubmit.indexOf("await updateLeagueRules("));
+    expect(afterSave).toMatch(/setRulesReloadToken\(\(current\) => current \+ 1\)/);
+    expect(leagueAdminSource).toMatch(/<MarketGateProvider reloadToken=\{[^}]*\brulesReloadToken\b[^}]*\}>/);
+  });
 });
-
-

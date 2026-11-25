@@ -4,6 +4,10 @@ import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
   describeH2HResult,
+  emptyLineupMessage,
+  enteredFromBench,
+  isMatchupRoundConcluded,
+  sideModuleLabel,
   fantasyBadgesFromBonusMalus,
   substitutionBadges,
   playerVoteState,
@@ -19,7 +23,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAthleteCard } from "../athletes/AthleteCard";
-import { BenchTabs, RosterVersus, kickoffCountdown, useNow } from "../components/match/MatchupLists";
+import { BenchTabs, MatchupPlayerRow, RosterVersus, kickoffCountdown, useNow } from "../components/match/MatchupLists";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
 import { probableTone } from "./formation/FormationParts";
@@ -73,15 +77,26 @@ function outcomeLabel(outcome: "home" | "away" | "draw" | null): string {
 
 type MatchupView = "campo" | "affiancata";
 
-function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+function SideBlock({
+  side,
+  title,
+  roundConcluded,
+}: {
+  side: H2HSideLineup;
+  title: string;
+  /** Turno concluso: la squadra senza formazione fa 0 punti. */
+  roundConcluded: boolean;
+}) {
   const athleteCard = useAthleteCard();
   const now = useNow();
   const teamLabel = side.teamName ?? side.displayName;
+  const entered = enteredFromBench(side.bench);
+  const module = sideModuleLabel(side);
   return (
     <View style={styles.side} testID={`matchup-side-${title}`}>
       <Text style={styles.heading}>
         {teamLabel}
-        {side.module ? ` · ${side.module}` : ""}
+        {module ? ` · ${module}` : ""}
       </Text>
       <Text style={styles.body}>
         {H2H_POINTS_LABEL}: {formatFantasyPoints(side.totalScore)} · {H2H_GOALS_LABEL}:{" "}
@@ -96,7 +111,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         <UiStatePanel
           state="empty"
           title="Formazione assente"
-          message="Questa squadra non ha ancora una formazione per il turno."
+          message={emptyLineupMessage(roundConcluded)}
           testID={`matchup-lineup-empty-${title}`}
         />
       ) : (
@@ -114,6 +129,16 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
             testID={`matchup-pitch-${title}`}
             onAthletePress={athleteCard?.open}
           />
+          {entered.length > 0 ? (
+            <>
+              <Text style={styles.subheading}>Entrati dalla panchina</Text>
+              <View style={styles.lineupGroup} testID={`matchup-auto-subs-${title}`}>
+                {entered.map((player) => (
+                  <MatchupPlayerRow key={player.athleteId} player={player} now={now} testIDPrefix="matchup-auto-sub" />
+                ))}
+              </View>
+            </>
+          ) : null}
           {side.bench.length > 0 ? (
             <>
               <Text style={styles.subheading}>Panchina e tribuna</Text>
@@ -321,8 +346,10 @@ export function MatchupDetailScreen() {
                 <RosterVersus home={detail.home} away={detail.away} />
               ) : (
               <View style={styles.sides}>
-                <SideBlock side={detail.home} title="home" />
-                {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
+                <SideBlock side={detail.home} title="home" roundConcluded={isMatchupRoundConcluded(detail)} />
+                {detail.away ? (
+                  <SideBlock side={detail.away} title="away" roundConcluded={isMatchupRoundConcluded(detail)} />
+                ) : null}
               </View>
               )}
             </>

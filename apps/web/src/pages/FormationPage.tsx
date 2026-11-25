@@ -51,6 +51,7 @@ import {
   resolveDefaultEuropeanTurn,
   resolveTurnDisplayStates,
   restoreBenchActiveRoles,
+  rosterBlockNotice,
   rosterDepartureNotices,
   savedStarterSlotIds,
   slotsFromLineupIds,
@@ -822,6 +823,8 @@ export function FormationPage() {
     lineupSignature({ module: moduleCode, starterIds: displayStarters, benchIds: lineupBench });
   // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
   const rosterNotices = rosterDepartureNotices(context?.issues);
+  // Rosa che non può schierare (es. 34/35 dopo uno scambio 2 per 1): il server dice perché.
+  const rosterBlock = rosterBlockNotice(context?.issues);
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
@@ -2192,6 +2195,13 @@ export function FormationPage() {
               ) : null}
             </CardBody>
           </Card>
+
+          {rosterBlock ? (
+            <div data-testid="formation-roster-blocked" className="fa-formation-layout__issues" role="alert">
+              <p className="fa-formation-layout__issues-title">Non puoi ancora schierare la formazione</p>
+              <p>{rosterBlock}</p>
+            </div>
+          ) : null}
 
           {rosterNotices.length > 0 ? (
             <div data-testid="formation-roster-notices" className="fa-formation-layout__notice" role="status">

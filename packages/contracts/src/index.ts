@@ -301,6 +301,7 @@ export {
   BENCH_ACTIVE_ROLE_QUOTA,
   BENCH_ACTIVE_SIZE,
   LINEUP_ATHLETE_LEFT_ROSTER_CODE,
+  ROSTER_NOT_VALIDATED_CODE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   CLEAR_LINEUP_CANCEL_LABEL,
   CLEAR_LINEUP_CONFIRM_BODY,
@@ -342,12 +343,15 @@ export {
   remainingRosterForBench,
   remainingTacticalMoves,
   resolveAutomaticSubstitutions,
+  rosterBlockNotice,
   rosterDepartureNotices,
   savedStarterSlotIds,
   slotsFromLineupIds,
   starterTemplate,
   withoutRoleQuotaExcess,
 } from "./fantasyLineups.js";
+
+export { countWithNoun, missingCount, missingStartersLabel, pendingInvitesA11yLabel } from "./plural.js";
 
 export {
   H2H_GOALS_LABEL,
@@ -360,6 +364,11 @@ export {
   cleanDisplayName,
   PROVISIONAL_LIVE_SCORE,
   h2hResultAriaLabel,
+  autoSubstitutionNote,
+  emptyLineupMessage,
+  enteredFromBench,
+  isMatchupRoundConcluded,
+  sideModuleLabel,
 } from "./h2hScore.js";
 export type { H2HResultDisplay, H2HResultStatus } from "./h2hScore.js";
 

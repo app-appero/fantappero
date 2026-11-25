@@ -25,7 +25,7 @@ from fantasy_lineups.models import EffectiveLineup, LineupPlayer, LineupSubmissi
 from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
-from fantasy_turns.readiness import LIVE_FIXTURE_STATUSES
+from fantasy_turns.readiness import LIVE_FIXTURE_STATUSES, evaluate_round_readiness
 from fantasy_turns.rules import derive_effective_status
 from fantasy_turns.service import FantasyTurnService
 from leagues.calendar_round_mapping import round_for_h2h_number, rounds_by_h2h_number
@@ -243,7 +243,13 @@ def get_h2h_matchup_detail(
 
     scores_by_athlete: dict[UUID, RoundAthleteScore] = {}
     probable_by_athlete: dict[UUID, AthleteProbable] = {}
+    # Stessa regola del conteggio di squadra (scoring_service): i panchinari
+    # subentrati entrano solo quando tutte le fixture del turno sono finite.
+    substitutions_applied = False
     if fantasy_round is not None:
+        substitutions_applied = evaluate_round_readiness(
+            session, round_id=fantasy_round.id
+        ).all_fixtures_finished
         scores_by_athlete = compute_round_athlete_scores(
             session,
             fantasy_round.id,
@@ -264,6 +270,7 @@ def get_h2h_matchup_detail(
         probable_by_athlete=probable_by_athlete,
         persisted_total=slot.home_score,
         persisted_goals=slot.home_fantasy_goals,
+        substitutions_applied=substitutions_applied,
     )
     away_side = None
     if not slot.is_bye and slot.away_membership is not None:
@@ -276,6 +283,7 @@ def get_h2h_matchup_detail(
             probable_by_athlete=probable_by_athlete,
             persisted_total=slot.away_score,
             persisted_goals=slot.away_fantasy_goals,
+            substitutions_applied=substitutions_applied,
         )
 
     return H2HMatchupDetailResponse(
@@ -287,6 +295,7 @@ def get_h2h_matchup_detail(
         europeanTurnStatus=european_status,
         live=live,
         isBye=slot.is_bye,
+        roundConcluded=substitutions_applied,
         home=home_side,
         away=away_side,
         result=_score_payload(slot),
@@ -478,6 +487,7 @@ def _build_side(
     probable_by_athlete: dict[UUID, AthleteProbable],
     persisted_total: float | None,
     persisted_goals: int | None,
+    substitutions_applied: bool = False,
 ) -> H2HSideLineupResponse:
     display_name = membership.user.display_name
     nickname = membership.user.profile.nickname if membership.user.profile is not None else None
@@ -521,6 +531,7 @@ def _build_side(
             probable_by_athlete=probable_by_athlete,
             persisted_total=persisted_total,
             persisted_goals=persisted_goals,
+            substitutions_applied=substitutions_applied,
         )
 
     if submission is not None:
@@ -560,27 +571,50 @@ def _side_from_effective(
     probable_by_athlete: dict[UUID, AthleteProbable],
     persisted_total: float | None,
     persisted_goals: int | None,
+    substitutions_applied: bool = False,
 ) -> H2HSideLineupResponse:
     # Il titolare originale resta sempre visibile al suo posto, con il SUO
     # punteggio (S.V. finché non ha un voto): il sostituto non prende mai
-    # visivamente l'identità né il punteggio del titolare. L'eventuale
-    # sostituzione nel conteggio di squadra è decisa altrove (scoring_service,
-    # solo a turno concluso), non qui nella card individuale.
+    # visivamente l'identità né il punteggio del titolare. A sostituzioni
+    # applicate (tutte le fixture finite, come in scoring_service) il titolare
+    # uscito è marcato «sostituito da» e il panchinaro entrato «entrato per»,
+    # così i punti visibili tornano col totale di squadra.
+    names = {
+        row.athlete_id: _athlete_name(row.athlete, row.athlete_id) for row in submission.players
+    }
+    replaced_by: dict[UUID, UUID] = {}
+    entered_for: dict[UUID, UUID] = {}
+    if substitutions_applied:
+        for item in effective.substitutions_json or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                out_id = UUID(str(item["outAthleteId"]))
+                in_id = UUID(str(item["inAthleteId"]))
+            except (KeyError, ValueError):
+                continue
+            replaced_by[out_id] = in_id
+            entered_for[in_id] = out_id
+
     starters: list[H2HPlayerScoreResponse] = []
     for player in sorted(
         (row for row in submission.players if row.slot_kind == LineupSlotKind.STARTER),
         key=lambda row: row.sort_order,
     ):
+        replacement = replaced_by.get(player.athlete_id)
         starters.append(
             _player_score_response(
                 athlete_id=player.athlete_id,
-                name=_athlete_name(player.athlete, player.athlete_id),
+                name=names[player.athlete_id],
                 photo_url=player.athlete.photo_url if player.athlete is not None else None,
                 role=player.role.value,
                 snapshot=scores_by_athlete.get(player.athlete_id),
                 probable=probable_by_athlete.get(player.athlete_id),
-                is_effective_starter=True,
+                is_effective_starter=replacement is None,
                 is_bench=False,
+                replaced_by=replacement,
+                entered_for=None,
+                names=names,
             )
         )
     bench: list[H2HPlayerScoreResponse] = []
@@ -588,21 +622,27 @@ def _side_from_effective(
         (row for row in submission.players if row.slot_kind == LineupSlotKind.BENCH),
         key=lambda row: row.sort_order,
     ):
+        replaced = entered_for.get(player.athlete_id)
         bench.append(
             _player_score_response(
                 athlete_id=player.athlete_id,
-                name=_athlete_name(player.athlete, player.athlete_id),
+                name=names[player.athlete_id],
                 photo_url=player.athlete.photo_url if player.athlete is not None else None,
                 role=player.role.value,
                 snapshot=scores_by_athlete.get(player.athlete_id),
                 probable=probable_by_athlete.get(player.athlete_id),
-                is_effective_starter=False,
+                is_effective_starter=replaced is not None,
                 is_bench=True,
+                replaced_by=None,
+                entered_for=replaced,
+                names=names,
             )
         )
     total = persisted_total
     if total is None:
-        total = sum(score or 0.0 for score in (row.fantasy_score for row in starters))
+        total = sum(
+            row.fantasy_score or 0.0 for row in (*starters, *bench) if row.is_effective_starter
+        )
     return H2HSideLineupResponse(
         fantasyTeamId=str(team.id),
         teamName=team.name,
@@ -682,8 +722,12 @@ def _player_score_response(
     probable: AthleteProbable | None,
     is_effective_starter: bool,
     is_bench: bool,
+    replaced_by: UUID | None = None,
+    entered_for: UUID | None = None,
+    names: dict[UUID, str] | None = None,
 ) -> H2HPlayerScoreResponse:
     score = snapshot or RoundAthleteScore()
+    known = names or {}
     return H2HPlayerScoreResponse(
         athleteId=str(athlete_id),
         name=name,
@@ -703,6 +747,10 @@ def _player_score_response(
         substitutedInMinute=score.substituted_in_minute,
         isEffectiveStarter=is_effective_starter,
         isBench=is_bench,
+        replacedByAthleteId=None if replaced_by is None else str(replaced_by),
+        replacedByName=None if replaced_by is None else known.get(replaced_by),
+        enteredForAthleteId=None if entered_for is None else str(entered_for),
+        enteredForName=None if entered_for is None else known.get(entered_for),
         probableHint=None if probable is None else probable.hint,
         probableNote=None if probable is None else probable.note,
         probableAbsence=None if probable is None else probable.absence,

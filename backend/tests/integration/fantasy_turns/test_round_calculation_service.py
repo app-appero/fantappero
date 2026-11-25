@@ -427,8 +427,8 @@ def test_round_started_before_the_league_is_homologated_without_h2h_once_data_ar
     assert slot.outcome is None
     assert slot.result_final is False
 
-    # Effetti dell'omologazione come per un turno normale: audit, notifica, turno dopo,
-    # mercato di nuovo aperto.
+    # Effetti dell'omologazione come per un turno normale (audit, turno dopo, mercato di
+    # nuovo aperto), ma nessuna notifica: quel turno la lega non l'ha giocato (QA 24-25/11).
     audit = db_session.scalars(
         select(LeagueAuditEvent).where(
             LeagueAuditEvent.league_id == scenario.league_id,
@@ -438,18 +438,14 @@ def test_round_started_before_the_league_is_homologated_without_h2h_once_data_ar
     assert audit.details["roundId"] == str(scenario.placeholder.id)
     assert audit.details["source"] == "automatic_live_pipeline"
     assert audit.details["beforeLeagueCreation"] is True
+    assert len(scenario.user_ids) == 2
     notifications = db_session.scalars(
         select(Notification).where(
             Notification.user_id.in_(scenario.user_ids),
             Notification.template_key == "risultati.omologazione",
         )
     ).all()
-    assert len(notifications) == len(scenario.user_ids) == 2
-    for notification in notifications:
-        assert notification.title == "Turno concluso"
-        assert "nessuno scontro diretto" in notification.body
-        assert "definitivo" not in notification.body
-        assert notification.deep_link.startswith("/turni?lega=")
+    assert notifications == []
     later = db_session.get(FantasyRound, scenario.later.id)
     assert later.status == FantasyTurnStatus.OPEN
     assert league_round_in_progress(db_session, scenario.league_id) is None

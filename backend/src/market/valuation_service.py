@@ -53,6 +53,7 @@ from sports_data.roster.models import Athlete
 from sports_data.season_stats.competition_types import (
     COMPETITION_TYPE_CUP,
     COMPETITION_TYPE_LEAGUE,
+    COMPETITION_TYPE_YOUTH,
     competition_kind,
     load_competition_types,
 )
@@ -72,7 +73,9 @@ logger = get_logger(__name__)
 #: 1.3.1: solo le righe di campionato delle stagioni passate (coppe escluse, 22/11).
 #: 1.4.0: ``components_json`` con il dettaglio di ogni passaggio («Dettaglio del Valore»,
 #: pannello operatore); la formula non cambia.
-VALUATION_VERSION = "1.4.0"
+#: 1.4.1: escluse anche giovanili, riserve e femminili date come campionato (righe ``youth``,
+#: ``competition_types.is_youth_or_reserve``; QA notte 24-25/11).
+VALUATION_VERSION = "1.4.1"
 FINGERPRINT_FLAG_PREFIX = "market_values:"
 #: Oltre questo numero di calciatori si legge la stagione intera (listone) invece di un IN.
 _BULK_READ_THRESHOLD = 400
@@ -198,7 +201,8 @@ class SeasonRowDetail:
     #: media ma senza presenze conta 1, come in ``combine_rows``.
     appearances: int
     average: float | None
-    #: ``league`` (contata), ``cup`` / ``unknown`` (escluse: non campionato) o ``no_rating``.
+    #: ``league`` (contata), ``cup`` / ``youth`` / ``unknown`` (escluse: non campionato senior)
+    #: o ``no_rating``.
     kind: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -292,6 +296,7 @@ def season_sample_details(
         stmt = stmt.where(AthleteSeasonStat.athlete_provider_id.in_(ids))
     types = load_competition_types(session)
     excluded_cups = 0
+    excluded_youth = 0
     excluded_unknown: dict[int, int] = defaultdict(int)
     by_key: dict[tuple[int, int], dict[str, list[_StoredRow]]] = defaultdict(
         lambda: defaultdict(list)
@@ -311,10 +316,14 @@ def season_sample_details(
         kind = (
             COMPETITION_TYPE_LEAGUE
             if source == SOURCE_FANTAPPERO
-            else competition_kind(int(competition), types)
+            else competition_kind(
+                int(competition), types, competition_name=competition_name, club_name=club_name
+            )
         )
         if kind == COMPETITION_TYPE_CUP:
             excluded_cups += 1
+        elif kind == COMPETITION_TYPE_YOUTH:
+            excluded_youth += 1
         elif kind != COMPETITION_TYPE_LEAGUE:
             excluded_unknown[int(competition)] += 1
         by_key[(int(pid), int(year))][source].append(
@@ -326,12 +335,13 @@ def season_sample_details(
                 kind=kind,
             )
         )
-    if excluded_cups or excluded_unknown:
+    if excluded_cups or excluded_youth or excluded_unknown:
         logger.info(
             "season_samples_rows_excluded",
             extra={
                 "current_season_year": current_season_year,
                 "cup_rows": excluded_cups,
+                "youth_rows": excluded_youth,
                 "unknown_type_rows": sum(excluded_unknown.values()),
                 # Le competizioni di tipo sconosciuto più frequenti (id del fornitore).
                 "unknown_competitions": sorted(
@@ -376,7 +386,8 @@ def season_samples(
 
     Solo campionati: delle righe del fornitore contano quelle di un campionato
     (``competition_types.is_championship``: i 5 di ``MVP_LEAGUE_IDS`` o tipo ``league``); le
-    coppe e le competizioni di tipo sconosciuto sono escluse. Una stagione con sole coppe è
+    coppe, le giovanili/riserve/femminili (anche se di tipo ``league``) e le competizioni di
+    tipo sconosciuto sono escluse. Una stagione con sole coppe è
     una stagione senza dati. Le righe nostre vengono dalle partite del catalogo, che ha solo i
     5 campionati: si prendono tutte.
     """

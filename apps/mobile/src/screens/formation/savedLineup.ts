@@ -7,7 +7,7 @@
  *
  * Solo logica pura e import di tipo: gira nei test `node:test` senza il bundle di
  * `@fantappero/contracts`. Sul web lo stesso criterio è in `@fantappero/contracts`
- * (`savedStarterSlotIds`, `rosterDepartureNotices`).
+ * (`savedStarterSlotIds`, `rosterDepartureNotices`, `rosterBlockNotice`).
  */
 import type { LineupIssue, LineupPlayer } from "@fantappero/contracts";
 
@@ -18,6 +18,14 @@ export function rosterDepartureNotices(issues: readonly LineupIssue[] | null | u
   return (issues ?? [])
     .filter((item) => item.code === LINEUP_ATHLETE_LEFT_ROSTER_CODE)
     .map((item) => item.message);
+}
+
+/** Rosa che non può schierare (es. 34/35 dopo uno scambio 2 per 1): primo elemento delle `issues`. */
+export const ROSTER_NOT_VALIDATED_CODE = "roster_not_validated";
+
+/** Messaggio del server sulla rosa che non può schierare, `null` se la rosa è a posto. */
+export function rosterBlockNotice(issues: readonly LineupIssue[] | null | undefined): string | null {
+  return (issues ?? []).find((item) => item.code === ROSTER_NOT_VALIDATED_CODE)?.message ?? null;
 }
 
 /**

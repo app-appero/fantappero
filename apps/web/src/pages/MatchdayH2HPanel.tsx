@@ -26,13 +26,15 @@ type Props = {
   onRetry: () => void;
 };
 
+// Ora italiana a prescindere dal fuso del browser (QA 24-25/11).
 const KICKOFF_FORMATTER = new Intl.DateTimeFormat("it-IT", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Europe/Rome",
 });
 
 /** Riga temporale della card: quando il risultato è stato calcolato. */
-function computedAtLabel(computedAt: string | null | undefined): string {
+export function computedAtLabel(computedAt: string | null | undefined): string {
   if (!computedAt) {
     return "Risultato non ancora calcolato";
   }
