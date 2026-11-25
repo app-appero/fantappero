@@ -102,5 +102,9 @@ export default defineConfig({
     // Di norma vitest svuota i CSS importati; solo gli import `?raw` restano leggibili, così un
     // test può controllare che una regola esista (es. i margini di /privacy).
     css: { include: [/\.css\?raw$/] },
+    // URL dell'API fisso nei test, a prescindere dalla macchina: senza VITE_API_BASE_URL un
+    // clone pulito falliva 13 test (login Google, pannello operatore), e alcuni test confrontano
+    // proprio questo indirizzo (QA notturna 24-25/11). Nessuna chiamata parte davvero.
+    env: { VITE_API_BASE_URL: "http://localhost:59999" },
   },
 });
