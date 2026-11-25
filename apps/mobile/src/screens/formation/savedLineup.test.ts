@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { rosterDepartureNotices, savedStarterSlotIds } from "./savedLineup.ts";
+import { rosterBlockNotice, rosterDepartureNotices, savedStarterSlotIds } from "./savedLineup.ts";
 
 const NOTICE =
   "N. Zortea non è più nella tua rosa: è stato tolto dalla formazione, scegli chi mettere al suo posto.";
@@ -52,5 +53,30 @@ describe("savedStarterSlotIds", () => {
       ),
       ["P1", "D1", "D2", ""],
     );
+  });
+});
+
+describe("rosterBlockNotice (roster_not_validated, QA 25/11)", () => {
+  const BLOCK = "Rosa incompleta: 34 giocatori su 35. Completa la rosa (mercato o scambio) per schierare la formazione.";
+
+  it("prende il messaggio del server sulla rosa che non può schierare", () => {
+    assert.equal(
+      rosterBlockNotice([
+        { code: "roster_not_validated", message: BLOCK },
+        { code: "lineup_athlete_left_roster", message: NOTICE },
+      ]),
+      BLOCK,
+    );
+  });
+
+  it("senza quell'avviso non c'è nessun banner", () => {
+    assert.equal(rosterBlockNotice([{ code: "lineup_athlete_left_roster", message: NOTICE }]), null);
+    assert.equal(rosterBlockNotice(undefined), null);
+  });
+
+  it("la schermata Formazione lo mostra in un banner", () => {
+    const source = readFileSync(new URL("../FormationScreen.tsx", import.meta.url), "utf8");
+    assert.match(source, /const rosterBlock = rosterBlockNotice\(context\?\.issues\);/);
+    assert.match(source, /testID="formation-roster-blocked"[\s\S]{0,200}\{rosterBlock\}/);
   });
 });

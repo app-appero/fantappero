@@ -182,5 +182,17 @@ describe("FormationPage — calciatore non più in rosa (QA 19/11)", () => {
   it("senza l'avviso del server non mostra nulla", async () => {
     await render(lineupContext([]));
     expect(notices()).toBeNull();
+    expect(container.querySelector('[data-testid="formation-roster-blocked"]')).toBeNull();
+  });
+
+  it("rosa che non può schierare: banner col motivo del server (roster_not_validated, QA 25/11)", async () => {
+    const block =
+      "Rosa incompleta: 34 giocatori su 35. Completa la rosa (mercato o scambio) per schierare la formazione.";
+    await render(lineupContext([{ code: "roster_not_validated", message: block }]));
+    const banner = container.querySelector('[data-testid="formation-roster-blocked"]');
+    expect(banner?.getAttribute("role")).toBe("alert");
+    expect(banner?.textContent).toContain(block);
+    // Non è un avviso «non è più nella tua rosa».
+    expect(notices()).toBeNull();
   });
 });
