@@ -34,4 +34,11 @@ describe("Amministrazione lega › «Salva regolamento» (corsa M4, 22/11)", () 
     assert.ok(rulesTab >= 0 && rulesTab < saved && saved < button && button < invitesTab);
     assert.match(source, /message=\{saveSuccess\}/);
   });
+
+  it("dopo il salvataggio il banner del mercato si rilegge (partecipanti cambiati, QA 24-25/11)", () => {
+    const body = onSaveRulesBody();
+    assert.match(body, /setRulesReload\(\(current\) => current \+ 1\)/);
+    const source = readFileSync(new URL("../screens/LeagueAdminScreen.tsx", import.meta.url), "utf8");
+    assert.match(source, /useMarketGate\(\{ reloadToken: [^}]*\brulesReload\b/);
+  });
 });
