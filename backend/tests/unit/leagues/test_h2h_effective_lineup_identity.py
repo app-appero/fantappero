@@ -101,7 +101,9 @@ def _substitution_fixture():
         _player(
             other_starter_id, slot_kind=LineupSlotKind.STARTER, role=FantasyRole.D, sort_order=2
         ),
-        _player(substitute_in_id, slot_kind=LineupSlotKind.BENCH, role=FantasyRole.D, sort_order=10),
+        _player(
+            substitute_in_id, slot_kind=LineupSlotKind.BENCH, role=FantasyRole.D, sort_order=10
+        ),
         _player(unused_bench_id, slot_kind=LineupSlotKind.BENCH, role=FantasyRole.D, sort_order=11),
     ]
     effective = EffectiveLineup(
