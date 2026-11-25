@@ -10959,3 +10959,203 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
 .fa-admin-appversion__actions {
   grid-column: 1 / -1;
 }
+
+/* 1.5 · Sostituto dopo uno scambio sbilanciato (decisione del 25/11, canvas «Scambio
+   sbilanciato: scelta del sostituto»): riquadro arancione «Dopo lo scambio avrai 34/35» nelle
+   conferme e «Rosa incompleta: 34/35» in Rosa e Formazione; finestra «Scegli il sostituto» con
+   il riquadro verde dello scambio fatto, le etichette, l'elenco dei liberi e il conto. */
+.fa-shortfall {
+  display: flex;
+  gap: var(--fa-space-sm);
+  align-items: flex-start;
+  margin: var(--fa-space-sm) 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-warning);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-warning) 14%, var(--fa-color-background-elevated));
+  color: var(--fa-color-foreground);
+}
+
+.fa-shortfall--banner {
+  margin: 0 0 var(--fa-space-md);
+}
+
+.fa-shortfall__icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--fa-color-warning);
+}
+
+.fa-shortfall__text {
+  display: grid;
+  gap: var(--fa-space-xs);
+  justify-items: start;
+}
+
+.fa-shortfall__title,
+.fa-shortfall__body {
+  margin: 0;
+}
+
+.fa-shortfall__title {
+  font-weight: 700;
+  color: var(--fa-color-warning);
+}
+
+.fa-shortfall__body {
+  line-height: 1.45;
+}
+
+.fa-shortfall__note {
+  margin: var(--fa-space-xs) 0 0;
+}
+
+/* Corsa Mercato del 25/11: crediti che non bastano per il sostituto (in grassetto nel riquadro
+   arancione) e ruoli sotto quota con la rosa piena (riquadro giallo più leggero, solo informativo). */
+.fa-shortfall__credits {
+  font-weight: 600;
+}
+
+.fa-shortfall--info {
+  border-color: color-mix(in srgb, var(--fa-color-warning) 45%, transparent);
+  background: color-mix(in srgb, var(--fa-color-warning) 6%, var(--fa-color-background-elevated));
+}
+
+.fa-replacement {
+  width: min(100%, 36rem);
+}
+
+.fa-replacement__head {
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-replacement__head p {
+  margin: 0;
+}
+
+.fa-replacement__done {
+  display: flex;
+  gap: var(--fa-space-xs);
+  align-items: center;
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border: 1px solid color-mix(in srgb, var(--fa-color-success) 55%, transparent);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-success) 12%, transparent);
+  color: var(--fa-color-success);
+  font-weight: 600;
+}
+
+.fa-replacement__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fa-replacement__chip {
+  padding: 2px var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: 999px;
+  background: var(--fa-color-background-subtle, var(--fa-color-background));
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.fa-replacement__roles,
+.fa-replacement__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-sm);
+  align-items: flex-end;
+}
+
+.fa-replacement__filters > .fa-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.fa-replacement__list {
+  display: grid;
+  gap: var(--fa-space-xs);
+  margin: var(--fa-space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fa-replacement__row {
+  display: flex;
+  gap: var(--fa-space-sm);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background: var(--fa-color-background);
+}
+
+.fa-replacement__row--disabled {
+  opacity: 0.6;
+}
+
+.fa-replacement__take {
+  flex: none;
+  white-space: nowrap;
+}
+
+.fa-replacement__who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fa-replacement__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.fa-replacement__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-xs);
+  align-items: center;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.875rem;
+}
+
+.fa-replacement__expensive {
+  color: var(--fa-color-warning);
+  font-size: 0.875rem;
+}
+
+.fa-replacement__later {
+  display: grid;
+  gap: var(--fa-space-xs);
+  justify-items: start;
+  width: 100%;
+}
+
+.fa-replacement__bill {
+  display: grid;
+  gap: var(--fa-space-xs);
+  margin: 0 0 var(--fa-space-sm);
+}
+
+.fa-replacement__bill-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+}
+
+.fa-replacement__bill-row dt,
+.fa-replacement__bill-row dd {
+  margin: 0;
+}
+
+.fa-replacement__bill-row--total {
+  padding-top: var(--fa-space-xs);
+  border-top: 1px solid var(--fa-color-border);
+  font-weight: 700;
+}

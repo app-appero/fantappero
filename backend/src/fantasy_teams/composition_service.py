@@ -503,6 +503,13 @@ def sync_team_composition_status(
             "fantasy_roster_composition_invalidated",
             extra={"fantasy_team_id": str(team.id), "status": report.status.value},
         )
+    # I sostituti da scegliere dopo uno scambio sbilanciato (1.5) seguono la rosa: se torna alla
+    # misura in altro modo (scambio 1 per 2, assegnazione dell'admin) le righe aperte si
+    # chiudono da sole. Import qui dentro: il mercato dipende già da questo modulo.
+    from market.trade_replacement import has_open_replacements, reconcile_trade_replacements
+
+    if has_open_replacements(session, team.id):
+        reconcile_trade_replacements(session, league=league, team=team)
     return report
 
 

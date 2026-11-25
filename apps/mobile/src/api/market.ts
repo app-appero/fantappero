@@ -14,8 +14,14 @@ import type {
   MarketSession,
   SetMarketGateRequest,
   SubmitMarketBidRequest,
+  TradePreview,
+  TradePreviewRequest,
   TradeProposal,
   TradeProposalList,
+  TradeReplacementCandidateList,
+  TradeReplacementCandidateQuery,
+  TradeReplacementPurchase,
+  TradeReplacementStatus,
 } from "@fantappero/contracts";
 import { apiRequest } from "./client";
 
@@ -322,6 +328,68 @@ export function counterTradeProposal(
     `/leagues/${leagueId}/mercato/scambi/proposte/${proposalId}/controproponi`,
     { accessToken, method: "POST", body },
   );
+}
+
+// -- Sostituto dopo uno scambio sbilanciato (1.5) ------------------------------
+
+/** Rosa delle due squadre dopo uno scambio ancora da inviare: l'avviso «Dopo lo scambio avrai 34/35». */
+export function previewTradeProposal(
+  accessToken: string,
+  leagueId: string,
+  body: TradePreviewRequest,
+): Promise<TradePreview> {
+  return apiRequest<TradePreview>(`/leagues/${leagueId}/mercato/scambi/anteprima`, {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}
+
+/** I sostituti che la mia squadra deve scegliere dopo uno scambio. */
+export function fetchTradeReplacements(
+  accessToken: string,
+  leagueId: string,
+): Promise<TradeReplacementStatus> {
+  return apiRequest<TradeReplacementStatus>(`/leagues/${leagueId}/mercato/sostituti`, {
+    accessToken,
+  });
+}
+
+/** I calciatori liberi del ruolo che manca, con Valore (il prezzo) e media. */
+export function fetchTradeReplacementCandidates(
+  accessToken: string,
+  leagueId: string,
+  query: TradeReplacementCandidateQuery = {},
+): Promise<TradeReplacementCandidateList> {
+  const params = new URLSearchParams();
+  if (query.role) {
+    params.set("ruolo", query.role);
+  }
+  const search = query.search?.trim();
+  if (search) {
+    params.set("cerca", search);
+  }
+  if (query.order) {
+    params.set("ordine", query.order);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<TradeReplacementCandidateList>(
+    `/leagues/${leagueId}/mercato/sostituti/liberi${suffix}`,
+    { accessToken },
+  );
+}
+
+/** Compra il sostituto al suo Valore (anche a mercato chiuso, non a turno in corso). */
+export function buyTradeReplacement(
+  accessToken: string,
+  leagueId: string,
+  athleteId: string,
+): Promise<TradeReplacementPurchase> {
+  return apiRequest<TradeReplacementPurchase>(`/leagues/${leagueId}/mercato/sostituti/acquista`, {
+    accessToken,
+    method: "POST",
+    body: { athleteId },
+  });
 }
 
 // -- Approvazione amministratore (EP08-07) -------------------------------------

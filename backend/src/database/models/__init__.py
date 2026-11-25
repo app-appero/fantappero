@@ -45,7 +45,7 @@ from market.live_models import (
     MarketLiveRaise,
     MarketLiveTurnOrderEntry,
 )
-from market.models import MarketBid, MarketSession, TradeProposal
+from market.models import MarketBid, MarketSession, TradeProposal, TradeReplacement
 from market.valuation_models import AthleteMarketValue
 from notifications.models import (
     Notification,
@@ -158,6 +158,7 @@ __all__ = [
     "FeedbackAttachment",
     "FeedbackReport",
     "TradeProposal",
+    "TradeReplacement",
     "Transfer",
     "User",
     "UserAppUsage",

@@ -49,10 +49,15 @@ export type FixtureDetailParams = {
   fixtureId: string;
 };
 
+/** Apertura dalla notifica «Scegli il sostituto dopo lo scambio» (1.5): apre la scelta. */
+export type RosterParams = WireframeParams & {
+  sostituto?: string;
+};
+
 export type AppTabParamList = {
   Matchday: WireframeParams | undefined;
   Standings: WireframeParams | undefined;
-  Roster: WireframeParams | undefined;
+  Roster: RosterParams | undefined;
   Formation: WireframeParams | undefined;
   Auction: AuctionParams | undefined;
   Waiver: WireframeParams | undefined;

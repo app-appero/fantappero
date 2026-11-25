@@ -24,19 +24,31 @@ from fantasy_teams.factory import (
 )
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.schemas import RosterUnderQuotaRoleResponse
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from market.gate import assert_trade_market_open
-from market.models import TradeProposal
+from market.models import TradeProposal, TradeReplacement
 from market.trade_execution import execute_trade
+from market.trade_replacement import (
+    RosterAfterTrade,
+    RosterAfterTradeCalculator,
+    missing_roles_label,
+    role_counts,
+)
 from market.trade_schemas import (
     CounterTradeProposalRequest,
     CreateTradeProposalRequest,
     TradeAthleteResponse,
+    TradeMissingRoleResponse,
+    TradePreviewRequest,
+    TradePreviewResponse,
     TradeProposalListResponse,
     TradeProposalResponse,
+    TradeReplacementCostResponse,
+    TradeRosterAfterResponse,
 )
 from market.trade_validators import (
     parse_athlete_ids,
@@ -362,7 +374,7 @@ class TradeService:
             get_metrics().incr("trade_proposal_accepted_total", labels={"result": "pending"})
             return self._to_response(proposal)
 
-        self._execute_or_expire(
+        replacements = self._execute_or_expire(
             league=league,
             proposal=proposal,
             proposer_team=proposer_team,
@@ -391,6 +403,10 @@ class TradeService:
             status=TradeStatus.ACCEPTED,
             team_ids=[proposer_team.id],
         )
+        # Chi accetta sceglie subito il sostituto dalla finestra: l'avviso va all'altra squadra.
+        self._notify_trade_replacements(
+            proposal, replacements, exclude_user_ids={league_access.user.id}
+        )
         self._session.commit()
         get_metrics().incr("trade_proposal_accepted_total", labels={"result": "executed"})
         return self._to_response(proposal)
@@ -409,7 +425,7 @@ class TradeService:
         recipient_team = self._session.get(FantasyTeam, proposal.recipient_team_id)
         assert proposer_team is not None and recipient_team is not None
 
-        self._execute_or_expire(
+        replacements = self._execute_or_expire(
             league=league,
             proposal=proposal,
             proposer_team=proposer_team,
@@ -438,6 +454,9 @@ class TradeService:
             status=TradeStatus.EXECUTED,
             team_ids=[proposer_team.id, recipient_team.id],
             exclude_user_ids={league_access.user.id},
+        )
+        self._notify_trade_replacements(
+            proposal, replacements, exclude_user_ids={league_access.user.id}
         )
         self._session.commit()
         get_metrics().incr("trade_proposal_approved_total")
@@ -547,7 +566,95 @@ class TradeService:
             )
         for league_id, athlete_ids in by_league.items():
             self._market_info.get(league_id, athlete_ids)  # una lettura per tutta la lista
-        return TradeProposalListResponse(proposals=[self._to_response(row) for row in rows])
+        calculator = RosterAfterTradeCalculator(self._session, league_access.league)
+        return TradeProposalListResponse(
+            proposals=[self._to_response(row, roster_after=calculator) for row in rows]
+        )
+
+    def preview_proposal(
+        self,
+        league_access: LeagueAccess,
+        payload: TradePreviewRequest,
+    ) -> TradePreviewResponse:
+        """Rosa delle due squadre dopo uno scambio ancora da proporre (1.5, solo lettura).
+
+        Serve all'avviso «Dopo lo scambio avrai 34/35» prima di inviare una proposta o una
+        controproposta: chi propone vede se resterà sotto la misura e quali sostituti dovrà
+        scegliere. Non controlla mercato e limiti: lo fa l'invio vero.
+        """
+        proposer = self._my_team(league_access)
+        try:
+            recipient_team_id = UUID(payload.recipient_team_id)
+        except ValueError as exc:
+            raise ValidationAuthError(
+                "Identificativo squadra destinataria non valido.",
+                code="invalid_recipient_team_id",
+            ) from exc
+        recipient = find_team_by_id(
+            self._session, league_id=league_access.league.id, team_id=recipient_team_id
+        )
+        if recipient is None:
+            raise ValidationAuthError(
+                "Squadra destinataria non trovata in questa lega.",
+                code="recipient_team_not_found",
+            )
+        offered = parse_athlete_ids(payload.offered_athlete_ids, field="offerta")
+        requested = parse_athlete_ids(payload.requested_athlete_ids, field="richiesta")
+        calculator = RosterAfterTradeCalculator(self._session, league_access.league)
+        return TradePreviewResponse(
+            proposerRosterAfter=self._roster_after_response(
+                calculator.after(
+                    proposer.id,
+                    outgoing=offered,
+                    incoming=requested,
+                    credits_out=payload.offered_credits,
+                    credits_in=payload.requested_credits,
+                ),
+                proposer,
+            ),
+            recipientRosterAfter=self._roster_after_response(
+                calculator.after(
+                    recipient.id,
+                    outgoing=requested,
+                    incoming=offered,
+                    credits_out=payload.requested_credits,
+                    credits_in=payload.offered_credits,
+                ),
+                recipient,
+            ),
+        )
+
+    @staticmethod
+    def _roster_after_response(
+        after: RosterAfterTrade, team: FantasyTeam | None
+    ) -> TradeRosterAfterResponse:
+        return TradeRosterAfterResponse(
+            teamId=str(after.team_id),
+            teamName=team.name if team is not None else "Squadra",
+            sizeAfter=after.size_after,
+            rosterSize=after.roster_size,
+            missingRoles=[
+                TradeMissingRoleResponse(role=role.value, count=count)
+                for role, count in role_counts(after.missing_roles)
+            ],
+            balanceAfter=after.balance_after,
+            replacementCosts=[
+                TradeReplacementCostResponse(
+                    role=cost.role.value,
+                    count=cost.count,
+                    cheapestPrice=cost.cheapest_price,
+                    totalPrice=cost.total_price,
+                )
+                for cost in after.replacement_costs
+            ],
+            canAffordReplacement=after.can_afford_replacement,
+            underQuotaRoles=[
+                RosterUnderQuotaRoleResponse(
+                    role=item.role.value, count=item.count, quota=item.quota
+                )
+                for item in after.under_quota
+            ],
+        )
 
     def get_proposal(
         self,
@@ -815,10 +922,13 @@ class TradeService:
         proposer_team: FantasyTeam,
         recipient_team: FantasyTeam,
         actor_id: UUID,
-    ) -> None:
-        """Esegue lo scambio; se i calciatori si sono mossi la proposta non resta in sospeso."""
+    ) -> dict[UUID, list[TradeReplacement]]:
+        """Esegue lo scambio; se i calciatori si sono mossi la proposta non resta in sospeso.
+
+        Ritorna i sostituti da scegliere creati dallo scambio, per squadra (1.5).
+        """
         try:
-            execute_trade(
+            return execute_trade(
                 self._session,
                 league=league,
                 proposal=proposal,
@@ -839,6 +949,49 @@ class TradeService:
                 )
                 self._session.commit()
             raise
+
+    def _notify_trade_replacements(
+        self,
+        proposal: TradeProposal,
+        replacements: dict[UUID, list[TradeReplacement]],
+        *,
+        exclude_user_ids: set[UUID],
+    ) -> None:
+        """1.5: chi resta sotto la misura dopo lo scambio deve scegliere il sostituto.
+
+        In app e push come le altre notifiche di mercato; il link porta alla scelta. Non va a chi
+        ha appena accettato o approvato: la finestra si apre già davanti a lui.
+        """
+        team_ids = [team_id for team_id, rows in replacements.items() if rows]
+        if not team_ids:
+            return
+        recipients = user_ids_for_teams(self._session, team_ids)
+        notifications = NotificationService(self._session)
+        shared = league_params(self._session, proposal.league_id)
+        for team_id, user_id in recipients.items():
+            if user_id in exclude_user_ids:
+                continue
+            rows = replacements.get(team_id) or []
+            other_id = (
+                proposal.proposer_team_id
+                if team_id == proposal.recipient_team_id
+                else proposal.recipient_team_id
+            )
+            other = self._session.get(FantasyTeam, other_id)
+            notifications.create_notification(
+                user_id=user_id,
+                category=NotificationCategory.MERCATO,
+                template_key="mercato.sostituto_scambio",
+                template_version=1,
+                params={
+                    **shared,
+                    "proposal_id": str(proposal.id),
+                    "other_team": other.name if other is not None else None,
+                    "missing_label": missing_roles_label(row.role for row in rows),
+                    "count": len(rows),
+                },
+                dedup_key=f"trade_replacement:{proposal.id}:{team_id}:{user_id}",
+            )
 
     def _notify_admins_trade_pending(
         self,
@@ -942,12 +1095,47 @@ class TradeService:
             return TradeStatus.EXPIRED
         return status
 
-    def _to_response(self, proposal: TradeProposal) -> TradeProposalResponse:
+    def _to_response(
+        self,
+        proposal: TradeProposal,
+        *,
+        roster_after: RosterAfterTradeCalculator | None = None,
+    ) -> TradeProposalResponse:
         now = datetime.now(UTC)
         offered = self._athlete_labels(proposal.offered_athlete_ids, league_id=proposal.league_id)
         requested = self._athlete_labels(
             proposal.requested_athlete_ids, league_id=proposal.league_id
         )
+        read_status = self._read_status(proposal, now)
+        proposer_after: TradeRosterAfterResponse | None = None
+        recipient_after: TradeRosterAfterResponse | None = None
+        if read_status in (TradeStatus.PROPOSED, TradeStatus.PENDING_APPROVAL):
+            # 1.5: come resterebbero le due rose, per l'avviso «Dopo lo scambio avrai 34/35».
+            league = self._session.get(League, proposal.league_id)
+            if league is not None:
+                calculator = roster_after or RosterAfterTradeCalculator(self._session, league)
+                offered_ids = [UUID(value) for value in proposal.offered_athlete_ids]
+                requested_ids = [UUID(value) for value in proposal.requested_athlete_ids]
+                proposer_after = self._roster_after_response(
+                    calculator.after(
+                        proposal.proposer_team_id,
+                        outgoing=offered_ids,
+                        incoming=requested_ids,
+                        credits_out=proposal.offered_credits,
+                        credits_in=proposal.requested_credits,
+                    ),
+                    self._session.get(FantasyTeam, proposal.proposer_team_id),
+                )
+                recipient_after = self._roster_after_response(
+                    calculator.after(
+                        proposal.recipient_team_id,
+                        outgoing=requested_ids,
+                        incoming=offered_ids,
+                        credits_out=proposal.requested_credits,
+                        credits_in=proposal.offered_credits,
+                    ),
+                    self._session.get(FantasyTeam, proposal.recipient_team_id),
+                )
         return TradeProposalResponse(
             id=str(proposal.id),
             leagueId=str(proposal.league_id),
@@ -957,7 +1145,7 @@ class TradeService:
             requestedAthletes=requested,
             offeredCredits=proposal.offered_credits,
             requestedCredits=proposal.requested_credits,
-            status=(read_status := self._read_status(proposal, now)).value,
+            status=read_status.value,
             expiresAt=proposal.expires_at.isoformat() if proposal.expires_at else None,
             createdAt=proposal.created_at.isoformat(),
             counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,
@@ -968,6 +1156,8 @@ class TradeService:
                 proposal.expires_at is not None
                 and proposal.expires_at <= (proposal.decided_at or now)
             ),
+            proposerRosterAfter=proposer_after,
+            recipientRosterAfter=recipient_after,
         )
 
     def _athlete_labels(

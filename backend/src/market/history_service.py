@@ -48,6 +48,8 @@ _ACQUISTO_ACTIONS = frozenset(
         LeagueAuditAction.MARKET_BID_WITHDRAWN,
         LeagueAuditAction.MARKET_SESSION_RESOLVED,
         LeagueAuditAction.MARKET_TIEBREAK_OPENED,
+        # 1.5: sostituto comprato al suo Valore dopo uno scambio che ha lasciato la rosa corta.
+        LeagueAuditAction.MARKET_TRADE_REPLACEMENT_PURCHASED,
     }
 )
 # Eventi che riguardano solo le squadre coinvolte (buste e proposte di scambio non ancora decise):

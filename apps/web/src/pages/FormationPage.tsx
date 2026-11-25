@@ -92,6 +92,11 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { FaqHelpButton } from "../components/FaqHelpButton";
 import { useLockCountdown } from "../matchday/useLockCountdown";
+import { useTradeReplacement } from "../market/TradeReplacementContext";
+import {
+  ReplacementAutoLineupNote,
+  RosterShortfallBanner,
+} from "../market/TradeShortfallNotice";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -670,6 +675,8 @@ export function FormationPage() {
   const canEdit = can(["roster:edit"]);
   const isOperator = can(["global:operate"]);
   const { push: pushToast } = useToast();
+  // 1.5: sostituto da scegliere dopo uno scambio che ha lasciato la rosa corta.
+  const replacement = useTradeReplacement();
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
     !isDemoMode ? activeLeagueId : null,
   );
@@ -825,6 +832,8 @@ export function FormationPage() {
   const rosterNotices = rosterDepartureNotices(context?.issues);
   // Rosa che non può schierare (es. 34/35 dopo uno scambio 2 per 1): il server dice perché.
   const rosterBlock = rosterBlockNotice(context?.issues);
+  // La mia squadra (non quella scelta dall'operatore) deve scegliere il sostituto di uno scambio.
+  const replacementBanner = !targetTeamId ? replacement.banner : null;
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
@@ -986,6 +995,18 @@ export function FormationPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 1.5: sostituto dopo uno scambio sbilanciato. Con la rosa corta per uno scambio il riquadro
+  // dice cosa manca e riapre la scelta; dopo l'acquisto la formazione si rilegge (torna schierabile).
+  const replacementFilled = replacement.status?.filledSlots;
+  const lastReplacementFilled = useRef(replacementFilled);
+  useEffect(() => {
+    const previous = lastReplacementFilled.current;
+    lastReplacementFilled.current = replacementFilled;
+    if (previous !== undefined && replacementFilled !== undefined && previous !== replacementFilled) {
+      void load();
+    }
+  }, [load, replacementFilled]);
 
   useEffect(() => {
     if (isDemoMode || !isOperator || !activeLeagueId) {
@@ -2196,7 +2217,15 @@ export function FormationPage() {
             </CardBody>
           </Card>
 
-          {rosterBlock ? (
+          {replacementBanner ? (
+            <RosterShortfallBanner
+              banner={replacementBanner}
+              onChoose={replacement.open}
+              testId="formation-replacement-banner"
+            />
+          ) : null}
+
+          {rosterBlock && !replacementBanner ? (
             <div data-testid="formation-roster-blocked" className="fa-formation-layout__issues" role="alert">
               <p className="fa-formation-layout__issues-title">Non puoi ancora schierare la formazione</p>
               <p>{rosterBlock}</p>
@@ -2421,7 +2450,8 @@ export function FormationPage() {
                 busy ||
                 !canModify ||
                 tacticalSaveBlocked ||
-                !clientEvaluation.valid
+                !clientEvaluation.valid ||
+                Boolean(replacementBanner)
               }
               onClick={() => void save()}
               loading={pendingAction === "save"}
@@ -2429,6 +2459,7 @@ export function FormationPage() {
             >
               {pendingAction === "save" ? "Salvataggio…" : "Salva formazione"}
             </Button>
+            {replacementBanner ? <ReplacementAutoLineupNote /> : null}
           </div>
           </aside>
 
