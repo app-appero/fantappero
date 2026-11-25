@@ -69,6 +69,8 @@ const WINDOW_DATE = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
+  // Date delle finestre in ora italiana, non nel fuso del browser.
+  timeZone: "Europe/Rome",
 });
 
 function windowLabel(window: CalendarWindow): string {
