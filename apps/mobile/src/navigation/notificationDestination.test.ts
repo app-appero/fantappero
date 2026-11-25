@@ -294,3 +294,24 @@ test("solo la notifica della nuova versione apre un link esterno, e solo https",
     { kind: "external", url: "https://x.example/a" },
   );
 });
+
+test("1.5: «Scegli il sostituto dopo lo scambio» apre Rosa con la scelta, nella lega dello scambio", () => {
+  const item = {
+    title: "Scegli il sostituto dopo lo scambio",
+    deepLink: "/rosa?sostituto=1&lega=league-2",
+  };
+  assert.deepEqual(resolveNotificationRoute(item), {
+    kind: "tab",
+    screen: "Roster",
+    params: { sostituto: "1" },
+  });
+  assert.deepEqual(
+    planNotificationOpen(item, { activeLeagueId: "league-1", leagues: [{ id: "league-1" }, { id: "league-2" }] }),
+    { route: { kind: "tab", screen: "Roster", params: { sostituto: "1" } }, switchToLeagueId: "league-2" },
+  );
+  // Rosa senza il parametro resta la Rosa di sempre.
+  assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/rosa?lega=league-2" }), {
+    kind: "tab",
+    screen: "Roster",
+  });
+});

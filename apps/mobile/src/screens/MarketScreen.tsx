@@ -18,7 +18,14 @@ import {
   fetchRosterOccupancy,
   fetchTeamPlayersForTrade,
 } from "../api/leagues";
-import { applyVoluntaryRelease, previewVoluntaryRelease } from "../api/market";
+import { applyVoluntaryRelease, previewTradeProposal, previewVoluntaryRelease } from "../api/market";
+import {
+  TRADE_SHORTFALL_PROPOSE_LABEL,
+  TRADE_SHORTFALL_PROPOSE_TITLE,
+  tradeShortfallWarning,
+  type TradeShortfallWarning,
+} from "@fantappero/contracts";
+import { TradeShortfallConfirmSheet } from "../market/TradeShortfall";
 import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
@@ -322,6 +329,35 @@ export function MarketScreen() {
     setExpiresAt("");
   }
 
+  // 1.5: chi propone uno scambio che lo lascerebbe sotto la misura della rosa lo vede prima di
+  // inviarlo («Dopo lo scambio avrai 34/35»). Il server dice come resterebbe la rosa.
+  const [proposeConfirm, setProposeConfirm] = useState<{
+    warning: TradeShortfallWarning;
+    submit: () => void;
+  } | null>(null);
+
+  async function withShortfallCheck(submit: () => void) {
+    if (offeredAthleteIds.length <= requestedAthleteIds.length || !accessToken || !activeLeagueId) {
+      submit();
+      return;
+    }
+    try {
+      const preview = await previewTradeProposal(accessToken, activeLeagueId, {
+        recipientTeamId,
+        offeredAthleteIds,
+        requestedAthleteIds,
+      });
+      const warning = tradeShortfallWarning(preview.proposerRosterAfter, "propose");
+      if (warning) {
+        setProposeConfirm({ warning, submit });
+        return;
+      }
+    } catch {
+      // Anteprima non disponibile: l'invio vero controlla comunque tutto.
+    }
+    submit();
+  }
+
   function handleCreateProposal() {
     // La scadenza è facoltativa (come sul web): senza, la proposta resta valida
     // finché non viene decisa o annullata — non blocca più l'invio.
@@ -337,16 +373,16 @@ export function MarketScreen() {
       expiresIso = parsed.toISOString();
     }
     const credits = Number(creditsAmount) || 0;
-    void trade
-      .createProposal({
-        recipientTeamId,
-        offeredAthleteIds,
-        requestedAthleteIds,
-        offeredCredits: creditsDirection === "offer" ? credits : 0,
-        requestedCredits: creditsDirection === "request" ? credits : 0,
-        expiresAt: expiresIso,
-      })
-      .then((sent) => {
+    const body = {
+      recipientTeamId,
+      offeredAthleteIds,
+      requestedAthleteIds,
+      offeredCredits: creditsDirection === "offer" ? credits : 0,
+      requestedCredits: creditsDirection === "request" ? credits : 0,
+      expiresAt: expiresIso,
+    };
+    void withShortfallCheck(() => {
+      void trade.createProposal(body).then((sent) => {
         // Con un errore del server (es. turno in corso) il form resta aperto, con quanto
         // compilato e il messaggio sopra «Invia proposta», come sul web (QA 20-21/11).
         if (sent) {
@@ -354,6 +390,7 @@ export function MarketScreen() {
           setShowForm(false);
         }
       });
+    });
   }
 
   useEffect(() => {
@@ -531,6 +568,19 @@ export function MarketScreen() {
       {SHOW_MARKET_HISTORY && activeLeagueId ? (
         <MarketHistorySection history={history} teams={teams} />
       ) : null}
+      <TradeShortfallConfirmSheet
+        visible={proposeConfirm !== null}
+        title={TRADE_SHORTFALL_PROPOSE_TITLE}
+        warnings={proposeConfirm ? [proposeConfirm.warning] : []}
+        confirmLabel={TRADE_SHORTFALL_PROPOSE_LABEL}
+        onCancel={() => setProposeConfirm(null)}
+        onConfirm={() => {
+          const pendingSubmit = proposeConfirm?.submit;
+          setProposeConfirm(null);
+          pendingSubmit?.();
+        }}
+        testID="market-trade-propose-shortfall"
+      />
     </PageContainer>
   );
 }

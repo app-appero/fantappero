@@ -10,6 +10,7 @@ import { AppDrawer } from "../components/AppDrawer";
 import { AppUpdateBanner } from "../components/AppUpdateBanner";
 import { useAppUpdateBanner } from "../appVersion/useAppUpdateBanner";
 import { ImpersonationBanner } from "../components/ImpersonationBanner";
+import { TradeReplacementProvider } from "../market/TradeReplacementContext";
 import { openAdminScreen } from "./adminEntry";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { subscribePendingInvitesChanged } from "./pendingInviteEvents";
@@ -282,7 +283,10 @@ function AppTabShell({
         }}
         onLogout={() => void handleLogout()}
       />
-      <View style={styles.content}>{children}</View>
+      {/* 1.5: sostituto dopo uno scambio sbilanciato, aperto da solo una volta per sessione. */}
+      <TradeReplacementProvider>
+        <View style={styles.content}>{children}</View>
+      </TradeReplacementProvider>
     </View>
   );
 }

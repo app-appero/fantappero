@@ -60,6 +60,8 @@ import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_C
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
 import { formationRoundToLoad } from "./formation/roundSelection";
 import { rosterBlockNotice, rosterDepartureNotices, savedStarterSlotIds } from "./formation/savedLineup";
+import { useTradeReplacement } from "../market/TradeReplacementContext";
+import { ReplacementAutoLineupNote, RosterShortfallBanner } from "../market/TradeShortfall";
 import { withoutRoleQuotaExcess } from "./formation/roleQuotaExcess";
 import {
   benchAfterStarterPick,
@@ -152,6 +154,8 @@ export function FormationScreen() {
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
   const targetTeamIdRef = useRef("");
+  // 1.5: sostituto da scegliere dopo uno scambio che ha lasciato la rosa corta.
+  const replacement = useTradeReplacement();
   const lineupRequest = useRef(0);
   const [context, setContext] = useState<LineupContext | null>(null);
   const [moduleCode, setModuleCode] = useState<FantasyModule>("4-3-3");
@@ -678,7 +682,17 @@ export function FormationScreen() {
   // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
   const rosterNotices = rosterDepartureNotices(context?.issues);
   // Rosa che non può schierare (es. 34/35 dopo uno scambio 2 per 1): il server dice perché.
+  // Dopo l'acquisto del sostituto la formazione si rilegge: torna schierabile.
+  const lastPurchaseCount = useRef(replacement.purchaseCount);
+  useEffect(() => {
+    if (lastPurchaseCount.current !== replacement.purchaseCount) {
+      lastPurchaseCount.current = replacement.purchaseCount;
+      void load();
+    }
+  }, [load, replacement.purchaseCount]);
   const rosterBlock = rosterBlockNotice(context?.issues);
+  // 1.5: la mia squadra (non quella scelta dall'operatore) deve scegliere il sostituto di uno scambio.
+  const replacementBanner = !targetTeamId ? replacement.banner : null;
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   const tacticalEvaluation = evaluateTacticalMove({
@@ -1761,7 +1775,14 @@ export function FormationScreen() {
             {actionError}
           </Text>
         ) : null}
-        {rosterBlock ? (
+        {replacementBanner ? (
+          <RosterShortfallBanner
+            banner={replacementBanner}
+            onChoose={replacement.open}
+            testID="formation-replacement-banner"
+          />
+        ) : null}
+        {rosterBlock && !replacementBanner ? (
           <View style={styles.banner} testID="formation-roster-blocked" accessibilityRole="alert">
             <Text style={styles.error}>Non puoi ancora schierare la formazione</Text>
             <Text style={styles.notice}>{rosterBlock}</Text>
@@ -1847,11 +1868,11 @@ export function FormationScreen() {
           ) : null}
           <Pressable
             accessibilityRole="button"
-            disabled={toolDisabled || missing > 0 || tacticalSaveBlocked}
+            disabled={toolDisabled || missing > 0 || tacticalSaveBlocked || Boolean(replacementBanner)}
             onPress={() => void save()}
             style={[
               styles.saveButton,
-              toolDisabled || missing > 0 || tacticalSaveBlocked ? styles.saveDisabled : null,
+              toolDisabled || missing > 0 || tacticalSaveBlocked || replacementBanner ? styles.saveDisabled : null,
             ]}
             testID="formation-save"
           >
@@ -1867,6 +1888,7 @@ export function FormationScreen() {
             )}
           </Pressable>
         </View>
+        {replacementBanner ? <ReplacementAutoLineupNote /> : null}
       </View>
 
       <PlayerPickerSheet

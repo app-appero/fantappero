@@ -117,6 +117,10 @@ export function resolveNotificationRoute(
     if (/^\/mercato/.test(path)) {
       return { kind: "tab", screen: "Roster" };
     }
+    // «Scegli il sostituto dopo lo scambio» (1.5, `/rosa?sostituto=1`): Rosa con la scelta aperta.
+    if (/^\/rosa/.test(path) && extractQueryParam(item.deepLink, "sostituto") === "1") {
+      return { kind: "tab", screen: "Roster", params: { sostituto: "1" } };
+    }
     // «La lega è al completo: puoi aprire il mercato» (20/11): l'amministrazione della lega
     // della notifica, che la schermata rende attiva.
     if (/^\/lega\/amministrazione/.test(path)) {

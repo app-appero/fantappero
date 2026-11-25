@@ -12,7 +12,7 @@ import type {
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
 import { roleQuotaErrorMessage, rosterRoleQuota } from "@fantappero/contracts";
-import { useNavigation, type NavigationProp } from "@react-navigation/core";
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -47,6 +47,9 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
+import { useTradeReplacement } from "../market/TradeReplacementContext";
+import { RosterShortfallBanner } from "../market/TradeShortfall";
+import { wantsReplacementSheet } from "../market/tradeReplacementPrompt";
 import { MarketGateBar } from "../market/MarketGateBar";
 import { manualAddMinimum } from "../market/pricePrefill";
 import { useMarketGate } from "../market/useMarketGate";
@@ -314,6 +317,26 @@ export function RosterScreen() {
   );
 
   const { refreshing, onRefresh } = useScreenData(loadRoster);
+
+  // 1.5: sostituto dopo uno scambio sbilanciato. Il riquadro resta finché la rosa non torna alla
+  // misura; il link della notifica (`?sostituto=1`) apre la scelta; dopo l'acquisto si rilegge.
+  const replacement = useTradeReplacement();
+  const route = useRoute<RouteProp<AppTabParamList, "Roster">>();
+  const openFromNotification = wantsReplacementSheet(route.params);
+  useEffect(() => {
+    if (!openFromNotification) {
+      return;
+    }
+    navigation.setParams({ sostituto: undefined } as never);
+    void replacement.refresh({ openIfPending: true });
+  }, [navigation, openFromNotification, replacement]);
+  const lastPurchaseCount = useRef(replacement.purchaseCount);
+  useEffect(() => {
+    if (lastPurchaseCount.current !== replacement.purchaseCount) {
+      lastPurchaseCount.current = replacement.purchaseCount;
+      void loadRoster();
+    }
+  }, [loadRoster, replacement.purchaseCount]);
 
   useEffect(() => {
     if (!canEdit || isAdmin || !team) {
@@ -919,6 +942,9 @@ export function RosterScreen() {
       />
       <MarketGateBar />
       {activeLeague ? null : <Text style={styles.meta}>Seleziona una lega dal selettore in alto.</Text>}
+      {replacement.banner ? (
+        <RosterShortfallBanner banner={replacement.banner} onChoose={replacement.open} />
+      ) : null}
 
       {!loading && canView && !loadError ? (
         <RosterSectionTabs pageSection={pageSection} onSelect={setPageSection} showListone={canEdit} />
