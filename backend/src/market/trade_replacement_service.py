@@ -256,6 +256,9 @@ class TradeReplacementService:
                 replacement_round_block_message(block.number), code=ROUND_IN_PROGRESS_CODE
             )
         team = self._my_team(league_access, for_update=True)
+        # Prima il conto, poi i sostituti: stesso ordine dello scambio (conti, slot, sostituti) e
+        # delle altre assegnazioni, così un acquisto e uno scambio concorrenti non si bloccano.
+        account = find_account_for_team(self._session, team.id, for_update=True)
         pending = open_replacements(self._session, team.id, for_update=True)
         if not pending:
             raise ValidationAuthError(NO_REPLACEMENT_MESSAGE, code=NO_REPLACEMENT_CODE)
@@ -313,7 +316,6 @@ class TradeReplacementService:
             self._session, league_id=league.id, athlete_ids=[athlete_id], league=league
         ).get(athlete_id)
         price = self._price(market.market_value if market is not None else None)
-        account = find_account_for_team(self._session, team.id, for_update=True)
         balance = account.balance if account is not None else 0
         if account is None or price > balance:
             raise ValidationAuthError(
