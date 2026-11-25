@@ -2,6 +2,7 @@
 
 import type { AthleteMarketFields } from "./athleteValue.js";
 import type { FantasyRole } from "./leagues.js";
+import type { TradeRosterAfter } from "./tradeReplacement.js";
 
 export type MarketSessionKind = "initial_auction" | "waiver" | "live_auction";
 
@@ -145,6 +146,12 @@ export interface TradeProposal {
   awaitingCredits?: boolean;
   /** Decaduta perché un calciatore non è più nella rosa (non per data di scadenza). */
   noLongerValid?: boolean;
+  /**
+   * 1.5: come resterebbero le due rose dopo lo scambio, solo per le proposte aperte (proposta o
+   * in attesa dell'admin). Assenti da un backend più vecchio.
+   */
+  proposerRosterAfter?: TradeRosterAfter | null;
+  recipientRosterAfter?: TradeRosterAfter | null;
 }
 
 export interface TradeProposalList {
