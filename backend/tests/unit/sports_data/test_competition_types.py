@@ -14,9 +14,11 @@ from sports_data.season_stats.competition_types import (
     COMPETITION_TYPE_CUP,
     COMPETITION_TYPE_LEAGUE,
     COMPETITION_TYPE_UNKNOWN,
+    COMPETITION_TYPE_YOUTH,
     CompetitionTypeItem,
     competition_kind,
     is_championship,
+    is_youth_or_reserve,
     parse_competition_types,
 )
 
@@ -86,3 +88,74 @@ def test_championship_rule() -> None:
     assert competition_kind(SERIE_B, {}) == COMPETITION_TYPE_UNKNOWN
     assert not is_championship(999, types)
     assert not is_championship(0, types)
+
+
+UEFA_YOUTH_LEAGUE = 14
+SERIE_C = 138
+
+
+def test_youth_reserve_and_women_competitions_are_excluded_even_when_typed_league() -> None:
+    """QA notte 24-25/11: K. Braithwaite con 7,3 di media dalla sola UEFA Youth League."""
+    types = {UEFA_YOUTH_LEAGUE: "league", SERIE_B: "league", SERIE_C: "league"}
+    assert competition_kind(UEFA_YOUTH_LEAGUE, types) == COMPETITION_TYPE_LEAGUE  # senza nome
+    assert (
+        competition_kind(UEFA_YOUTH_LEAGUE, types, competition_name="UEFA Youth League")
+        == COMPETITION_TYPE_YOUTH
+    )
+    assert not is_championship(UEFA_YOUTH_LEAGUE, types, competition_name="UEFA Youth League")
+    for name in (
+        "UEFA Youth League",
+        "FA Youth Cup",
+        "Premier League 2 Division One",
+        "Professional Development League",
+        "U18 Premier League - North",
+        "U19 Bundesliga",
+        "UEFA U21 Championship - Qualification",
+        "Liga Revelação U23",
+        "CONMEBOL Sudamericano Sub20",
+        "Under 21 Friendlies",
+        "Primavera 1",
+        "Coppa Italia Primavera",
+        "Reserve League",
+        "División de Honor Juvenil",
+        "DFB Junioren Pokal",
+        "Serie A Women",
+        "Frauen Bundesliga",
+        "FA WSL",
+        "Liga F Femenina",
+    ):
+        assert is_youth_or_reserve(name), name
+    # Campionati senior con «II», «B» o «2» nel nome: contano.
+    for name in (
+        "Serie B",
+        "Liga II",
+        "Primera B Metropolitana",
+        "2. Bundesliga",
+        "3. Liga",
+        "Super League 2",
+        "Championship",
+        "Eredivisie",
+    ):
+        assert not is_youth_or_reserve(name), name
+        assert is_championship(SERIE_B, types, competition_name=name)
+
+
+def test_reserve_teams_are_excluded_in_senior_leagues() -> None:
+    types = {SERIE_C: "league"}
+    for club in (
+        "Bayern München II",
+        "Barcelona B",
+        "Sporting CP B",
+        "Juventus U23",
+        "Juventus Next Gen",
+        "Jong Ajax",
+        "Liverpool Reserves",
+    ):
+        assert (
+            competition_kind(SERIE_C, types, competition_name="Serie C", club_name=club)
+            == COMPETITION_TYPE_YOUTH
+        ), club
+    for club in ("Boca Juniors", "Bologna", "Club Brugge KV", "Real Madrid", None):
+        assert is_championship(SERIE_C, types, competition_name="Serie C", club_name=club), club
+    # I 5 campionati contano sempre.
+    assert is_championship(135, {}, competition_name="Serie A", club_name="Squadra B")

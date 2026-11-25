@@ -121,9 +121,9 @@ class AdminMarketValueSeasonRow(ApiModel):
     #: Peso nella media: presenze (fornitore) o partite con voto (FantApperò).
     appearances: int
     average: float | None = None
-    #: ``league`` (contata); ``cup``, ``unknown`` (non campionato) e ``no_rating`` (senza
-    #: media) sono escluse.
-    kind: Literal["league", "cup", "unknown", "no_rating"]
+    #: ``league`` (contata); ``cup``, ``youth`` (giovanili, riserve, femminili), ``unknown``
+    #: (non campionato) e ``no_rating`` (senza media) sono escluse.
+    kind: Literal["league", "cup", "youth", "unknown", "no_rating"]
 
 
 class AdminMarketValueSeasonDetail(ApiModel):

@@ -12,8 +12,11 @@ import type { FantasyRole } from "./leagues.js";
 
 export type MarketValueSeasonSlot = "current" | "previous" | "twoSeasonsAgo";
 
-/** `league` conta; `cup`, `unknown` (non campionato) e `no_rating` (senza media) no. */
-export type MarketValueRowKind = "league" | "cup" | "unknown" | "no_rating";
+/**
+ * `league` conta; `cup`, `youth` (giovanili, riserve, femminili: 25/11), `unknown` (non
+ * campionato) e `no_rating` (senza media) no.
+ */
+export type MarketValueRowKind = "league" | "cup" | "youth" | "unknown" | "no_rating";
 
 export interface AdminMarketValueSeasonRow {
   competition: string;
@@ -115,6 +118,7 @@ const ROLE_PLURAL: Record<FantasyRole, string> = {
 const ROW_KIND_LABEL: Record<MarketValueRowKind, string> = {
   league: "campionato",
   cup: "coppa",
+  youth: "giovanili o riserve",
   unknown: "competizione di tipo sconosciuto",
   no_rating: "senza media",
 };

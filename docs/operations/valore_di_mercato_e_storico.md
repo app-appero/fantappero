@@ -70,11 +70,13 @@ Regola per ogni riga del fornitore (`competition_types.is_championship`):
 | Tipo `league` nell'elenco (es. Serie B, Eredivisie) | Sì |
 | Tipo `cup` nell'elenco (Champions League, Coppa Italia, supercoppe…) | No |
 | Tipo sconosciuto: elenco non ancora scaricato, competizione assente dall'elenco, competizione senza id | No (le righe escluse si contano nel log `season_samples_rows_excluded`, con gli id più frequenti) |
+| Giovanili, riserve e femminili, **anche se il fornitore le dà come `league`** (dal 25/11, `competition_types.is_youth_or_reserve`; riga `youth`, «giovanili o riserve» nel Dettaglio del Valore) | No. Nome della competizione con «Youth», U14–U23 / «Under 21» / «Sub-20», «Primavera», «Reserve»/«Reserves», «Juvenil», «Junioren», «Premier League 2», «Professional Development League» o femminile (Women, Femminile, Féminine, Femenina, Frauen, WSL); oppure squadra seconda squadra: «… II», «… B», «… U23», «… Reserves», «… Next Gen», «Jong …» (giocano in campionati senior: 3. Liga, Primera Federación, Serie C, Eerste Divisie). Un «II» o una «B» nel nome della competizione non basta («Liga II», «Primera B» sono senior). Caso reale: K. Braithwaite con 7,3 dalla sola UEFA Youth League. Restano nella carriera |
 
 Conseguenze:
 
 - con più righe nella stessa stagione si sommano solo quelle di campionato (presenze e media pesata);
 - un calciatore che in una stagione ha **solo righe di coppa** ha quella stagione **senza dati**: nessuna media «25/26» e percentile `MISSING_SEASON_INDEX` nel Valore, come una stagione mancante;
+- un calciatore con **sole righe giovanili o di riserve** in una stagione ha quella stagione **senza dati**, come per le coppe (versione della formula `1.4.1`: il ricalcolo periodico riscrive tutti i valori una volta);
 - la **stagione in corso** viene dalle nostre partite: il catalogo ha solo i 5 campionati (sincronizzazione del catalogo e delle partite filtrata su `MVP_LEAGUE_IDS`), quindi non ci sono coppe e le righe si prendono tutte. Lo stesso vale per le stagioni passate vissute in FantApperò.
 
 **Dopo l'aggiornamento che introduce la regola** (database dove l'import era già stato fatto): finché l'elenco non è scaricato contano solo i 5 campionati. Basta **rilanciare l'import** (§ 2): costa **1 chiamata** (pagine e calciatori sono già nel registro) e alla fine ricalcola medie e Valore. Il ricalcolo periodico rifà comunque il calcolo una volta con la regola nuova (versione della formula `1.3.1`) e di nuovo quando l'elenco dei tipi cambia.
@@ -209,7 +211,7 @@ Per capire **perché** un calciatore ha quel Valore (richiesta di Rosario, 23/11
 | Riga | Cosa vuol dire |
 | --- | --- |
 | Fonte | `fornitore` (media del fornitore, stagioni passate) o `FantApperò` (media dei nostri voti `player_match_ratings.display`, stagione in corso e stagioni vissute in FantApperò). È la **media voto**, non la fantamedia |
-| Competizioni | Le righe di campionato contate. Sotto, nel calcolo, «Non contano: …» elenca le righe escluse: coppe, competizioni di tipo sconosciuto (§ 1.1) e righe senza media (il fornitore a volte non dà `games.rating`) |
+| Competizioni | Le righe di campionato contate. Sotto, nel calcolo, «Non contano: …» elenca le righe escluse: coppe, giovanili o riserve, competizioni di tipo sconosciuto (§ 1.1) e righe senza media (il fornitore a volte non dà `games.rating`) |
 | Presenze con voto | *n*: presenze (fornitore) o partite con voto (FantApperò), sommate sulle righe contate |
 | Media | Media voto della stagione (pesata per presenze se più righe) |
 | Media dei portieri / difensori / … | Media del ruolo in quella stagione, fra i calciatori del listone con dati |

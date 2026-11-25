@@ -16,11 +16,24 @@ Regola (``is_championship``):
 - competizione dei 5 campionati di ``MVP_LEAGUE_IDS`` → campionato, sempre;
 - tipo noto ``league`` → campionato;
 - tipo noto ``cup`` → coppa, esclusa;
-- tipo sconosciuto (elenco non ancora scaricato, competizione nuova, id ``0``) → esclusa.
+- tipo sconosciuto (elenco non ancora scaricato, competizione nuova, id ``0``) → esclusa;
+- giovanili, riserve e femminili (``is_youth_or_reserve``) → escluse anche se il fornitore le
+  dà come ``league`` (QA notte 24-25/11: K. Braithwaite con 7,3 di media dalla sola UEFA Youth
+  League). Restano nella carriera.
+
+Giovanili e riserve (``COMPETITION_TYPE_YOUTH``), elenco volutamente prudente: si guarda il
+**nome della competizione** (``_YOUTH_COMPETITION``: «Youth», U14–U23 / «Under 21» / «Sub-20»,
+«Primavera», «Reserve»/«Reserves», «Juvenil», «Junioren», «Premier League 2», «Professional
+Development League», competizioni femminili) e il **nome della squadra** (``_RESERVE_TEAM``:
+seconde squadre «… II», «… B», «… U23», «… Reserves», «… Next Gen», «Jong …»), perché le seconde
+squadre giocano in campionati senior (3. Liga, Primera Federación, Serie C, Eerste Divisie). Un
+«II» o una «B» nel nome della competizione non basta: «Liga II» e «Primera B» sono campionati
+senior. I 5 campionati di ``MVP_LEAGUE_IDS`` contano sempre.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -41,9 +54,30 @@ COMPETITION_TYPE_LEAGUE = "league"
 COMPETITION_TYPE_CUP = "cup"
 #: Non è un valore della tabella: competizione assente dall'elenco del fornitore.
 COMPETITION_TYPE_UNKNOWN = "unknown"
+#: Non è un valore della tabella: giovanili, riserve o femminili, dal nome (25/11).
+COMPETITION_TYPE_YOUTH = "youth"
 COMPETITION_TYPES = (COMPETITION_TYPE_LEAGUE, COMPETITION_TYPE_CUP)
 
 _MVP = frozenset(MVP_LEAGUE_IDS)
+
+_YOUTH_COMPETITION = re.compile(
+    r"\byouth\b"
+    r"|\bu-?(?:1[4-9]|2[0-3])\b"
+    r"|\bunder[- ]?(?:1[4-9]|2[0-3])\b"
+    r"|\bsub[- ]?(?:1[4-9]|2[0-3])\b"
+    r"|\bprimavera\b"
+    r"|\breserves?\b"
+    r"|\bjuvenil\b"
+    r"|\bjunioren\b"
+    r"|\bpremier league 2\b"
+    r"|\bprofessional development league\b"
+    r"|\bwomen\b|\bwomen's\b|\bfemminile\b|\bf[eé]minine\b|\bfemenin[ao]\b"
+    r"|\bfeminin[ao]\b|\bfrauen\b|\bwsl\b",
+    re.IGNORECASE,
+)
+_RESERVE_TEAM = re.compile(
+    r"\s(?:II|B|U-?(?:1[4-9]|2[0-3])|Reserves?|Next Gen)$|^Jong\s",
+)
 
 
 @dataclass(frozen=True)
@@ -132,16 +166,45 @@ def load_competition_types(session: Session) -> dict[int, str]:
     }
 
 
-def competition_kind(competition_provider_id: int, types: Mapping[int, str]) -> str:
-    """``league``, ``cup`` o ``unknown`` (i 5 campionati sono sempre ``league``)."""
+def is_youth_or_reserve(competition_name: str | None, club_name: str | None = None) -> bool:
+    """Competizione giovanile, di riserve o femminile, o seconda squadra (vedi il modulo)."""
+    if competition_name and _YOUTH_COMPETITION.search(competition_name):
+        return True
+    return bool(club_name and _RESERVE_TEAM.search(club_name.strip()))
+
+
+def competition_kind(
+    competition_provider_id: int,
+    types: Mapping[int, str],
+    *,
+    competition_name: str | None = None,
+    club_name: str | None = None,
+) -> str:
+    """``league``, ``cup``, ``youth`` o ``unknown`` (i 5 campionati sono sempre ``league``)."""
     if competition_provider_id in _MVP:
         return COMPETITION_TYPE_LEAGUE
+    if is_youth_or_reserve(competition_name, club_name):
+        return COMPETITION_TYPE_YOUTH
     return types.get(competition_provider_id, COMPETITION_TYPE_UNKNOWN)
 
 
-def is_championship(competition_provider_id: int, types: Mapping[int, str]) -> bool:
-    """La riga conta nella media e nel Valore solo se è di un campionato."""
-    return competition_kind(competition_provider_id, types) == COMPETITION_TYPE_LEAGUE
+def is_championship(
+    competition_provider_id: int,
+    types: Mapping[int, str],
+    *,
+    competition_name: str | None = None,
+    club_name: str | None = None,
+) -> bool:
+    """La riga conta nella media e nel Valore solo se è di un campionato senior."""
+    return (
+        competition_kind(
+            competition_provider_id,
+            types,
+            competition_name=competition_name,
+            club_name=club_name,
+        )
+        == COMPETITION_TYPE_LEAGUE
+    )
 
 
 __all__ = [
@@ -149,10 +212,12 @@ __all__ = [
     "COMPETITION_TYPE_CUP",
     "COMPETITION_TYPE_LEAGUE",
     "COMPETITION_TYPE_UNKNOWN",
+    "COMPETITION_TYPE_YOUTH",
     "LEAGUES_ENDPOINT",
     "CompetitionTypeItem",
     "competition_kind",
     "is_championship",
+    "is_youth_or_reserve",
     "load_competition_types",
     "parse_competition_types",
     "upsert_competition_types",
