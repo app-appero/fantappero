@@ -105,6 +105,7 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from market.trade_replacement import missing_roles_label, open_replacements
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -2394,6 +2395,16 @@ class FantasyLineupService:
         )
         roster_size = resolve_league_rules_limits(self._session, league.id).roster_size
         if filled < roster_size:
+            pending = open_replacements(self._session, team.id)
+            if pending:
+                # 1.5: dopo uno scambio sbilanciato il sostituto si sceglie subito, anche a
+                # mercato chiuso: lo si dice invece di rimandare a mercato o scambi.
+                missing = missing_roles_label(row.role for row in pending)
+                return (
+                    f"Rosa incompleta: {filled} giocatori su {roster_size}. Dopo lo scambio "
+                    f"{'ti mancano' if len(pending) > 1 else 'ti manca'} {missing}: scegli il "
+                    "sostituto per schierare la formazione."
+                )
             return (
                 f"Rosa incompleta: {filled} giocatori su {roster_size}. Completa la rosa "
                 "(mercato o scambio) per schierare la formazione."

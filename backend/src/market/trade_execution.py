@@ -18,6 +18,7 @@ from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assign_allowing_role_quota_overflow,
     reconcile_roster_overflow,
+    resolve_effective_athlete_roles,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
@@ -25,7 +26,8 @@ from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign, sync_ownership_on_release
 from leagues.models.league import League
 from market.assignment import next_free_slot_or_overflow
-from market.models import TradeProposal
+from market.models import TradeProposal, TradeReplacement
+from market.trade_replacement import net_outgoing_roles, reconcile_trade_replacements
 from market.trade_validators import validate_trade_credits_available
 
 
@@ -60,8 +62,13 @@ def execute_trade(
     proposer_team: FantasyTeam,
     recipient_team: FantasyTeam,
     actor_id: UUID | None,
-) -> None:
-    """Re-validate and atomically apply an accepted trade. Raises, never partially applies."""
+) -> dict[UUID, list[TradeReplacement]]:
+    """Re-validate and atomically apply an accepted trade. Raises, never partially applies.
+
+    Ritorna, per squadra, i sostituti da scegliere creati dallo scambio (1.5): una squadra che
+    cede più giocatori di quanti ne riceve e resta sotto la misura della rosa deve sceglierne
+    subito uno per ogni posto vuoto (`market.trade_replacement`).
+    """
     offered_ids = [UUID(value) for value in proposal.offered_athlete_ids]
     requested_ids = [UUID(value) for value in proposal.requested_athlete_ids]
 
@@ -103,6 +110,18 @@ def execute_trade(
         slot.athlete_id: slot.purchase_credits or 0
         for slot in (*proposer_out_slots, *recipient_out_slots)
         if slot.athlete_id is not None
+    }
+
+    # Ruoli di chi esce e di chi entra, letti prima di muovere nulla: servono a scegliere il
+    # ruolo del sostituto quando le quote non bastano a deciderlo (il «ceduto in più»).
+    trade_roles = {
+        athlete_id: item.role
+        for athlete_id, item in resolve_effective_athlete_roles(
+            session,
+            league_id=league.id,
+            athlete_ids=[*offered_ids, *requested_ids],
+            season_year=league.season_year,
+        ).items()
     }
 
     with session.begin_nested():
@@ -227,7 +246,26 @@ def execute_trade(
         session.flush()
         reconcile_roster_overflow(session, league=league, team=proposer_team)
         reconcile_roster_overflow(session, league=league, team=recipient_team)
+        # Chi cede più giocatori di quanti ne riceve e resta sotto la misura della rosa ha
+        # diritto a un sostituto per ogni posto vuoto (1.5, decisione del 25/11).
+        created: dict[UUID, list[TradeReplacement]] = {}
+        for team, outgoing, incoming in (
+            (proposer_team, offered_ids, requested_ids),
+            (recipient_team, requested_ids, offered_ids),
+        ):
+            created[team.id] = reconcile_trade_replacements(
+                session,
+                league=league,
+                team=team,
+                trade=proposal,
+                new_allowance=len(outgoing) - len(incoming),
+                preferred_roles=net_outgoing_roles(
+                    [trade_roles.get(athlete_id) for athlete_id in outgoing],
+                    [trade_roles.get(athlete_id) for athlete_id in incoming],
+                ),
+            )
         # Lo stato salvato segue sempre la regola delle letture della rosa: una squadra
         # rimasta a 34/35 è "incompleta", non "non valida" (`sync_team_composition_status`).
         sync_team_composition_status(session, proposer_team, league=league)
         sync_team_composition_status(session, recipient_team, league=league)
+    return created

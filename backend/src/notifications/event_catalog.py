@@ -84,6 +84,7 @@ EVENT_KEY_BY_TEMPLATE_KEY: dict[str, str] = {
     "risultati.infortunio": "calciatori.infortunio",
     "risultati.squalifica": "calciatori.squalifica",
     "mercato.scambio": "sistema.scambi",
+    "mercato.sostituto_scambio": "sistema.scambi",
     "mercato.esito_busta": "sistema.asta",
     "mercato.asta_live_iniziata": "sistema.asta",
     "mercato.asta_live_aggiudicato": "sistema.asta",

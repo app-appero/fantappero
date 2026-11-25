@@ -31,9 +31,22 @@ from market.schemas import (
     SubmitMarketBidRequest,
 )
 from market.service import MarketService
+from market.trade_replacement_schemas import (
+    TradeReplacementCandidateListResponse,
+    TradeReplacementPurchaseRequest,
+    TradeReplacementPurchaseResponse,
+    TradeReplacementStatusResponse,
+)
+from market.trade_replacement_service import (
+    DEFAULT_CANDIDATE_LIMIT,
+    MAX_CANDIDATE_LIMIT,
+    TradeReplacementService,
+)
 from market.trade_schemas import (
     CounterTradeProposalRequest,
     CreateTradeProposalRequest,
+    TradePreviewRequest,
+    TradePreviewResponse,
     TradeProposalListResponse,
     TradeProposalResponse,
 )
@@ -89,6 +102,12 @@ def get_market_history_service(
     session: Session = Depends(get_db_session),
 ) -> MarketHistoryService:
     return MarketHistoryService(session)
+
+
+def get_trade_replacement_service(
+    session: Session = Depends(get_db_session),
+) -> TradeReplacementService:
+    return TradeReplacementService(session)
 
 
 @router.get(
@@ -456,6 +475,22 @@ def create_trade_proposal(
         return _error_response(exc)
 
 
+@router.post(
+    "/{league_id}/mercato/scambi/anteprima",
+    response_model=TradePreviewResponse,
+)
+def preview_trade_proposal(
+    body: TradePreviewRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradePreviewResponse | JSONResponse:
+    """Rosa delle due squadre dopo uno scambio ancora da inviare (1.5, solo lettura)."""
+    try:
+        return service.preview_proposal(league_access, body)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
 @router.get(
     "/{league_id}/mercato/scambi/proposte",
     response_model=TradeProposalListResponse,
@@ -585,6 +620,64 @@ def reject_trade_proposal_admin(
     """Reject a trade awaiting admin sign-off."""
     try:
         return service.reject_admin_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+# -- Sostituto dopo uno scambio sbilanciato (1.5, decisione del 25/11) ----------
+# Solo completamento della rosa: niente blocco del mercato, solo il turno in corso.
+
+
+@router.get(
+    "/{league_id}/mercato/sostituti",
+    response_model=TradeReplacementStatusResponse,
+)
+def get_trade_replacements(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeReplacementService = Depends(get_trade_replacement_service),
+) -> TradeReplacementStatusResponse | JSONResponse:
+    """I sostituti che la mia squadra deve scegliere dopo uno scambio (ruoli, rosa, crediti)."""
+    try:
+        return service.get_status(league_access)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/mercato/sostituti/liberi",
+    response_model=TradeReplacementCandidateListResponse,
+)
+def list_trade_replacement_candidates(
+    role: str | None = Query(default=None, alias="ruolo", max_length=1),
+    search: str | None = Query(default=None, alias="cerca", max_length=80),
+    order: str = Query(default="valore", alias="ordine", max_length=20),
+    limit: int = Query(
+        default=DEFAULT_CANDIDATE_LIMIT, ge=1, le=MAX_CANDIDATE_LIMIT, alias="limite"
+    ),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeReplacementService = Depends(get_trade_replacement_service),
+) -> TradeReplacementCandidateListResponse | JSONResponse:
+    """I calciatori liberi del ruolo che manca, con Valore (il prezzo) e media."""
+    try:
+        return service.list_candidates(
+            league_access, role=role, search=search, order=order, limit=limit
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/sostituti/acquista",
+    response_model=TradeReplacementPurchaseResponse,
+)
+def purchase_trade_replacement(
+    body: TradeReplacementPurchaseRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeReplacementService = Depends(get_trade_replacement_service),
+) -> TradeReplacementPurchaseResponse | JSONResponse:
+    """Compra il sostituto al suo Valore, anche a mercato chiuso (non a turno in corso)."""
+    try:
+        return service.purchase(league_access, body)
     except AuthError as exc:
         return _error_response(exc)
 

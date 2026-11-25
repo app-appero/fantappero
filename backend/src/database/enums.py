@@ -140,6 +140,8 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_TRADE_COUNTERED = "market_trade_countered"
     MARKET_TRADE_APPROVED = "market_trade_approved"
     MARKET_TRADE_REJECTED_BY_ADMIN = "market_trade_rejected_by_admin"
+    #: Sostituto comprato dopo uno scambio che ha lasciato la rosa sotto la misura (1.5).
+    MARKET_TRADE_REPLACEMENT_PURCHASED = "market_trade_replacement_purchased"
     MARKET_LIVE_SESSION_CREATED = "market_live_session_created"
     MARKET_LIVE_SESSION_STARTED = "market_live_session_started"
     MARKET_LIVE_LOT_NOMINATED = "market_live_lot_nominated"
@@ -313,6 +315,18 @@ class MarketSessionStatus(str, enum.Enum):
     OPEN = "open"
     CLOSED = "closed"
     RESOLVED = "resolved"
+
+
+class TradeReplacementStatus(str, enum.Enum):
+    """Diritto al sostituto dopo uno scambio sbilanciato (1.5, decisione del 25/11).
+
+    ``pending``: da scegliere; ``chosen``: calciatore preso; ``cancelled``: la rosa è tornata
+    alla misura in altro modo (scambio 1 per 2, assegnazione dell'admin) e il diritto decade.
+    """
+
+    PENDING = "pending"
+    CHOSEN = "chosen"
+    CANCELLED = "cancelled"
 
 
 class TradeStatus(str, enum.Enum):

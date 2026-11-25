@@ -690,6 +690,30 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
     )
 
 
+@register_template("mercato.sostituto_scambio", 1)
+def _render_mercato_sostituto_scambio(params: NotificationParams) -> NotificationContent:
+    """Uno scambio diventato effettivo ha lasciato la rosa sotto la misura (1.5, 25/11).
+
+    La squadra deve scegliere il sostituto dagli svincolati, al suo Valore: il link apre la
+    scelta (``?sostituto=1``) nella lega dello scambio.
+    """
+    team = params.get("other_team")
+    missing = str(params.get("missing_label") or "un calciatore")
+    many = int(params.get("count") or 1) > 1
+    done = f"Scambio con {team} fatto" if team else "Scambio fatto"
+    pick = (
+        "Sceglili dagli svincolati, al loro Valore, per schierare la formazione."
+        if many
+        else "Sceglilo dagli svincolati, al suo Valore, per schierare la formazione."
+    )
+    verb = "ti mancano" if many else "ti manca"
+    return NotificationContent(
+        title="Scegli il sostituto dopo lo scambio",
+        body=_league_body(f"{done}: {verb} {missing}. {pick}", params),
+        deep_link=_league_link("/rosa?sostituto=1", params),
+    )
+
+
 @register_template("lega.nuovo_membro", 1)
 def _render_lega_nuovo_membro(params: NotificationParams) -> NotificationContent:
     """Un partecipante è entrato nella lega: arriva ai proprietari."""

@@ -20,10 +20,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from database.enums import (
+    FantasyRole,
     MarketBidStatus,
     MarketLiveNominationMode,
     MarketSessionKind,
     MarketSessionStatus,
+    TradeReplacementStatus,
     TradeStatus,
 )
 from database.types import UTCDateTime
@@ -275,3 +277,71 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         remote_side="TradeProposal.id",
         foreign_keys=[counter_of_id],
     )
+
+
+class TradeReplacement(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Diritto a un sostituto dopo uno scambio sbilanciato (1.5, decisione del 25/11).
+
+    Uno scambio eseguito che lascia la squadra sotto la misura della rosa (es. 2 per 1, 34/35)
+    crea una riga per ogni posto rimasto vuoto, con il ruolo che manca: la squadra compra un
+    calciatore libero di quel ruolo al suo Valore, anche a mercato chiuso. Solo uno scambio
+    crea righe: una rosa incompleta per altri motivi (asta, svincolo, rimozione dell'admin) non
+    dà questo diritto. Le righe aperte si chiudono da sole (``cancelled``) se la rosa torna alla
+    misura in altro modo (`market.trade_replacement.reconcile_trade_replacements`).
+    """
+
+    __tablename__ = "trade_replacements"
+    __table_args__ = (
+        Index("ix_trade_replacements_league_id", "league_id"),
+        Index("ix_trade_replacements_team_status", "fantasy_team_id", "status"),
+        Index("ix_trade_replacements_trade_proposal_id", "trade_proposal_id"),
+        CheckConstraint(
+            "price_credits IS NULL OR price_credits >= 0",
+            name="ck_trade_replacements_price_credits",
+        ),
+    )
+
+    league_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fantasy_team_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: Lo scambio che ha lasciato la rosa sotto la misura.
+    trade_proposal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("trade_proposals.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[FantasyRole] = mapped_column(
+        Enum(
+            FantasyRole,
+            name="fantasy_role",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+    )
+    status: Mapped[TradeReplacementStatus] = mapped_column(
+        Enum(
+            TradeReplacementStatus,
+            name="trade_replacement_status",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=text("'pending'"),
+    )
+    #: Il calciatore preso (``chosen``) e quanto è costato: il suo Valore al momento.
+    athlete_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("athletes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    price_credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chosen_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+    trade_proposal: Mapped[TradeProposal] = relationship()

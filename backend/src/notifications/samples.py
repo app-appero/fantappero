@@ -95,6 +95,13 @@ SAMPLES: tuple[SampleNotification, ...] = (
         },
     ),
     SampleNotification(
+        "scambio-sostituto",
+        NotificationCategory.MERCATO,
+        "mercato.sostituto_scambio",
+        1,
+        {"other_team": "Giulia United", "missing_label": "1 Difensore", "count": 1},
+    ),
+    SampleNotification(
         "asta-sorpasso",
         NotificationCategory.MERCATO,
         "mercato.asta_live_sorpassato",
