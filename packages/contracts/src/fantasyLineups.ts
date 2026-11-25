@@ -874,7 +874,11 @@ export function evaluateLineup(input: {
     issues.push(
       issue(
         "bench_incomplete",
-        `Tutti i calciatori in rosa devono essere schierati: mancano ${unusedRoster.length} in panchina.`,
+        // Con 1 «manca 1», non «mancano 1» (QA 24-25/11; `missingCount` di plural.ts, qui in
+        // linea perché i moduli dei contratti non si importano a runtime fra loro).
+        `Tutti i calciatori in rosa devono essere schierati: ${
+          unusedRoster.length === 1 ? "manca 1" : `mancano ${unusedRoster.length}`
+        } in panchina.`,
       ),
     );
   }

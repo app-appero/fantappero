@@ -349,6 +349,8 @@ export {
   withoutRoleQuotaExcess,
 } from "./fantasyLineups.js";
 
+export { countWithNoun, missingCount, missingStartersLabel, pendingInvitesA11yLabel } from "./plural.js";
+
 export {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,

@@ -929,7 +929,7 @@ describe("formazione con chi non è più in rosa (QA 19/11)", () => {
     assert.deepEqual(
       rosterDepartureNotices([
         { code: "lineup_athlete_left_roster", message: notice },
-        { code: "bench_incomplete", message: "Tutti i calciatori in rosa devono essere schierati: mancano 1 in panchina." },
+        { code: "bench_incomplete", message: "Tutti i calciatori in rosa devono essere schierati: manca 1 in panchina." },
       ]),
       [notice],
     );

@@ -1,4 +1,5 @@
 import { lazyStyles } from "../theme/lazyStyles";
+import { pendingInvitesA11yLabel } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -116,7 +117,7 @@ export function AppDrawer({
         {item.id === "received-invites" && pendingInviteCount > 0 ? (
           <Text
             style={styles.badge}
-            accessibilityLabel={`${pendingInviteCount} inviti in attesa di risposta`}
+            accessibilityLabel={pendingInvitesA11yLabel(pendingInviteCount)}
             testID="app-drawer-invite-badge"
           >
             {pendingInviteCount > 99 ? "99+" : pendingInviteCount}

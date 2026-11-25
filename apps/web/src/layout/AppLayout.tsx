@@ -8,6 +8,7 @@ import {
   SidebarNav,
   type NavLinkAnchorProps,
 } from "@fantappero/ui";
+import { pendingInvitesA11yLabel } from "@fantappero/contracts";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
@@ -260,7 +261,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     badgeCount: item.id === "received-invites" ? pendingInvites : undefined,
     badgeLabel:
       item.id === "received-invites" && pendingInvites > 0
-        ? `${pendingInvites} inviti in attesa di risposta`
+        ? pendingInvitesA11yLabel(pendingInvites)
         : undefined,
   }));
   const navGroups = resolveNavGroups();

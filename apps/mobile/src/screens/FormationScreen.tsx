@@ -37,6 +37,8 @@ import {
   fantasyBadgesFromBonusMalus,
   playerAvatarUrl,
   FAQ_HELP,
+  countWithNoun,
+  missingStartersLabel,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
@@ -1852,7 +1854,7 @@ export function FormationScreen() {
               </View>
             ) : (
               <Text style={styles.buttonLabel}>
-                {missing > 0 ? `Mancano ${missing} titolari` : "Salva formazione"}
+                {missing > 0 ? missingStartersLabel(missing) : "Salva formazione"}
               </Text>
             )}
           </Pressable>
@@ -2129,7 +2131,7 @@ export function FormationScreen() {
                     >
                       {team.fantasyTeamName || team.fantasyTeamId} —{" "}
                       {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
-                      {team.starters > 0 ? ` · ${team.starters} titolari` : ""}
+                      {team.starters > 0 ? ` · ${countWithNoun(team.starters, "titolare", "titolari")}` : ""}
                       {team.usedFallback ? " · fallback locale" : ""}
                       {team.message ? ` · ${team.message}` : ""}
                     </Text>
