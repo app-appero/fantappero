@@ -203,6 +203,10 @@ def load_league_candidate_fixtures(session: Session, league: League) -> list[Eli
     return result
 
 
+def _is_homologated(fantasy_round: FantasyRound) -> bool:
+    return fantasy_round.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
+
+
 class FantasyTurnService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -965,6 +969,7 @@ class FantasyTurnService:
             stored=fantasy_round.status,
             now=now,
             cutoff_at=fantasy_round.cutoff_at,
+            homologated=_is_homologated(fantasy_round),
         )
         link = self._session.scalars(
             select(FantasyRoundFixture)
@@ -1054,6 +1059,7 @@ class FantasyTurnService:
             stored=fantasy_round.status,
             now=now,
             cutoff_at=fantasy_round.cutoff_at,
+            homologated=_is_homologated(fantasy_round),
         )
         link = self._session.scalars(
             select(FantasyRoundFixture)
@@ -1116,6 +1122,7 @@ class FantasyTurnService:
             stored=fantasy_round.status,
             now=now,
             cutoff_at=fantasy_round.cutoff_at,
+            homologated=_is_homologated(fantasy_round),
         )
         links = list(
             self._session.scalars(
@@ -2543,10 +2550,12 @@ class FantasyTurnService:
                 FantasyRoundFixture.excluded_at.is_(None),
             )
         ).all()
+        homologated = _is_homologated(fantasy_round)
         effective = derive_effective_status(
             fantasy_round.status,
             now=now,
             cutoff_at=fantasy_round.cutoff_at,
+            homologated=homologated,
         )
         return FantasyTurnSummaryResponse(
             id=str(fantasy_round.id),
@@ -2573,8 +2582,10 @@ class FantasyTurnService:
                 stored=fantasy_round.status,
                 now=now,
                 cutoff_at=fantasy_round.cutoff_at,
+                homologated=homologated,
             ),
             matchStatus=aggregate_turn_status(list(fixture_states)),
+            homologationStatus=fantasy_round.homologation_status.value,
         )
 
     def _to_detail(
@@ -2604,7 +2615,7 @@ class FantasyTurnService:
             generatedAt=summary.generated_at,
             modificationAllowed=summary.modification_allowed,
             matchStatus=summary.match_status,
-            homologationStatus=fantasy_round.homologation_status.value,
+            homologationStatus=summary.homologation_status,
             fixtures=fixtures,
             excludedFixtures=excluded,
         )

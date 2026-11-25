@@ -17,11 +17,17 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
-from database.enums import FantasyRoundHomologationStatus, LeagueAuditAction, NotificationCategory
+from database.enums import (
+    FantasyRoundHomologationStatus,
+    LeagueAuditAction,
+    LeagueState,
+    NotificationCategory,
+)
 from fantasy_ratings.config import default_formula_config
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.readiness import evaluate_round_readiness
 from leagues.calendar_round_mapping import is_pre_creation_placeholder
+from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_league
@@ -35,6 +41,22 @@ class HomologationResult:
     homologation_status: str
     homologated_at: datetime | None
     formula_version: str | None
+
+
+def _notifies_homologation(
+    session: Session, *, league_id: UUID, before_league_creation: bool
+) -> bool:
+    """«Turno omologato» solo a chi quel turno l'ha giocato (QA notte 24-25/11).
+
+    Niente notifica per il turno segnaposto iniziato prima della creazione della lega (nessuno
+    scontro diretto, la lega non c'era) né per una lega non attiva (in configurazione, asta,
+    conclusa): lì i membri ricevevano «Turno concluso» per un turno finito prima che la lega
+    esistesse. L'omologazione e l'audit restano.
+    """
+    if before_league_creation:
+        return False
+    league = session.get(League, league_id)
+    return league is not None and league.state == LeagueState.ACTIVE
 
 
 def homologate_round(
@@ -53,8 +75,8 @@ def homologate_round(
     vicenda o duplicare l'evento di audit.
 
     ``before_league_creation``: turno segnaposto iniziato prima della creazione della lega
-    (nessuno scontro diretto). ``None`` = da ricavare qui. Cambia solo il testo della
-    notifica (niente «risultato definitivo» né link alla classifica) e annota l'audit.
+    (nessuno scontro diretto). ``None`` = da ricavare qui. Annota l'audit e non notifica
+    nessuno (``_notifies_homologation``); in una lega non attiva non si notifica comunque.
     """
     fantasy_round = session.get(FantasyRound, round_id)
     if fantasy_round is None:
@@ -111,20 +133,22 @@ def homologate_round(
             },
         )
     )
-    notifications = NotificationService(session)
-    for _, user_id in user_ids_for_league(session, fantasy_round.league_id):
-        notifications.create_notification(
-            user_id=user_id,
-            category=NotificationCategory.RISULTATI,
-            template_key="risultati.omologazione",
-            template_version=2,
-            params={
-                "round_number": fantasy_round.number,
-                **({"before_league_creation": True} if before_league_creation else {}),
-                **league_params(session, fantasy_round.league_id),
-            },
-            dedup_key=f"round_homologated:{round_id}:{now.isoformat()}:{user_id}",
-        )
+    if _notifies_homologation(
+        session, league_id=fantasy_round.league_id, before_league_creation=before_league_creation
+    ):
+        notifications = NotificationService(session)
+        for _, user_id in user_ids_for_league(session, fantasy_round.league_id):
+            notifications.create_notification(
+                user_id=user_id,
+                category=NotificationCategory.RISULTATI,
+                template_key="risultati.omologazione",
+                template_version=2,
+                params={
+                    "round_number": fantasy_round.number,
+                    **league_params(session, fantasy_round.league_id),
+                },
+                dedup_key=f"round_homologated:{round_id}:{now.isoformat()}:{user_id}",
+            )
     session.flush()
 
     # Un turno omologato è il "verdetto" che sblocca il successivo

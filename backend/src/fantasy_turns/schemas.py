@@ -163,10 +163,14 @@ class FantasyTurnSummaryResponse(ApiModel):
     # scheduled | needs_update — distinto dal ciclo di vita fantasy
     # (status/effectiveStatus: scheduled/open/locked/skipped).
     match_status: str = Field(alias="matchStatus")
+    # Anche nell'elenco (25/11): un turno omologato mai aperto resta ``status: scheduled``
+    # (stato memorizzato), ma ``effectiveStatus`` è ``locked`` e qui si vede che è concluso.
+    homologation_status: Literal["provisional", "homologated"] = Field(
+        default="provisional", alias="homologationStatus"
+    )
 
 
 class FantasyTurnDetailResponse(FantasyTurnSummaryResponse):
-    homologation_status: Literal["provisional", "homologated"] = Field(alias="homologationStatus")
     fixtures: list[FantasyTurnFixtureResponse] = Field(default_factory=list)
     # Partite escluse dall'admin: restano visibili per poterle rimettere nel turno.
     excluded_fixtures: list[FantasyTurnFixtureResponse] = Field(
