@@ -11,7 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
-import { roleQuotaErrorMessage, rosterRoleQuota } from "@fantappero/contracts";
+import { roleQuotaErrorMessage, rosterRoleQuota, teamUnderQuotaNotice } from "@fantappero/contracts";
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -48,7 +48,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
 import { useTradeReplacement } from "../market/TradeReplacementContext";
-import { RosterShortfallBanner } from "../market/TradeShortfall";
+import { RosterQuotaNotice, RosterShortfallBanner } from "../market/TradeShortfall";
 import { wantsReplacementSheet } from "../market/tradeReplacementPrompt";
 import { MarketGateBar } from "../market/MarketGateBar";
 import { manualAddMinimum } from "../market/pricePrefill";
@@ -321,6 +321,7 @@ export function RosterScreen() {
   // 1.5: sostituto dopo uno scambio sbilanciato. Il riquadro resta finché la rosa non torna alla
   // misura; il link della notifica (`?sostituto=1`) apre la scelta; dopo l'acquisto si rilegge.
   const replacement = useTradeReplacement();
+  const underQuotaNotice = teamUnderQuotaNotice(team);
   const route = useRoute<RouteProp<AppTabParamList, "Roster">>();
   const openFromNotification = wantsReplacementSheet(route.params);
   useEffect(() => {
@@ -944,6 +945,9 @@ export function RosterScreen() {
       {activeLeague ? null : <Text style={styles.meta}>Seleziona una lega dal selettore in alto.</Text>}
       {replacement.banner ? (
         <RosterShortfallBanner banner={replacement.banner} onChoose={replacement.open} />
+      ) : underQuotaNotice ? (
+        // Corsa Mercato del 25/11: rosa alla misura ma un ruolo sotto quota (solo un avviso).
+        <RosterQuotaNotice text={underQuotaNotice} />
       ) : null}
 
       {!loading && canView && !loadError ? (

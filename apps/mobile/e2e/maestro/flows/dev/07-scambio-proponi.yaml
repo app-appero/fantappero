@@ -38,6 +38,18 @@ appId: com.fantappero.mobile
     speed: 80
 - tapOn: { id: "market-trade-create-submit" }
 - waitForAnimationToEnd
+# 1.5 e corsa Mercato del 25/11: se lo scambio lascia la rosa corta o un ruolo sotto quota (un 1
+# per 1 tra ruoli diversi), prima dell'invio c'è il foglio «Proporre lo scambio?» con il riquadro
+# arancione o giallo: si conferma con «Proponi scambio». (In una controproposta lo stesso foglio
+# dice «Inviare la controproposta?» / «Invia controproposta».)
+- runFlow:
+    when:
+      visible: { id: "market-trade-propose-shortfall-confirm" }
+    commands:
+      - takeScreenshot: dev-07-avviso
+      - assertVisible: "Proporre lo scambio?"
+      - tapOn: { id: "market-trade-propose-shortfall-confirm" }
+      - waitForAnimationToEnd
 - assertNotVisible: { id: "market-trade-create-error" }
 - scrollUntilVisible:
     element: { id: "market-trade-proposal-.+" }

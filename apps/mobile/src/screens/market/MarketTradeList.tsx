@@ -5,16 +5,15 @@ import type {
   TradeProposal,
 } from "@fantappero/contracts";
 import {
+  approveTradeNotices,
   avatarLetters,
   myRosterAfter,
-  shortRostersAfter,
   TRADE_SHORTFALL_ACCEPT_LABEL,
   TRADE_SHORTFALL_APPROVE_LABEL,
   TRADE_SHORTFALL_APPROVE_TITLE,
-  TRADE_SHORTFALL_PROPOSE_LABEL,
-  TRADE_SHORTFALL_PROPOSE_TITLE,
-  tradeShortfallWarning,
-  type TradeShortfallWarning,
+  tradeAfterNotice,
+  tradeProposeConfirmCopy,
+  type TradeAfterNotice,
 } from "@fantappero/contracts";
 import { HScroll } from "../../components/HScroll";
 import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
@@ -31,6 +30,7 @@ import { previewTradeProposal } from "../../api/market";
 import { useAuthSession } from "../../session/DemoSessionContext";
 import { useTradeReplacement } from "../../market/TradeReplacementContext";
 import { TradeShortfallConfirmSheet } from "../../market/TradeShortfall";
+import { tradeAcceptConfirmMode, tradePreviewDraft } from "../../market/tradeNoticeFlow";
 import type { useTradeFlow } from "../../market/useTradeFlow";
 import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
 import {
@@ -126,20 +126,19 @@ export function MarketTradeList({
   // 1.5: scambio che lascia la mia rosa corta (accetto) o quella di una squadra (approvo da admin).
   const replacement = useTradeReplacement();
   const { accessToken, activeLeagueId } = useAuthSession();
+  // Controproposta: titolo e pulsante suoi («Inviare la controproposta?», corsa Mercato 25/11).
+  const counterCopy = tradeProposeConfirmCopy("counter");
   const [counterConfirm, setCounterConfirm] = useState<{
-    warning: TradeShortfallWarning;
+    notice: TradeAfterNotice;
     submit: () => void;
   } | null>(null);
   const [shortfallAccept, setShortfallAccept] = useState<TradeProposal | null>(null);
   const [shortfallApprove, setShortfallApprove] = useState<TradeProposal | null>(null);
-  const acceptWarning = shortfallAccept
-    ? tradeShortfallWarning(myRosterAfter(shortfallAccept, selfTeamId), "accept")
-    : null;
-  const approveWarnings = shortfallApprove
-    ? shortRostersAfter(shortfallApprove)
-        .map((after) => tradeShortfallWarning(after, "approve"))
-        .filter((warning): warning is TradeShortfallWarning => warning !== null)
-    : [];
+  // Avvisi anche per i crediti che non bastano e i ruoli sotto quota; solo i giocatori mancanti
+  // cambiano il pulsante in «Accetta e scegli».
+  const acceptNotice = shortfallAccept ? tradeAfterNotice(myRosterAfter(shortfallAccept, selfTeamId), "accept") : null;
+  const acceptMode = tradeAcceptConfirmMode(acceptNotice);
+  const approveNotices = shortfallApprove ? approveTradeNotices(shortfallApprove) : [];
 
   async function acceptAndChoose(proposal: TradeProposal) {
     setShortfallAccept(null);
@@ -179,8 +178,9 @@ export function MarketTradeList({
       return;
     }
     // 1.5: se lo scambio mi lascia sotto la misura della rosa, la conferma lo dice (foglio dal
-    // basso con il riquadro arancione e «Accetta e scegli»).
-    if (tradeShortfallWarning(myRosterAfter(proposal, selfTeamId), "accept")) {
+    // basso con il riquadro arancione e «Accetta e scegli»); con un ruolo che resta sotto quota il
+    // foglio ha il riquadro giallo e il pulsante di sempre.
+    if (tradeAcceptConfirmMode(tradeAfterNotice(myRosterAfter(proposal, selfTeamId), "accept")) !== "alert") {
       setShortfallAccept(proposal);
       return;
     }
@@ -215,26 +215,25 @@ export function MarketTradeList({
         })
         .then(() => setCounteringProposalId(null));
     };
-    // 1.5: chi controproponga uno scambio che lo lascerebbe sotto la misura lo vede prima.
+    // 1.5: chi controproponga uno scambio che lo lascerebbe sotto la misura lo vede prima (con i
+    // crediti dopo lo scambio e i ruoli sotto quota, corsa Mercato del 25/11).
     const original = trade.proposals.find((row) => row.id === proposalId);
-    if (
-      !original ||
-      !accessToken ||
-      !activeLeagueId ||
-      counterOfferedAthleteIds.length <= counterRequestedAthleteIds.length
-    ) {
+    const draft = tradePreviewDraft({
+      recipientTeamId: original?.proposerTeamId,
+      offeredAthleteIds: counterOfferedAthleteIds,
+      requestedAthleteIds: counterRequestedAthleteIds,
+      direction: counterCreditsDirection,
+      amount: counterCreditsAmount,
+    });
+    if (!draft || !accessToken || !activeLeagueId) {
       submit();
       return;
     }
-    void previewTradeProposal(accessToken, activeLeagueId, {
-      recipientTeamId: original.proposerTeamId,
-      offeredAthleteIds: counterOfferedAthleteIds,
-      requestedAthleteIds: counterRequestedAthleteIds,
-    })
+    void previewTradeProposal(accessToken, activeLeagueId, draft)
       .then((preview) => {
-        const warning = tradeShortfallWarning(preview.proposerRosterAfter, "propose");
-        if (warning) {
-          setCounterConfirm({ warning, submit });
+        const notice = tradeAfterNotice(preview.proposerRosterAfter, "propose");
+        if (notice) {
+          setCounterConfirm({ notice, submit });
         } else {
           submit();
         }
@@ -448,7 +447,7 @@ export function MarketTradeList({
                       style={[styles.button, (pending || locked) && styles.disabled]}
                       disabled={pending || locked}
                       onPress={() => {
-                        if (shortRostersAfter(proposal).length > 0) {
+                        if (approveTradeNotices(proposal).length > 0) {
                           setShortfallApprove(proposal);
                         } else {
                           void approve(proposal);
@@ -542,11 +541,11 @@ export function MarketTradeList({
         </View>
       ) : null}
       <TradeShortfallConfirmSheet
-        visible={shortfallAccept !== null && acceptWarning !== null}
+        visible={shortfallAccept !== null && acceptNotice !== null}
         title={TRADE_ACCEPT_CONFIRM_TITLE}
         message={shortfallAccept ? tradeAcceptConfirmMessage(shortfallAccept, selfTeamId) : null}
-        warnings={acceptWarning ? [acceptWarning] : []}
-        confirmLabel={TRADE_SHORTFALL_ACCEPT_LABEL}
+        notices={acceptNotice ? [acceptNotice] : []}
+        confirmLabel={acceptMode === "short" ? TRADE_SHORTFALL_ACCEPT_LABEL : TRADE_ACCEPT_CONFIRM_LABEL}
         onCancel={() => setShortfallAccept(null)}
         onConfirm={() => {
           if (shortfallAccept) {
@@ -556,9 +555,9 @@ export function MarketTradeList({
         testID="market-trade-accept-shortfall"
       />
       <TradeShortfallConfirmSheet
-        visible={shortfallApprove !== null && approveWarnings.length > 0}
+        visible={shortfallApprove !== null && approveNotices.length > 0}
         title={TRADE_SHORTFALL_APPROVE_TITLE}
-        warnings={approveWarnings}
+        notices={approveNotices}
         confirmLabel={TRADE_SHORTFALL_APPROVE_LABEL}
         onCancel={() => setShortfallApprove(null)}
         onConfirm={() => {
@@ -570,9 +569,9 @@ export function MarketTradeList({
       />
       <TradeShortfallConfirmSheet
         visible={counterConfirm !== null}
-        title={TRADE_SHORTFALL_PROPOSE_TITLE}
-        warnings={counterConfirm ? [counterConfirm.warning] : []}
-        confirmLabel={TRADE_SHORTFALL_PROPOSE_LABEL}
+        title={counterCopy.title}
+        notices={counterConfirm ? [counterConfirm.notice] : []}
+        confirmLabel={counterCopy.label}
         onCancel={() => setCounterConfirm(null)}
         onConfirm={() => {
           const pendingSubmit = counterConfirm?.submit;

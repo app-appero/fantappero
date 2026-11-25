@@ -21,6 +21,7 @@ import {
   replacementIntro,
   replacementRoles,
   replacementTakeLabel,
+  replacementUnaffordableNotice,
   roleSingularLabel,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
@@ -31,7 +32,7 @@ import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { getApiErrorMessage } from "../session/DemoSessionContext";
 import { lazyStyles } from "../theme/lazyStyles";
 import { AthleteMarketTags } from "./AthleteMarketTags";
-import { shortfallStyles } from "./TradeShortfall";
+import { ReplacementUnaffordableBox, shortfallStyles } from "./TradeShortfall";
 
 const { colors, spacing, typography, radius } = theme;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -138,6 +139,8 @@ export function TradeReplacementSheet({
     return null;
   }
   const done = replacementDoneBanner(status);
+  // Corsa Mercato del 25/11: nessun libero del ruolo alla portata dei crediti. L'elenco resta, grigio.
+  const unaffordable = replacementUnaffordableNotice(status, activeRole);
   const closeOrBack = target ? () => setTarget(null) : onClose;
 
   return (
@@ -193,6 +196,7 @@ export function TradeReplacementSheet({
                   <Text style={styles.doneLabel}>{`✓ ${done}`}</Text>
                 </View>
               ) : null}
+              {unaffordable ? <ReplacementUnaffordableBox text={unaffordable} /> : null}
               <Text style={styles.body} testID="replacement-intro">
                 {replacementIntro(status.missingRoles)}
               </Text>

@@ -19,13 +19,9 @@ import {
   fetchTeamPlayersForTrade,
 } from "../api/leagues";
 import { applyVoluntaryRelease, previewTradeProposal, previewVoluntaryRelease } from "../api/market";
-import {
-  TRADE_SHORTFALL_PROPOSE_LABEL,
-  TRADE_SHORTFALL_PROPOSE_TITLE,
-  tradeShortfallWarning,
-  type TradeShortfallWarning,
-} from "@fantappero/contracts";
+import { tradeAfterNotice, tradeProposeConfirmCopy, type TradeAfterNotice } from "@fantappero/contracts";
 import { TradeShortfallConfirmSheet } from "../market/TradeShortfall";
+import { tradePreviewDraft } from "../market/tradeNoticeFlow";
 import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
@@ -330,26 +326,32 @@ export function MarketScreen() {
   }
 
   // 1.5: chi propone uno scambio che lo lascerebbe sotto la misura della rosa lo vede prima di
-  // inviarlo («Dopo lo scambio avrai 34/35»). Il server dice come resterebbe la rosa.
+  // inviarlo («Dopo lo scambio avrai 34/35»). Il server dice come resterebbe la rosa: anche i
+  // crediti dopo lo scambio (se non bastano per il sostituto) e i ruoli che resterebbero sotto
+  // quota con la rosa alla misura (corsa Mercato del 25/11).
   const [proposeConfirm, setProposeConfirm] = useState<{
-    warning: TradeShortfallWarning;
+    notice: TradeAfterNotice;
     submit: () => void;
   } | null>(null);
+  const proposeCopy = tradeProposeConfirmCopy("propose");
 
   async function withShortfallCheck(submit: () => void) {
-    if (offeredAthleteIds.length <= requestedAthleteIds.length || !accessToken || !activeLeagueId) {
+    const draft = tradePreviewDraft({
+      recipientTeamId,
+      offeredAthleteIds,
+      requestedAthleteIds,
+      direction: creditsDirection,
+      amount: creditsAmount,
+    });
+    if (!draft || !accessToken || !activeLeagueId) {
       submit();
       return;
     }
     try {
-      const preview = await previewTradeProposal(accessToken, activeLeagueId, {
-        recipientTeamId,
-        offeredAthleteIds,
-        requestedAthleteIds,
-      });
-      const warning = tradeShortfallWarning(preview.proposerRosterAfter, "propose");
-      if (warning) {
-        setProposeConfirm({ warning, submit });
+      const preview = await previewTradeProposal(accessToken, activeLeagueId, draft);
+      const notice = tradeAfterNotice(preview.proposerRosterAfter, "propose");
+      if (notice) {
+        setProposeConfirm({ notice, submit });
         return;
       }
     } catch {
@@ -570,9 +572,9 @@ export function MarketScreen() {
       ) : null}
       <TradeShortfallConfirmSheet
         visible={proposeConfirm !== null}
-        title={TRADE_SHORTFALL_PROPOSE_TITLE}
-        warnings={proposeConfirm ? [proposeConfirm.warning] : []}
-        confirmLabel={TRADE_SHORTFALL_PROPOSE_LABEL}
+        title={proposeCopy.title}
+        notices={proposeConfirm ? [proposeConfirm.notice] : []}
+        confirmLabel={proposeCopy.label}
         onCancel={() => setProposeConfirm(null)}
         onConfirm={() => {
           const pendingSubmit = proposeConfirm?.submit;
