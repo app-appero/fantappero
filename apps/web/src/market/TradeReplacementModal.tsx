@@ -302,6 +302,7 @@ export function TradeReplacementModal({
               type="button"
               size="sm"
               variant="primary"
+              className="fa-replacement__take"
               disabled={!candidate.affordable || blocked}
               onClick={() => {
                 setError(null);

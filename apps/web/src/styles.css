@@ -11089,6 +11089,11 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   opacity: 0.6;
 }
 
+.fa-replacement__take {
+  flex: none;
+  white-space: nowrap;
+}
+
 .fa-replacement__who {
   display: grid;
   gap: 2px;
