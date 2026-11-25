@@ -11,7 +11,9 @@
  * dal sorgente.
  */
 import type { AthleteSeasonAverage } from "./athleteValue.js";
-import type { FantasyRole } from "./leagues.js";
+import type { FantasyRole, FantasyTeam, RosterUnderQuotaRole } from "./leagues.js";
+
+export type { RosterUnderQuotaRole } from "./leagues.js";
 
 /** Un ruolo da scegliere come sostituto e quanti. */
 export interface TradeMissingRole {
@@ -20,9 +22,26 @@ export interface TradeMissingRole {
 }
 
 /**
+ * Quanto costano i sostituti di un ruolo che manca, ai prezzi dei liberi di adesso: stesso prezzo
+ * dell'acquisto (il Valore, il minimo dove manca) e stessi liberi (non impegnati in aste o
+ * svincolati aperti).
+ */
+export interface TradeReplacementCost {
+  role: FantasyRole;
+  count: number;
+  /** Il libero più economico del ruolo; `null` se non c'è nessun libero. */
+  cheapestPrice: number | null;
+  /** I `count` liberi più economici insieme; `null` se non ce ne sono abbastanza. */
+  totalPrice: number | null;
+}
+
+/**
  * Come resterebbe la rosa di una squadra dopo lo scambio (campo `proposerRosterAfter` /
  * `recipientRosterAfter` delle proposte aperte e dell'anteprima). `missingRoles` sono i sostituti
  * da scegliere subito dopo: vuoto se la rosa resta alla misura.
+ *
+ * I campi facoltativi sono arrivati dopo la corsa Mercato del 25/11 (assenti sui server più
+ * vecchi): crediti dopo lo scambio, prezzo più basso dei sostituti e se bastano, ruoli sotto quota.
  */
 export interface TradeRosterAfter {
   teamId: string;
@@ -30,6 +49,13 @@ export interface TradeRosterAfter {
   sizeAfter: number;
   rosterSize: number;
   missingRoles: TradeMissingRole[];
+  /** Crediti dopo lo scambio, con i crediti offerti o chiesti. */
+  balanceAfter?: number;
+  replacementCosts?: TradeReplacementCost[];
+  /** `false`: da sola non potrà prendere i sostituti (dovrà assegnarli l'admin). Solo un avviso. */
+  canAffordReplacement?: boolean;
+  /** Ruoli sotto la quota della lega subito dopo lo scambio (prima dei sostituti). */
+  underQuotaRoles?: RosterUnderQuotaRole[];
 }
 
 /** Bozza da valutare prima di inviare una proposta o una controproposta. */
@@ -37,6 +63,9 @@ export interface TradePreviewRequest {
   recipientTeamId: string;
   offeredAthleteIds: string[];
   requestedAthleteIds: string[];
+  /** Crediti offerti e chiesti, per i crediti dopo lo scambio (facoltativi). */
+  offeredCredits?: number;
+  requestedCredits?: number;
 }
 
 export interface TradePreview {
@@ -66,6 +95,13 @@ export interface TradeReplacementStatus {
   /** `round_in_progress`: le rose sono ferme fino al calcolo del turno. */
   blockedReason: "round_in_progress" | null;
   blockedMessage: string | null;
+  /** `false`: con i crediti di adesso non può prendere da sola i sostituti (server dopo il 25/11). */
+  canAffordReplacement?: boolean;
+  /** Il libero più economico fra i ruoli che mancano; `null` senza sostituti o senza liberi. */
+  cheapestReplacementPrice?: number | null;
+  replacementCosts?: TradeReplacementCost[];
+  /** Ruoli sotto la quota della lega nella rosa di adesso. */
+  underQuotaRoles?: RosterUnderQuotaRole[];
 }
 
 export interface TradeReplacementCandidate {
@@ -187,6 +223,16 @@ export const TRADE_SHORTFALL_APPROVE_LABEL = "Approva";
 /** Titolo della conferma per chi propone e per l'amministratore (chi accetta ha già la sua). */
 export const TRADE_SHORTFALL_PROPOSE_TITLE = "Proporre lo scambio?";
 export const TRADE_SHORTFALL_APPROVE_TITLE = "Approvare lo scambio?";
+/** Stessa conferma nella controproposta (corsa Mercato del 25/11): titolo e pulsante suoi. */
+export const TRADE_SHORTFALL_COUNTER_TITLE = "Inviare la controproposta?";
+export const TRADE_SHORTFALL_COUNTER_LABEL = "Invia controproposta";
+
+/** Titolo e pulsante della conferma prima di inviare: proposta nuova o controproposta. */
+export function tradeProposeConfirmCopy(kind: "propose" | "counter"): { title: string; label: string } {
+  return kind === "counter"
+    ? { title: TRADE_SHORTFALL_COUNTER_TITLE, label: TRADE_SHORTFALL_COUNTER_LABEL }
+    : { title: TRADE_SHORTFALL_PROPOSE_TITLE, label: TRADE_SHORTFALL_PROPOSE_LABEL };
+}
 
 /**
  * Il riquadro arancione «Dopo lo scambio avrai 34/35» per una squadra che resterà sotto la misura
@@ -258,6 +304,217 @@ export function shortRostersAfter(proposal: RosterAfterProposal): TradeRosterAft
   );
 }
 
+// -- Crediti che non bastano per il sostituto (corsa Mercato del 25/11) ----------
+
+/** Articolo determinativo del ruolo al singolare: «il Difensore», «l'Attaccante». */
+const ROLE_ARTICLE: Record<FantasyRole, string> = { P: "il ", D: "il ", C: "il ", A: "l'" };
+
+/** «il Difensore», «i 2 Difensori», «il Difensore e il Centrocampista». */
+function rolesWithArticle(costs: readonly TradeReplacementCost[]): string {
+  const parts = costs.map((cost) =>
+    cost.count === 1 ? `${ROLE_ARTICLE[cost.role]}${roleSingularLabel(cost.role)}` : `i ${roleCountLabel(cost.role, cost.count)}`,
+  );
+  if (parts.length <= 1) {
+    return parts[0] ?? "";
+  }
+  return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
+}
+
+function orderedCosts(costs: readonly TradeReplacementCost[] | null | undefined): TradeReplacementCost[] {
+  return [...(costs ?? [])]
+    .filter((cost) => cost.count > 0)
+    .sort((left, right) => ROLE_ORDER.indexOf(left.role) - ROLE_ORDER.indexOf(right.role));
+}
+
+/**
+ * «Attenzione: dopo lo scambio avrai 0 crediti e il Difensore libero più economico costa 8. Da solo
+ * non potrai prendere il sostituto: dovrà assegnartelo l'admin.» (all'admin in terza persona, con
+ * il nome della squadra). `null` se i crediti bastano, se non mancano giocatori o se il server non
+ * manda i prezzi (più vecchio, o nessun libero del ruolo). Solo un avviso: lo scambio non si blocca.
+ */
+export function tradeCreditsWarning(
+  after: TradeRosterAfter | null | undefined,
+  audience: TradeShortfallAudience,
+): string | null {
+  if (!after || after.canAffordReplacement !== false || typeof after.balanceAfter !== "number") {
+    return null;
+  }
+  const total = missingRolesTotal(after.missingRoles);
+  const costs = orderedCosts(after.replacementCosts);
+  if (total === 0 || costs.length === 0 || costs.some((cost) => cost.totalPrice === null)) {
+    return null;
+  }
+  const many = costs.reduce((sum, cost) => sum + cost.count, 0) > 1;
+  const price = costs.reduce((sum, cost) => sum + (cost.totalPrice ?? 0), 0);
+  const credits = creditsLabel(Math.max(0, after.balanceAfter));
+  const cheapest = many
+    ? `${rolesWithArticle(costs)} liberi più economici costano ${price} in tutto`
+    : `${rolesWithArticle(costs)} libero più economico costa ${price}`;
+  const what = many ? "i sostituti" : "il sostituto";
+  if (audience === "approve") {
+    return (
+      `Attenzione: dopo lo scambio ${after.teamName} avrà ${credits} e ${cheapest}. ` +
+      `Da sola non potrà prendere ${what}: dovrà ${many ? "assegnarglieli" : "assegnarglielo"} l'admin.`
+    );
+  }
+  return (
+    `Attenzione: dopo lo scambio avrai ${credits} e ${cheapest}. ` +
+    `Da solo non potrai prendere ${what}: dovrà ${many ? "assegnarteli" : "assegnartelo"} l'admin.`
+  );
+}
+
+// -- Ruoli sotto quota con la rosa piena (corsa Mercato del 25/11) ----------------
+
+/** I ruoli davvero sotto quota, nell'ordine P, D, C, A. */
+function normalizedUnderQuota(items: readonly RosterUnderQuotaRole[] | null | undefined): RosterUnderQuotaRole[] {
+  return ROLE_ORDER.flatMap((role) =>
+    (items ?? []).filter((item) => item.role === role && item.count < item.quota).slice(0, 1),
+  );
+}
+
+/** «9 Centrocampisti su 11», «2 Portieri su 3 e 9 Centrocampisti su 11». */
+export function underQuotaLabel(items: readonly RosterUnderQuotaRole[] | null | undefined): string {
+  const parts = normalizedUnderQuota(items).map((item) => `${roleCountLabel(item.role, item.count)} su ${item.quota}`);
+  if (parts.length <= 1) {
+    return parts[0] ?? "";
+  }
+  return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
+}
+
+/** I ruoli sotto quota dopo aver preso un calciatore del ruolo `role`. */
+export function underQuotaAfterPurchase(
+  items: readonly RosterUnderQuotaRole[] | null | undefined,
+  role: FantasyRole,
+): RosterUnderQuotaRole[] {
+  return normalizedUnderQuota(items)
+    .map((item) => (item.role === role ? { ...item, count: item.count + 1 } : item))
+    .filter((item) => item.count < item.quota);
+}
+
+/**
+ * I ruoli che restano sotto quota anche dopo i sostituti: a ogni ruolo sotto quota si aggiungono
+ * i sostituti dello stesso ruolo da scegliere subito dopo lo scambio.
+ */
+export function underQuotaAfterReplacements(after: TradeRosterAfter | null | undefined): RosterUnderQuotaRole[] {
+  if (!after) {
+    return [];
+  }
+  const covered = new Map(normalized(after.missingRoles).map((item) => [item.role, item.count]));
+  return normalizedUnderQuota(after.underQuotaRoles)
+    .map((item) => ({ ...item, count: item.count + (covered.get(item.role) ?? 0) }))
+    .filter((item) => item.count < item.quota);
+}
+
+/**
+ * Riga informativa prima dello scambio: «Dopo lo scambio avrai 9 Centrocampisti su 11.». Se mancano
+ * anche giocatori dice che il ruolo resta sotto quota pure con i sostituti («Anche con il sostituto
+ * avrai 10 Centrocampisti su 11.»); all'admin con il nome della squadra. `null` se nessun ruolo
+ * resta sotto quota, o se la rosa resterà corta per altri motivi (lì l'avviso dei ruoli non aiuta).
+ */
+export function tradeQuotaNote(
+  after: TradeRosterAfter | null | undefined,
+  audience: TradeShortfallAudience,
+): string | null {
+  if (!after) {
+    return null;
+  }
+  const missing = missingRolesTotal(after.missingRoles);
+  if (after.sizeAfter + missing < after.rosterSize) {
+    return null;
+  }
+  const label = underQuotaLabel(underQuotaAfterReplacements(after));
+  if (!label) {
+    return null;
+  }
+  const subject = audience === "approve" ? `${after.teamName} avrà` : "avrai";
+  if (missing === 0) {
+    return `Dopo lo scambio ${subject} ${label}.`;
+  }
+  return `Anche ${missing > 1 ? "con i sostituti" : "con il sostituto"} ${subject} ${label}.`;
+}
+
+/**
+ * Tutto quello che va detto prima dello scambio su una squadra: il riquadro arancione «Dopo lo
+ * scambio avrai 34/35» (con l'avviso dei crediti se non bastano) e la riga dei ruoli sotto quota.
+ * Senza giocatori mancanti la riga dei ruoli va da sola in un riquadro giallo più leggero (`info`).
+ */
+export interface TradeAfterNotice {
+  /** `warning`: mancano giocatori (arancione); `info`: solo ruoli sotto quota (giallo leggero). */
+  tone: "warning" | "info";
+  title: string | null;
+  body: string | null;
+  /** «Attenzione: dopo lo scambio avrai N crediti…», solo con `warning`. */
+  creditsWarning: string | null;
+  /** «Dopo lo scambio avrai 9 Centrocampisti su 11.» */
+  quotaNote: string | null;
+}
+
+export function tradeAfterNotice(
+  after: TradeRosterAfter | null | undefined,
+  audience: TradeShortfallAudience,
+): TradeAfterNotice | null {
+  const shortfall = tradeShortfallWarning(after, audience);
+  const quotaNote = tradeQuotaNote(after, audience);
+  if (!shortfall && !quotaNote) {
+    return null;
+  }
+  return {
+    tone: shortfall ? "warning" : "info",
+    title: shortfall?.title ?? null,
+    body: shortfall?.body ?? null,
+    creditsWarning: shortfall ? tradeCreditsWarning(after, audience) : null,
+    quotaNote,
+  };
+}
+
+/** Per l'amministratore che approva: gli avvisi delle due squadre (vuoto se non c'è niente da dire). */
+export function approveTradeNotices(proposal: RosterAfterProposal): TradeAfterNotice[] {
+  return [proposal.proposerRosterAfter, proposal.recipientRosterAfter]
+    .map((after) => tradeAfterNotice(after, "approve"))
+    .filter((notice): notice is TradeAfterNotice => notice !== null);
+}
+
+/** Chiave stabile di un avviso in un elenco (titolo o riga dei ruoli, con il nome della squadra). */
+export function tradeAfterNoticeKey(notice: TradeAfterNotice): string {
+  return notice.title ?? notice.quotaNote ?? notice.body ?? "";
+}
+
+/** Il riquadro «Ruoli sotto quota» in Rosa: testo per una rosa alla misura, `null` altrimenti. */
+export const ROSTER_UNDER_QUOTA_HINT = "Puoi completarli con uno scambio o agli svincolati.";
+
+/**
+ * «Ruoli sotto quota: 9 Centrocampisti su 11. Puoi completarli con uno scambio o agli svincolati.»
+ * Solo con la rosa alla misura (con la rosa corta ci sono già gli altri avvisi, e durante l'asta i
+ * ruoli sono tutti sotto quota); `null` se nessun ruolo è sotto quota. Non blocca niente.
+ */
+export function rosterUnderQuotaNotice(
+  roster:
+    | { filledSlots: number; rosterSize: number; underQuotaRoles?: readonly RosterUnderQuotaRole[] | null }
+    | null
+    | undefined,
+): string | null {
+  if (!roster || roster.rosterSize <= 0 || roster.filledSlots < roster.rosterSize) {
+    return null;
+  }
+  const label = underQuotaLabel(roster.underQuotaRoles);
+  return label ? `Ruoli sotto quota: ${label}. ${ROSTER_UNDER_QUOTA_HINT}` : null;
+}
+
+/** Lo stesso riquadro dalla squadra letta in Rosa (`GET …/rosa`, `composition.underQuotaRoles`). */
+export function teamUnderQuotaNotice(
+  team: Pick<FantasyTeam, "filledSlots" | "rosterSize" | "composition"> | null | undefined,
+): string | null {
+  const composition = team?.composition;
+  if (!team || !composition) {
+    return null;
+  }
+  return rosterUnderQuotaNotice({
+    filledSlots: team.filledSlots,
+    rosterSize: composition.limits?.rosterSize ?? team.rosterSize,
+    underQuotaRoles: composition.underQuotaRoles,
+  });
+}
+
 // -- Finestra «Scegli il sostituto» ---------------------------------------------
 
 export const REPLACEMENT_SHEET_TITLE = "Scegli il sostituto";
@@ -282,7 +539,9 @@ type ReplacementStatusLike = Pick<
   TradeReplacementStatus,
   "pending" | "missingRoles" | "filledSlots" | "rosterSize"
 > &
-  Partial<Pick<TradeReplacementStatus, "tradeProposalId" | "receivedAthleteNames" | "receivedCredits" | "balance">>;
+  Partial<
+    Pick<TradeReplacementStatus, "tradeProposalId" | "receivedAthleteNames" | "receivedCredits" | "balance" | "underQuotaRoles">
+  >;
 
 /** Ci sono sostituti da scegliere. */
 export function hasPendingReplacement(status: Pick<TradeReplacementStatus, "pending"> | null | undefined): boolean {
@@ -393,7 +652,14 @@ export function replacementConfirmNote(status: ReplacementStatusLike, role: Fant
   const after = status.filledSlots + 1;
   const left = missingAfterPurchase(status.missingRoles, role);
   if (left.length === 0 && after >= status.rosterSize) {
-    return `La rosa torna ${after}/${status.rosterSize} e puoi schierare subito la formazione. Vale anche a mercato chiuso.`;
+    const base = `La rosa torna ${after}/${status.rosterSize} e puoi schierare subito la formazione. Vale anche a mercato chiuso.`;
+    // Ultimo sostituto: se un ruolo resta sotto quota lo dice già qui (corsa Mercato del 25/11).
+    const quota = rosterUnderQuotaNotice({
+      filledSlots: after,
+      rosterSize: status.rosterSize,
+      underQuotaRoles: underQuotaAfterPurchase(status.underQuotaRoles, role),
+    });
+    return quota ? `${base} ${quota}` : base;
   }
   if (left.length === 0) {
     return `La rosa sale a ${after}/${status.rosterSize}. Vale anche a mercato chiuso.`;
@@ -408,7 +674,40 @@ export function replacementPurchasedMessage(purchase: Pick<TradeReplacementPurch
   if (left > 0) {
     return `${head} Ti resta da scegliere ${missingRolesLabel(purchase.status.missingRoles)}.`;
   }
-  return `${head} La rosa è completa: puoi schierare la formazione.`;
+  const done = `${head} La rosa è completa: puoi schierare la formazione.`;
+  // Fine della finestra: un ruolo ancora sotto quota (dato del server dopo l'acquisto).
+  const quota = rosterUnderQuotaNotice(purchase.status);
+  return quota ? `${done} ${quota}` : done;
+}
+
+/**
+ * Riquadro in alto nella finestra quando nessun libero del ruolo è alla portata: «Nessun libero alla
+ * tua portata: hai 0 crediti e il più economico costa 8. Chiedi all'admin di assegnarti un
+ * Difensore.». L'elenco resta visibile (tutto grigio). `null` se il più economico si può prendere o
+ * se il server non manda i prezzi.
+ */
+export function replacementUnaffordableNotice(
+  status:
+    | (Pick<TradeReplacementStatus, "balance" | "missingRoles"> &
+        Partial<Pick<TradeReplacementStatus, "replacementCosts" | "cheapestReplacementPrice">>)
+    | null
+    | undefined,
+  role: FantasyRole | null | undefined,
+): string | null {
+  if (!status || !role) {
+    return null;
+  }
+  const cost = status.replacementCosts?.find((item) => item.role === role);
+  const cheapest = cost ? cost.cheapestPrice : (status.cheapestReplacementPrice ?? null);
+  if (cheapest === null || cheapest <= status.balance) {
+    return null;
+  }
+  const count = normalized(status.missingRoles).find((item) => item.role === role)?.count ?? cost?.count ?? 1;
+  const who = count === 1 ? `un ${roleSingularLabel(role)}` : roleCountLabel(role, count);
+  return (
+    `Nessun libero alla tua portata: hai ${creditsLabel(Math.max(0, status.balance))} e il più economico ` +
+    `costa ${cheapest}. Chiedi all'admin di assegnarti ${who}.`
+  );
 }
 
 // -- Riquadro in Rosa e Formazione ----------------------------------------------

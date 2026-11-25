@@ -937,6 +937,13 @@ export interface RosterCompositionIssue {
   message: string;
 }
 
+/** Un ruolo sotto la quota della lega: quanti calciatori ci sono e quanti ne prevede (1.5). */
+export interface RosterUnderQuotaRole {
+  role: FantasyRole;
+  count: number;
+  quota: number;
+}
+
 export interface RosterComposition {
   status: RosterCompositionStatus | string;
   filledSlots: number;
@@ -946,6 +953,11 @@ export interface RosterComposition {
   limits: RosterCompositionLimits;
   counts: RosterCompositionCounts;
   issues: RosterCompositionIssue[];
+  /**
+   * Ruoli sotto la quota della lega (es. 9 Centrocampisti su 11), anche a rosa alla misura: solo
+   * un avviso in Rosa. Assente sui server più vecchi.
+   */
+  underQuotaRoles?: RosterUnderQuotaRole[];
 }
 
 export interface FantasyRosterSlot {
