@@ -702,12 +702,17 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
       recipientTeamId: "team-2",
       offeredAthleteIds: ["athlete-1"],
       requestedAthleteIds: [],
+      offeredCredits: 0,
+      requestedCredits: 0,
     });
     expect(createTradeProposalMock).not.toHaveBeenCalled();
     expect(query("market-trade-propose-warning")?.textContent).toContain("Dopo lo scambio avrai 33/35");
     expect(query("market-trade-propose-warning")?.textContent).toContain(
       "Ti mancheranno 2 Difensori. Se lo scambio viene accettato dovrai sceglierli dagli svincolati, al loro Valore.",
     );
+    // La proposta normale non cambia: titolo e pulsante di sempre.
+    expect(container.textContent).toContain("Proporre lo scambio?");
+    expect(query("market-trade-propose-confirm")?.textContent).toBe("Proponi scambio");
     await act(async () => {
       query("market-trade-propose-confirm")!.click();
     });
@@ -759,6 +764,222 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     });
     await flushAsync();
     expect(approveTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-pending-short");
+    unmount();
+  });
+
+  it("corsa Mercato 25/11: chi accetta senza crediti per il sostituto lo legge sotto il riquadro arancione", async () => {
+    const received = {
+      id: "proposal-poor",
+      leagueId: "league-1",
+      proposerTeamId: "team-2",
+      recipientTeamId: "team-1",
+      offeredAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+      requestedAthletes: [
+        { id: "athlete-1", name: "Giocatore Svincolabile" },
+        { id: "athlete-3", name: "Secondo Ceduto" },
+      ],
+      offeredCredits: 0,
+      requestedCredits: 150,
+      status: "proposed",
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+      proposerRosterAfter: { teamId: "team-2", teamName: "Squadra Avversaria", sizeAfter: 36, rosterSize: 35, missingRoles: [] },
+      recipientRosterAfter: {
+        teamId: "team-1",
+        teamName: "La Mia Squadra",
+        sizeAfter: 34,
+        rosterSize: 35,
+        missingRoles: [{ role: "D", count: 1 }],
+        balanceAfter: 0,
+        replacementCosts: [{ role: "D", count: 1, cheapestPrice: 8, totalPrice: 8 }],
+        canAffordReplacement: false,
+        underQuotaRoles: [{ role: "D", count: 10, quota: 11 }],
+      },
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [received] });
+    acceptTradeProposalMock.mockReset().mockResolvedValue({ ...received, status: "accepted" });
+    fetchTradeReplacementsMock.mockReset().mockRejectedValue(new Error("nessuno"));
+    const { container, unmount } = await renderAppAt("/mercato");
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    await act(async () => {
+      query("market-trade-accept-proposal-poor")!.click();
+    });
+    expect(query("trade-shortfall-warning")?.textContent).toContain("Dopo lo scambio avrai 34/35");
+    expect(query("trade-shortfall-warning-credits")?.textContent).toBe(
+      "Attenzione: dopo lo scambio avrai 0 crediti e il Difensore libero più economico costa 8. " +
+        "Da solo non potrai prendere il sostituto: dovrà assegnartelo l'admin.",
+    );
+    // Il sostituto riporta i Difensori alla quota: nessuna riga dei ruoli.
+    expect(query("trade-shortfall-warning-quota")).toBeNull();
+    // È solo un avviso: lo scambio si accetta lo stesso.
+    expect(query("market-trade-accept-confirm")?.textContent).toBe("Accetta e scegli");
+    await act(async () => {
+      query("market-trade-accept-confirm")!.click();
+    });
+    await flushAsync();
+    expect(acceptTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-poor");
+    unmount();
+  });
+
+  it("corsa Mercato 25/11: 1 per 1 tra ruoli diversi, riquadro giallo «Dopo lo scambio avrai 10 Centrocampisti su 11.»", async () => {
+    createTradeProposalMock.mockReset().mockResolvedValue({});
+    previewTradeProposalMock.mockReset().mockResolvedValue({
+      proposerRosterAfter: {
+        teamId: "team-1",
+        teamName: "La Mia Squadra",
+        sizeAfter: 35,
+        rosterSize: 35,
+        missingRoles: [],
+        balanceAfter: 150,
+        replacementCosts: [],
+        canAffordReplacement: true,
+        underQuotaRoles: [{ role: "C", count: 10, quota: 11 }],
+      },
+      recipientRosterAfter: { teamId: "team-2", teamName: "Squadra Avversaria", sizeAfter: 35, rosterSize: 35, missingRoles: [] },
+    });
+    const { container, unmount } = await renderAppAt("/mercato");
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    const select = container.querySelector('select[name="trade-recipient"]') as HTMLSelectElement;
+    await act(async () => {
+      select.value = "team-2";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flushAsync();
+    const offered = container.querySelector(
+      '[data-testid="market-trade-offered-athletes"] input[type="checkbox"]',
+    ) as HTMLInputElement;
+    const requested = container.querySelector(
+      '[data-testid="market-trade-requested-athletes"] input[type="checkbox"]',
+    ) as HTMLInputElement | null;
+    await act(async () => {
+      offered.click();
+      requested?.click();
+    });
+    const form = container.querySelector('[data-testid="market-trade-create-form"]') as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+    expect(createTradeProposalMock).not.toHaveBeenCalled();
+    const notice = query("market-trade-propose-warning");
+    expect(notice?.className).toContain("fa-shortfall--info");
+    expect(notice?.textContent).toBe("Dopo lo scambio avrai 10 Centrocampisti su 11.");
+    expect(container.textContent).toContain("Proporre lo scambio?");
+    await act(async () => {
+      query("market-trade-propose-confirm")!.click();
+    });
+    await flushAsync();
+    expect(createTradeProposalMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("corsa Mercato 25/11: la controproposta si conferma con «Inviare la controproposta?» e «Invia controproposta»", async () => {
+    const received = {
+      id: "proposal-to-counter",
+      leagueId: "league-1",
+      proposerTeamId: "team-2",
+      recipientTeamId: "team-1",
+      offeredAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+      requestedAthletes: [],
+      offeredCredits: 0,
+      requestedCredits: 0,
+      status: "proposed",
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [received] });
+    previewTradeProposalMock.mockReset().mockResolvedValue({
+      proposerRosterAfter: {
+        teamId: "team-1",
+        teamName: "La Mia Squadra",
+        sizeAfter: 34,
+        rosterSize: 35,
+        missingRoles: [{ role: "A", count: 1 }],
+      },
+      recipientRosterAfter: { teamId: "team-2", teamName: "Squadra Avversaria", sizeAfter: 36, rosterSize: 35, missingRoles: [] },
+    });
+    const { container, unmount } = await renderAppAt("/mercato");
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    const card = container.querySelector('[data-testid="market-trade-proposal-proposal-to-counter"]');
+    const counter = [...(card?.querySelectorAll("button") ?? [])].find(
+      (button) => (button.textContent ?? "") === "Controproponi",
+    );
+    await act(async () => {
+      counter!.click();
+    });
+    const form = container.querySelector(
+      '[data-testid="market-trade-counter-form-proposal-to-counter"]',
+    ) as HTMLFormElement;
+    const offered = form.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await act(async () => {
+      offered.click();
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+    expect(previewTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", {
+      recipientTeamId: "team-2",
+      offeredAthleteIds: ["athlete-1"],
+      requestedAthleteIds: [],
+      offeredCredits: 0,
+      requestedCredits: 0,
+    });
+    expect(query("market-trade-propose-warning")?.textContent).toContain("Dopo lo scambio avrai 34/35");
+    expect(container.textContent).toContain("Inviare la controproposta?");
+    expect(container.textContent).not.toContain("Proporre lo scambio?");
+    expect(query("market-trade-propose-confirm")?.textContent).toBe("Invia controproposta");
+    unmount();
+  });
+
+  it("corsa Mercato 25/11: l'admin che approva vede anche i ruoli sotto quota, in terza persona", async () => {
+    const pending = {
+      id: "proposal-pending-quota",
+      leagueId: "league-1",
+      proposerTeamId: "team-2",
+      recipientTeamId: "team-3",
+      offeredAthletes: [{ id: "athlete-5", name: "Primo" }],
+      requestedAthletes: [{ id: "athlete-7", name: "Terzo" }],
+      offeredCredits: 0,
+      requestedCredits: 0,
+      status: "pending_approval",
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+      proposerRosterAfter: {
+        teamId: "team-2",
+        teamName: "Squadra Avversaria",
+        sizeAfter: 35,
+        rosterSize: 35,
+        missingRoles: [],
+        underQuotaRoles: [{ role: "C", count: 10, quota: 11 }],
+      },
+      recipientRosterAfter: { teamId: "team-3", teamName: "Terza", sizeAfter: 35, rosterSize: 35, missingRoles: [], underQuotaRoles: [] },
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [pending] });
+    approveTradeProposalMock.mockReset().mockResolvedValue({ ...pending, status: "executed" });
+    fetchTradeReplacementsMock.mockReset().mockRejectedValue(new Error("nessuno"));
+    const adminLeague: LeagueSummary = { id: "league-1", name: "Lega Test", role: "league_admin" };
+    const { container, unmount } = await renderAppAt("/mercato", [adminLeague]);
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    await act(async () => {
+      query("market-trade-approve-proposal-pending-quota")!.click();
+    });
+    expect(approveTradeProposalMock).not.toHaveBeenCalled();
+    expect(query("market-trade-approve-warning")?.textContent).toBe(
+      "Dopo lo scambio Squadra Avversaria avrà 10 Centrocampisti su 11.",
+    );
+    await act(async () => {
+      query("market-trade-approve-confirm")!.click();
+    });
+    await flushAsync();
+    expect(approveTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-pending-quota");
     unmount();
   });
 

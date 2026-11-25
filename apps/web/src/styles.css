@@ -11010,6 +11010,17 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   margin: var(--fa-space-xs) 0 0;
 }
 
+/* Corsa Mercato del 25/11: crediti che non bastano per il sostituto (in grassetto nel riquadro
+   arancione) e ruoli sotto quota con la rosa piena (riquadro giallo più leggero, solo informativo). */
+.fa-shortfall__credits {
+  font-weight: 600;
+}
+
+.fa-shortfall--info {
+  border-color: color-mix(in srgb, var(--fa-color-warning) 45%, transparent);
+  background: color-mix(in srgb, var(--fa-color-warning) 6%, var(--fa-color-background-elevated));
+}
+
 .fa-replacement {
   width: min(100%, 36rem);
 }

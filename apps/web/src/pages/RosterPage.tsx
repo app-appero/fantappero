@@ -11,7 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
-import { canConfirmRosterImport, roleQuotaErrorMessage, rosterRoleQuota } from "@fantappero/contracts";
+import { canConfirmRosterImport, roleQuotaErrorMessage, rosterRoleQuota, teamUnderQuotaNotice } from "@fantappero/contracts";
 import { Breadcrumb, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -44,7 +44,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketGate } from "../market/MarketGateContext";
 import { useTradeReplacement } from "../market/TradeReplacementContext";
-import { RosterShortfallBanner } from "../market/TradeShortfallNotice";
+import { RosterQuotaNotice, RosterShortfallBanner } from "../market/TradeShortfallNotice";
 import { manualPriceMinimum } from "../market/athleteValue";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
@@ -485,6 +485,7 @@ export function RosterPage() {
   // 1.5: sostituto dopo uno scambio sbilanciato. Il riquadro resta finché la rosa non torna alla
   // misura; dopo l'acquisto (finestra aperta da qui o da sola) la rosa si rilegge.
   const replacement = useTradeReplacement();
+  const underQuotaNotice = teamUnderQuotaNotice(team);
   const replacementFilled = replacement.status?.filledSlots;
   const lastReplacementFilled = useRef(replacementFilled);
   useEffect(() => {
@@ -1566,6 +1567,12 @@ export function RosterPage() {
 
       {!loading && !showForbidden && !loadError && replacement.banner ? (
         <RosterShortfallBanner banner={replacement.banner} onChoose={replacement.open} />
+      ) : null}
+
+      {/* Corsa Mercato del 25/11: rosa alla misura ma un ruolo sotto quota (solo un avviso). Con
+          sostituti da scegliere si vede il riquadro dei sostituti, non questo. */}
+      {!loading && !showForbidden && !loadError && !replacement.banner && underQuotaNotice ? (
+        <RosterQuotaNotice text={underQuotaNotice} />
       ) : null}
 
       {!loading && !showForbidden && !loadError ? (

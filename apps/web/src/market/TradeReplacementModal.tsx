@@ -21,6 +21,7 @@ import {
   replacementPurchasedMessage,
   replacementRoles,
   replacementTakeLabel,
+  replacementUnaffordableNotice,
   roleSingularLabel,
 } from "@fantappero/contracts";
 import { Button, Input, Modal, Select, UiStatePanel, useOptionalToast } from "@fantappero/ui";
@@ -29,6 +30,7 @@ import { buyTradeReplacement, fetchTradeReplacementCandidates } from "../api/mar
 import { getApiErrorMessage } from "../api/client";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { MarketValueBadge, SeasonAverageBadge } from "./AthleteValueTags";
+import { ReplacementUnaffordableNotice } from "./TradeShortfallNotice";
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -153,6 +155,8 @@ export function TradeReplacementModal({
     return null;
   }
   const done = replacementDoneBanner(status);
+  // Corsa Mercato del 25/11: nessun libero del ruolo alla portata dei crediti. L'elenco resta, grigio.
+  const unaffordable = replacementUnaffordableNotice(status, activeRole);
 
   if (target && activeRole) {
     return (
@@ -219,6 +223,7 @@ export function TradeReplacementModal({
             {done}
           </p>
         ) : null}
+        {unaffordable ? <ReplacementUnaffordableNotice text={unaffordable} /> : null}
         <p data-testid="replacement-intro">{replacementIntro(status.missingRoles)}</p>
         {activeRole ? (
           <ul className="fa-replacement__chips" data-testid="replacement-chips">

@@ -231,6 +231,76 @@ describe("Sostituto dopo lo scambio sbilanciato (1.5)", () => {
     unmount();
   });
 
+  it("corsa Mercato 25/11: nessun libero alla portata, riquadro in alto ed elenco tutto grigio", async () => {
+    fetchTradeReplacementsMock.mockResolvedValue({
+      ...PENDING,
+      balance: 0,
+      canAffordReplacement: false,
+      cheapestReplacementPrice: 12,
+      replacementCosts: [{ role: "D", count: 1, cheapestPrice: 12, totalPrice: 12 }],
+    });
+    fetchCandidatesMock.mockResolvedValue({
+      ...CANDIDATES,
+      balance: 0,
+      candidates: CANDIDATES.candidates.map((item) => ({ ...item, affordable: false })),
+    });
+    const { container, unmount } = await render();
+    expect(byTestId(container, "replacement-unaffordable")?.textContent).toBe(
+      "Nessun libero alla tua portata: hai 0 crediti e il più economico costa 12. Chiedi all'admin di assegnarti un Difensore.",
+    );
+    // L'elenco resta visibile, con tutte le righe spente.
+    expect(byTestId(container, "replacement-list")).not.toBeNull();
+    for (const id of ["a-cheap", "a-rich"]) {
+      expect(byTestId(container, `replacement-candidate-${id}`)?.className).toContain("fa-replacement__row--disabled");
+      expect((byTestId(container, `replacement-take-${id}`) as HTMLButtonElement | null)?.disabled).toBe(true);
+    }
+    unmount();
+  });
+
+  it("con i crediti che bastano niente riquadro", async () => {
+    fetchTradeReplacementsMock.mockResolvedValue({
+      ...PENDING,
+      canAffordReplacement: true,
+      cheapestReplacementPrice: 12,
+      replacementCosts: [{ role: "D", count: 1, cheapestPrice: 12, totalPrice: 12 }],
+    });
+    const { container, unmount } = await render();
+    expect(byTestId(container, "replacement-sheet")).not.toBeNull();
+    expect(byTestId(container, "replacement-unaffordable")).toBeNull();
+    unmount();
+  });
+
+  it("corsa Mercato 25/11: dopo l'ultimo sostituto, se un ruolo resta sotto quota, la conferma lo dice", async () => {
+    fetchTradeReplacementsMock.mockResolvedValue({
+      ...PENDING,
+      underQuotaRoles: [
+        { role: "D", count: 10, quota: 11 },
+        { role: "C", count: 10, quota: 11 },
+      ],
+    });
+    buyMock.mockResolvedValue({
+      athleteId: "a-cheap",
+      athleteName: "A. Bianchi",
+      role: "D",
+      priceCredits: 12,
+      balance: 108,
+      status: { ...DONE, underQuotaRoles: [{ role: "C", count: 10, quota: 11 }] },
+    } satisfies TradeReplacementPurchase);
+    const { container, unmount } = await render();
+    await click(byTestId(container, "replacement-take-a-cheap"));
+    expect(byTestId(container, "replacement-confirm-note")?.textContent).toBe(
+      "La rosa torna 35/35 e puoi schierare subito la formazione. Vale anche a mercato chiuso. " +
+        "Ruoli sotto quota: 10 Centrocampisti su 11. Puoi completarli con uno scambio o agli svincolati.",
+    );
+    await click(byTestId(container, "replacement-confirm"));
+    expect(buyMock).toHaveBeenCalledWith("token", "league-1", "a-cheap");
+    expect(document.body.textContent).toContain(
+      "Hai preso A. Bianchi per 12 crediti. La rosa è completa: puoi schierare la formazione. " +
+        "Ruoli sotto quota: 10 Centrocampisti su 11. Puoi completarli con uno scambio o agli svincolati.",
+    );
+    unmount();
+  });
+
   it("a turno in corso dice quando si potrà scegliere e non fa prendere nessuno", async () => {
     fetchTradeReplacementsMock.mockResolvedValue({
       ...PENDING,
