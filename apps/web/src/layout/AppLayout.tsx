@@ -38,6 +38,7 @@ import { NotificationCenter } from "../notifications/NotificationCenter";
 import { ImpersonationBanner } from "../auth/ImpersonationBanner";
 import { rememberLastAppPath } from "../feedback/lastPage";
 import { SkipLink } from "./SkipLink";
+import { TradeReplacementProvider } from "../market/TradeReplacementContext";
 
 const APP_ICONS: Record<string, ReactNode> = {
   "league-hub": <IconTrophy />,
@@ -420,7 +421,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </NavDrawer>
         }
       >
-        {children}
+        {/* 1.5: sostituto dopo uno scambio sbilanciato, aperto da solo una volta per sessione. */}
+        <TradeReplacementProvider>{children}</TradeReplacementProvider>
       </AppShell>
     </>
   );

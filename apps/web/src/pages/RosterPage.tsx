@@ -43,6 +43,8 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketGate } from "../market/MarketGateContext";
+import { useTradeReplacement } from "../market/TradeReplacementContext";
+import { RosterShortfallBanner } from "../market/TradeShortfallNotice";
 import { manualPriceMinimum } from "../market/athleteValue";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
@@ -479,6 +481,19 @@ export function RosterPage() {
   useEffect(() => {
     void loadRoster();
   }, [loadRoster]);
+
+  // 1.5: sostituto dopo uno scambio sbilanciato. Il riquadro resta finché la rosa non torna alla
+  // misura; dopo l'acquisto (finestra aperta da qui o da sola) la rosa si rilegge.
+  const replacement = useTradeReplacement();
+  const replacementFilled = replacement.status?.filledSlots;
+  const lastReplacementFilled = useRef(replacementFilled);
+  useEffect(() => {
+    const previous = lastReplacementFilled.current;
+    lastReplacementFilled.current = replacementFilled;
+    if (previous !== undefined && replacementFilled !== undefined && previous !== replacementFilled) {
+      void loadRoster();
+    }
+  }, [loadRoster, replacementFilled]);
 
   useEffect(() => {
     void loadEditContext();
@@ -1547,6 +1562,10 @@ export function RosterPage() {
           message="Non hai i permessi per visualizzare la rosa."
           testId="roster-forbidden"
         />
+      ) : null}
+
+      {!loading && !showForbidden && !loadError && replacement.banner ? (
+        <RosterShortfallBanner banner={replacement.banner} onChoose={replacement.open} />
       ) : null}
 
       {!loading && !showForbidden && !loadError ? (

@@ -24,6 +24,8 @@ const rejectTradeProposalMock = vi.fn();
 const cancelTradeProposalMock = vi.fn();
 const approveTradeProposalMock = vi.fn();
 const rejectTradeProposalAsAdminMock = vi.fn();
+const previewTradeProposalMock = vi.fn();
+const fetchTradeReplacementsMock = vi.fn();
 
 vi.mock("../api/auth", () => ({
   fetchMe: (...args: unknown[]) => fetchMeMock(...args),
@@ -81,6 +83,10 @@ vi.mock("../api/market", () => ({
   fetchMarketHistory: (...args: unknown[]) => fetchMarketHistoryMock(...args),
   fetchMarketGate: (...args: unknown[]) => fetchMarketGateMock(...args),
   setMarketGate: (...args: unknown[]) => setMarketGateMock(...args),
+  previewTradeProposal: (...args: unknown[]) => previewTradeProposalMock(...args),
+  fetchTradeReplacements: (...args: unknown[]) => fetchTradeReplacementsMock(...args),
+  fetchTradeReplacementCandidates: vi.fn().mockResolvedValue({ role: "D", balance: 150, total: 0, candidates: [] }),
+  buyTradeReplacement: vi.fn(),
 }));
 
 vi.mock("../api/notifications", () => ({
@@ -589,6 +595,170 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     expect(acceptTradeProposalMock).toHaveBeenCalledTimes(1);
     expect(acceptTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-received");
     expect(query("market-trade-accept-dialog")).toBeNull();
+    unmount();
+  });
+
+  it("1.5: chi accetta uno scambio che lo lascia corto vede l'avviso e poi sceglie il sostituto", async () => {
+    const received = {
+      id: "proposal-short",
+      leagueId: "league-1",
+      proposerTeamId: "team-2",
+      recipientTeamId: "team-1",
+      offeredAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+      requestedAthletes: [
+        { id: "athlete-1", name: "Giocatore Svincolabile" },
+        { id: "athlete-3", name: "Secondo Ceduto" },
+      ],
+      offeredCredits: 0,
+      requestedCredits: 0,
+      status: "proposed",
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+      proposerRosterAfter: { teamId: "team-2", teamName: "Squadra Avversaria", sizeAfter: 36, rosterSize: 35, missingRoles: [] },
+      recipientRosterAfter: {
+        teamId: "team-1",
+        teamName: "La Mia Squadra",
+        sizeAfter: 34,
+        rosterSize: 35,
+        missingRoles: [{ role: "D", count: 1 }],
+      },
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [received] });
+    acceptTradeProposalMock.mockReset().mockResolvedValue({ ...received, status: "accepted" });
+    fetchTradeReplacementsMock.mockReset().mockRejectedValue(new Error("nessuno"));
+    const { container, unmount } = await renderAppAt("/mercato");
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    await act(async () => {
+      query("market-trade-accept-proposal-short")!.click();
+    });
+    expect(query("trade-shortfall-warning")?.textContent).toContain("Dopo lo scambio avrai 34/35");
+    expect(query("trade-shortfall-warning")?.textContent).toContain(
+      "Ti mancherà un Difensore. Appena accetti dovrai sceglierlo dagli svincolati, al suo Valore. " +
+        "Finché non lo scegli non potrai schierare la formazione.",
+    );
+    expect(query("market-trade-accept-cancel")?.textContent).toBe("Annulla");
+    expect(query("market-trade-accept-confirm")?.textContent).toBe("Accetta e scegli");
+
+    fetchTradeReplacementsMock.mockReset().mockResolvedValue({
+      teamId: "team-1",
+      rosterSize: 35,
+      filledSlots: 34,
+      balance: 150,
+      pending: [{ id: "r1", role: "D", tradeProposalId: "proposal-short", createdAt: "2026-11-25T10:00:00Z" }],
+      missingRoles: [{ role: "D", count: 1 }],
+      tradeProposalId: "proposal-short",
+      otherTeamName: "Squadra Avversaria",
+      receivedAthleteNames: ["Giocatore Avversario"],
+      receivedCredits: 0,
+      blockedReason: null,
+      blockedMessage: null,
+    });
+    await act(async () => {
+      query("market-trade-accept-confirm")!.click();
+    });
+    await flushAsync();
+    expect(acceptTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-short");
+    // Scambio fatto: si apre subito «Scegli il sostituto».
+    expect(query("replacement-sheet")).not.toBeNull();
+    expect(query("replacement-done")?.textContent).toContain("Scambio fatto: è arrivato Giocatore Avversario");
+    unmount();
+  });
+
+  it("1.5: chi propone uno scambio che lo lascerebbe corto lo vede prima di inviarlo", async () => {
+    createTradeProposalMock.mockReset().mockResolvedValue({});
+    previewTradeProposalMock.mockReset().mockResolvedValue({
+      proposerRosterAfter: {
+        teamId: "team-1",
+        teamName: "La Mia Squadra",
+        sizeAfter: 33,
+        rosterSize: 35,
+        missingRoles: [{ role: "D", count: 2 }],
+      },
+      recipientRosterAfter: { teamId: "team-2", teamName: "Squadra Avversaria", sizeAfter: 37, rosterSize: 35, missingRoles: [] },
+    });
+    const { container, unmount } = await renderAppAt("/mercato");
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    const select = container.querySelector('select[name="trade-recipient"]') as HTMLSelectElement;
+    await act(async () => {
+      select.value = "team-2";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flushAsync();
+    const offered = container.querySelector(
+      '[data-testid="market-trade-offered-athletes"] input[type="checkbox"]',
+    ) as HTMLInputElement;
+    await act(async () => {
+      offered.click();
+    });
+    const form = container.querySelector('[data-testid="market-trade-create-form"]') as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+    expect(previewTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", {
+      recipientTeamId: "team-2",
+      offeredAthleteIds: ["athlete-1"],
+      requestedAthleteIds: [],
+    });
+    expect(createTradeProposalMock).not.toHaveBeenCalled();
+    expect(query("market-trade-propose-warning")?.textContent).toContain("Dopo lo scambio avrai 33/35");
+    expect(query("market-trade-propose-warning")?.textContent).toContain(
+      "Ti mancheranno 2 Difensori. Se lo scambio viene accettato dovrai sceglierli dagli svincolati, al loro Valore.",
+    );
+    await act(async () => {
+      query("market-trade-propose-confirm")!.click();
+    });
+    await flushAsync();
+    expect(createTradeProposalMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("1.5: l'admin che approva vede quale squadra resterà corta", async () => {
+    const pending = {
+      id: "proposal-pending-short",
+      leagueId: "league-1",
+      proposerTeamId: "team-2",
+      recipientTeamId: "team-3",
+      offeredAthletes: [{ id: "athlete-5", name: "Primo" }, { id: "athlete-6", name: "Secondo" }],
+      requestedAthletes: [{ id: "athlete-7", name: "Terzo" }],
+      offeredCredits: 0,
+      requestedCredits: 0,
+      status: "pending_approval",
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+      proposerRosterAfter: {
+        teamId: "team-2",
+        teamName: "Squadra Avversaria",
+        sizeAfter: 34,
+        rosterSize: 35,
+        missingRoles: [{ role: "D", count: 1 }],
+      },
+      recipientRosterAfter: { teamId: "team-3", teamName: "Terza", sizeAfter: 36, rosterSize: 35, missingRoles: [] },
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [pending] });
+    approveTradeProposalMock.mockReset().mockResolvedValue({ ...pending, status: "executed" });
+    fetchTradeReplacementsMock.mockReset().mockRejectedValue(new Error("nessuno"));
+    const adminLeague: LeagueSummary = { id: "league-1", name: "Lega Test", role: "league_admin" };
+    const { container, unmount } = await renderAppAt("/mercato", [adminLeague]);
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    await act(async () => {
+      query("market-trade-approve-proposal-pending-short")!.click();
+    });
+    expect(approveTradeProposalMock).not.toHaveBeenCalled();
+    expect(query("market-trade-approve-warning")?.textContent).toContain(
+      "Dopo lo scambio Squadra Avversaria avrà 34/35",
+    );
+    expect(query("market-trade-approve-warning")?.textContent).toContain("Le mancherà un Difensore. Appena approvi");
+    await act(async () => {
+      query("market-trade-approve-confirm")!.click();
+    });
+    await flushAsync();
+    expect(approveTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-pending-short");
     unmount();
   });
 

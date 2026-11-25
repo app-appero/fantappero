@@ -9,6 +9,18 @@ import type {
   RosterOccupancyEntry,
   TeamRosterPlayer,
   TradeProposal,
+  TradeShortfallWarning,
+} from "@fantappero/contracts";
+import {
+  myRosterAfter,
+  shortRostersAfter,
+  TRADE_SHORTFALL_ACCEPT_LABEL,
+  TRADE_SHORTFALL_APPROVE_LABEL,
+  TRADE_SHORTFALL_APPROVE_TITLE,
+  TRADE_SHORTFALL_CANCEL_LABEL,
+  TRADE_SHORTFALL_PROPOSE_LABEL,
+  TRADE_SHORTFALL_PROPOSE_TITLE,
+  tradeShortfallWarning,
 } from "@fantappero/contracts";
 import {
   Badge,
@@ -22,7 +34,7 @@ import {
   WireframeSection,
 } from "@fantappero/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { applyVoluntaryRelease, previewVoluntaryRelease } from "../api/market";
+import { applyVoluntaryRelease, previewTradeProposal, previewVoluntaryRelease } from "../api/market";
 import {
   fetchFantasyTeams,
   fetchLeagueListone,
@@ -45,6 +57,8 @@ import {
   tradeAcceptConfirmMessage,
 } from "../market/tradeAcceptConfirm";
 import { useTradeFlow } from "../market/useTradeFlow";
+import { useTradeReplacement } from "../market/TradeReplacementContext";
+import { TradeShortfallNotice } from "../market/TradeShortfallNotice";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -299,6 +313,8 @@ export function MarketPage() {
     onBalanceAffectingAction: () => void loadTeam(true),
   });
   const history = useMarketHistory({ leagueId: activeLeagueId, active: !isDemoMode });
+  // 1.5: dopo uno scambio che lascia la rosa corta si sceglie subito il sostituto.
+  const replacement = useTradeReplacement();
 
   const ownedSlots = useMemo(
     () => (team?.slots ?? []).filter((slot) => slot.athleteId !== null),
@@ -456,22 +472,62 @@ export function MarketPage() {
     setExpiresAt("");
   }
 
+  // 1.5: chi propone uno scambio che lo lascerebbe sotto la misura della rosa lo vede prima di
+  // inviarlo («Dopo lo scambio avrai 34/35»). Il server dice come resterebbe la rosa.
+  const [proposeConfirm, setProposeConfirm] = useState<{
+    warning: TradeShortfallWarning;
+    submit: () => void;
+  } | null>(null);
+
+  async function withShortfallCheck(
+    target: string,
+    offered: string[],
+    requested: string[],
+    submit: () => void,
+  ) {
+    if (offered.length <= requested.length || !activeLeagueId) {
+      submit();
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      submit();
+      return;
+    }
+    try {
+      const preview = await previewTradeProposal(stored.accessToken, activeLeagueId, {
+        recipientTeamId: target,
+        offeredAthleteIds: offered,
+        requestedAthleteIds: requested,
+      });
+      const warning = tradeShortfallWarning(preview.proposerRosterAfter, "propose");
+      if (warning) {
+        setProposeConfirm({ warning, submit });
+        return;
+      }
+    } catch {
+      // Anteprima non disponibile: l'invio vero controlla comunque tutto.
+    }
+    submit();
+  }
+
   function handleCreateProposal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (ownedSlots.length === 0 || !recipientTeamId || (hasExpiry && !expiresAt)) {
       return;
     }
     const credits = Number(creditsAmount) || 0;
-    void trade
-      .createProposal({
-        recipientTeamId,
-        offeredAthleteIds,
-        requestedAthleteIds,
-        offeredCredits: creditsDirection === "offer" ? credits : 0,
-        requestedCredits: creditsDirection === "request" ? credits : 0,
-        expiresAt: hasExpiry && expiresAt ? new Date(expiresAt).toISOString() : null,
-      })
-      .then(resetTradeForm);
+    const body = {
+      recipientTeamId,
+      offeredAthleteIds,
+      requestedAthleteIds,
+      offeredCredits: creditsDirection === "offer" ? credits : 0,
+      requestedCredits: creditsDirection === "request" ? credits : 0,
+      expiresAt: hasExpiry && expiresAt ? new Date(expiresAt).toISOString() : null,
+    };
+    void withShortfallCheck(recipientTeamId, offeredAthleteIds, requestedAthleteIds, () => {
+      void trade.createProposal(body).then(resetTradeForm);
+    });
   }
 
   const [tradeTab, setTradeTab] = useState<"received" | "sent" | "open" | "all">("open");
@@ -486,6 +542,17 @@ export function MarketPage() {
   // indietro): la proposta da accettare passa prima da una conferma (QA 19/11).
   // Rifiuta e Controproponi restano senza conferma.
   const [acceptTarget, setAcceptTarget] = useState<TradeProposal | null>(null);
+  // 1.5: chi accetta uno scambio che lo lascia sotto la misura lo vede nella conferma.
+  const acceptWarning = acceptTarget
+    ? tradeShortfallWarning(myRosterAfter(acceptTarget, team?.id), "accept")
+    : null;
+  // L'amministratore che approva uno scambio che lascia corta una squadra lo vede con il nome.
+  const [approveTarget, setApproveTarget] = useState<TradeProposal | null>(null);
+  const approveWarnings = approveTarget
+    ? shortRostersAfter(approveTarget)
+        .map((after) => tradeShortfallWarning(after, "approve"))
+        .filter((warning): warning is TradeShortfallWarning => warning !== null)
+    : [];
 
   // N15: il link di una notifica deve mostrare lo scambio anche se è già concluso, ma la
   // scheda predefinita è "In corso": passa a "Tutte" una volta sola, se serve.
@@ -529,15 +596,23 @@ export function MarketPage() {
       return;
     }
     const credits = Number(counterCreditsAmount) || 0;
-    void trade
-      .counterProposal(proposalId, {
-        offeredAthleteIds: counterOfferedAthleteIds,
-        requestedAthleteIds: counterRequestedAthleteIds,
-        offeredCredits: counterCreditsDirection === "offer" ? credits : 0,
-        requestedCredits: counterCreditsDirection === "request" ? credits : 0,
-        expiresAt: counterHasExpiry && counterExpiresAt ? new Date(counterExpiresAt).toISOString() : null,
-      })
-      .then(() => setCounteringProposalId(null));
+    const body = {
+      offeredAthleteIds: counterOfferedAthleteIds,
+      requestedAthleteIds: counterRequestedAthleteIds,
+      offeredCredits: counterCreditsDirection === "offer" ? credits : 0,
+      requestedCredits: counterCreditsDirection === "request" ? credits : 0,
+      expiresAt: counterHasExpiry && counterExpiresAt ? new Date(counterExpiresAt).toISOString() : null,
+    };
+    // La controproposta va a chi aveva proposto: lui diventa il destinatario.
+    const original = trade.proposals.find((row) => row.id === proposalId);
+    void withShortfallCheck(
+      original?.proposerTeamId ?? "",
+      counterOfferedAthleteIds,
+      counterRequestedAthleteIds,
+      () => {
+        void trade.counterProposal(proposalId, body).then(() => setCounteringProposalId(null));
+      },
+    );
   }
 
   async function onConfirmAccept() {
@@ -546,8 +621,19 @@ export function MarketPage() {
       return;
     }
     // L'esito (anche l'errore) si legge nella pagina: la conferma si chiude in entrambi i casi.
+    const shortAfter = acceptWarning !== null;
     await trade.acceptProposal(target.id);
     setAcceptTarget((current) => (current?.id === target.id ? null : current));
+    // Scambio eseguito e rosa rimasta corta: si apre subito «Scegli il sostituto». Con
+    // l'approvazione dell'admin non c'è ancora nulla da scegliere (arriva la notifica).
+    void replacement.refresh({ openIfPending: shortAfter });
+  }
+
+  async function onApprove(proposal: TradeProposal) {
+    await trade.approveProposal(proposal.id);
+    setApproveTarget((current) => (current?.id === proposal.id ? null : current));
+    // L'amministratore può essere una delle due parti: rilegge i suoi sostituti.
+    void replacement.refresh({ openIfPending: true });
   }
 
   function teamNameFor(teamId: string): string {
@@ -1120,7 +1206,14 @@ export function MarketPage() {
                             variant="primary"
                             size="sm"
                             disabled={pending || tradesLocked}
-                            onClick={() => void trade.approveProposal(proposal.id)}
+                            onClick={() => {
+                              if (shortRostersAfter(proposal).length > 0) {
+                                setApproveTarget(proposal);
+                              } else {
+                                void onApprove(proposal);
+                              }
+                            }}
+                            data-testid={`market-trade-approve-${proposal.id}`}
                           >
                             Approva
                           </Button>
@@ -1317,7 +1410,7 @@ export function MarketPage() {
                 onClick={() => setAcceptTarget(null)}
                 data-testid="market-trade-accept-cancel"
               >
-                {TRADE_ACCEPT_CANCEL_LABEL}
+                {acceptWarning ? TRADE_SHORTFALL_CANCEL_LABEL : TRADE_ACCEPT_CANCEL_LABEL}
               </Button>
               <Button
                 type="button"
@@ -1326,7 +1419,7 @@ export function MarketPage() {
                 onClick={() => void onConfirmAccept()}
                 data-testid="market-trade-accept-confirm"
               >
-                {TRADE_ACCEPT_CONFIRM_LABEL}
+                {acceptWarning ? TRADE_SHORTFALL_ACCEPT_LABEL : TRADE_ACCEPT_CONFIRM_LABEL}
               </Button>
             </>
           }
@@ -1334,6 +1427,76 @@ export function MarketPage() {
           <p data-testid="market-trade-accept-dialog">
             {acceptTarget ? tradeAcceptConfirmMessage(acceptTarget, team?.id) : null}
           </p>
+          {acceptWarning ? <TradeShortfallNotice warning={acceptWarning} /> : null}
+        </Modal>
+
+        <Modal
+          open={proposeConfirm !== null}
+          onClose={() => setProposeConfirm(null)}
+          title={TRADE_SHORTFALL_PROPOSE_TITLE}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setProposeConfirm(null)}
+                data-testid="market-trade-propose-cancel"
+              >
+                {TRADE_SHORTFALL_CANCEL_LABEL}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  const pendingSubmit = proposeConfirm?.submit;
+                  setProposeConfirm(null);
+                  pendingSubmit?.();
+                }}
+                data-testid="market-trade-propose-confirm"
+              >
+                {TRADE_SHORTFALL_PROPOSE_LABEL}
+              </Button>
+            </>
+          }
+        >
+          {proposeConfirm ? (
+            <TradeShortfallNotice warning={proposeConfirm.warning} testId="market-trade-propose-warning" />
+          ) : null}
+        </Modal>
+
+        <Modal
+          open={approveTarget !== null}
+          onClose={() => setApproveTarget(null)}
+          title={TRADE_SHORTFALL_APPROVE_TITLE}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setApproveTarget(null)}
+                data-testid="market-trade-approve-cancel"
+              >
+                {TRADE_SHORTFALL_CANCEL_LABEL}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                loading={approveTarget !== null && trade.actionPendingId === approveTarget.id}
+                onClick={() => {
+                  if (approveTarget) {
+                    void onApprove(approveTarget);
+                  }
+                }}
+                data-testid="market-trade-approve-confirm"
+              >
+                {TRADE_SHORTFALL_APPROVE_LABEL}
+              </Button>
+            </>
+          }
+        >
+          {approveWarnings.map((warning) => (
+            <TradeShortfallNotice key={warning.title} warning={warning} testId="market-trade-approve-warning" />
+          ))}
         </Modal>
       </div>
     </PageContainer>
