@@ -724,3 +724,33 @@ def test_add_oracle_player_own_match_wins_over_lookup_no_budget_spent() -> None:
     row = added[0]
     assert row.athlete_id == athlete_id
     assert budget.remaining == 5  # il riscontro interno ha gia' risolto, niente lookup
+
+
+def test_sync_falls__back_to_fotmob_when_oracle_answers_without_lineups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Oracle risponde ma non ha nessuna formazione: le partite scoperte vanno a FotMob."""
+    fixture = SimpleNamespace(
+        id=uuid4(),
+        provider_id=1001,
+        home_club_id=uuid4(),
+        away_club_id=uuid4(),
+        sport_season_id=uuid4(),
+        kickoff_at=datetime(2026, 10, 20, 18, 0, tzinfo=UTC),
+        home_club=SimpleNamespace(provider_id=10, name="Home"),
+        away_club=SimpleNamespace(provider_id=20, name="Away"),
+    )
+    monkeypatch.setattr("sports_data.predicted.sync._candidate_fixtures", lambda *a, **k: [fixture])
+    monkeypatch.setattr("sports_data.predicted.sync._has_recent_snapshot", lambda *a, **k: False)
+    monkeypatch.setattr("sports_data.predicted.sync._sync_via_oracle", lambda *a, **k: None)
+    synced: list[object] = []
+    monkeypatch.setattr(
+        "sports_data.predicted.sync._sync_one", lambda s, c, f, **k: synced.append(f)
+    )
+    session = MagicMock()
+    session.scalars.return_value.all.return_value = []  # nessuno snapshot salvato da Oracle
+    client = MagicMock()
+    client.requests_made = 0
+
+    sync_predicted_lineups(session, client, oracle=MagicMock())
+    assert synced == [fixture]

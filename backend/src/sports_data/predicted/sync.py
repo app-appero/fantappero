@@ -122,7 +122,18 @@ def sync_predicted_lineups(
                 oracle_min_confidence,
                 oracle_max_lookup_calls,
             )
-            remaining = []
+            # Oracle risponde ma può non avere la formazione di alcune partite (o nessuna):
+            # quelle senza snapshot ripiegano su FotMob, invece di restare scoperte.
+            covered = {
+                row
+                for row in session.scalars(
+                    select(PredictedLineupSnapshot.fixture_id).where(
+                        PredictedLineupSnapshot.fixture_id.in_([f.id for f in pending]),
+                        PredictedLineupSnapshot.fetched_at >= moment - timedelta(minutes=5),
+                    )
+                ).all()
+            }
+            remaining = [fixture for fixture in pending if fixture.id not in covered]
         except SoccerOracleError:
             logger.warning("soccer_oracle_sync_unavailable_falling_back_to_fotmob", exc_info=True)
             remaining = pending
