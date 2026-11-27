@@ -38,9 +38,18 @@ def sports_data_beat_schedule(
             "options": {"expires": float(fixtures_interval_seconds)},
         }
     if predicted_lineups_enabled:
+        from celery.schedules import crontab
+
+        # Con l'intervallo giornaliero di default il giro parte a ora fissa (07:00 UTC, dopo
+        # quello di Soccer-Oracle delle 06:30): con un semplice "ogni 24 ore" l'orario
+        # slittava a ogni riavvio. Un intervallo diverso resta un intervallo.
         schedule["sports-predicted-lineups"] = {
             "task": "sports_data.sync_predicted_lineups",
-            "schedule": float(predicted_lineups_interval_seconds),
+            "schedule": (
+                crontab(hour=7, minute=0)
+                if predicted_lineups_interval_seconds == 86_400
+                else float(predicted_lineups_interval_seconds)
+            ),
             "options": {"expires": float(predicted_lineups_interval_seconds)},
         }
     if market_values_enabled:
