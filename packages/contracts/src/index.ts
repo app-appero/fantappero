@@ -203,11 +203,15 @@ export type {
 export {
   CONFIRM_CANCEL_LABEL,
   CONFIRM_TITLE,
+  DEFAULT_PARTICIPANT_MIN,
   broadcastConfirmation,
+  memberRemovedMessage,
   operatorEmailConfirmation,
+  participantCountAfterRemoval,
   removeMemberConfirmation,
+  usersLabel,
 } from "./confirmations.js";
-export type { BroadcastConfirmInput, ConfirmCopy } from "./confirmations.js";
+export type { BroadcastConfirmInput, ConfirmCopy, RemovalCounts } from "./confirmations.js";
 
 export {
   COACH_RESET_FILTERS_LABEL,
@@ -1007,3 +1011,4 @@ export {
 } from "./tradeReplacement.js";
 
 export { absenceKindLabel, absenceLine, italianAbsenceText } from "./providerAbsence.js";
+export { italianVarEventText } from "./providerEventText.js";

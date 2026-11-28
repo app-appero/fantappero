@@ -4,7 +4,6 @@ import {
   canAssignRandomRoster,
   canManageMember,
   canOpenMemberProfile,
-  memberRemovedMessage,
   memberRoleLabel,
   randomRosterAssignedMessage,
 } from "./memberRow.ts";
@@ -39,10 +38,6 @@ describe("partecipanti in Amministrazione lega: profilo e rosa random (1.5)", ()
     assert.equal(
       randomRosterAssignedMessage("Allenatore IA 01", { filledSlots: 25, rosterSize: 25 }),
       "Rosa random assegnata a Allenatore IA 01: 25/25 giocatori.",
-    );
-    assert.equal(
-      memberRemovedMessage("Giulia"),
-      "Giulia è stato rimosso dalla lega. Il numero partecipanti previsti è stato allineato agli iscritti.",
     );
   });
 });

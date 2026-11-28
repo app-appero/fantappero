@@ -34,6 +34,26 @@ SAMPLES: tuple[SampleNotification, ...] = (
         {**_MATCH, "player": "Dumfries", "scorer": "Lautaro Martinez", "minute": 23},
     ),
     SampleNotification(
+        "gol-annullato",
+        NotificationCategory.RISULTATI,
+        "risultati.gol_annullato",
+        1,
+        {**_MATCH, "player": "Lautaro Martinez", "club_name": "Inter", "reason": "fuorigioco"},
+    ),
+    SampleNotification(
+        "assist-annullato",
+        NotificationCategory.RISULTATI,
+        "risultati.assist_annullato",
+        1,
+        {
+            **_MATCH,
+            "player": "Dumfries",
+            "club_name": "Inter",
+            "scorer": "Lautaro Martinez",
+            "reason": "fuorigioco",
+        },
+    ),
+    SampleNotification(
         "ammonizione",
         NotificationCategory.RISULTATI,
         "risultati.ammonizione",

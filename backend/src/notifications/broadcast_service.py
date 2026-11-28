@@ -169,7 +169,8 @@ def audience_label(session: Session, audience: dict[str, object], count: int) ->
         shown = ", ".join(sorted(names)[:3]) + ("…" if len(names) > 3 else "")
         return f"Leghe: {shown}"[:200]
     if mode == "users":
-        return f"{count} utenti scelti"
+        # Singolare con un solo destinatario: «1 utente scelto», mai «1 utenti scelti».
+        return "1 utente scelto" if count == 1 else f"{count} utenti scelti"
     return "Tutti gli utenti"
 
 

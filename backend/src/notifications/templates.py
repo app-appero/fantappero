@@ -560,11 +560,18 @@ def _live_content_v2(
         _match_line(params) and f"{_match_line(params)}{detail}" or detail.lstrip(" ·"),
         _team_note(params),
     )
-    resolved = params.get("deep_link")
-    final_deep_link = _league_link(
-        str(resolved) if isinstance(resolved, str) and resolved else deep_link, params
+    return NotificationContent(
+        title=title, body=body, deep_link=_resolved_deep_link(params, deep_link)
     )
-    return NotificationContent(title=title, body=body, deep_link=final_deep_link)
+
+
+def _resolved_deep_link(params: NotificationParams, fallback: str) -> str:
+    """Il link già risolto dal produttore (scontro H2H del destinatario) o ``fallback``,
+    sempre con ``?lega=`` per chi è in più leghe."""
+    resolved = params.get("deep_link")
+    return _league_link(
+        str(resolved) if isinstance(resolved, str) and resolved else fallback, params
+    )
 
 
 def _player(params: NotificationParams) -> str:
@@ -581,6 +588,45 @@ def _render_risultati_assist(params: NotificationParams) -> NotificationContent:
     scorer = params.get("scorer")
     detail = f" · assist per il gol di {scorer}" if scorer else " · assist"
     return _live_content_v2(f"Assist di {_player(params)}", detail, params)
+
+
+def _retracted_content(title: str, subject: str, params: NotificationParams) -> NotificationContent:
+    """«Gol annullato» / «Assist annullato»: dice cosa è stato tolto, il motivo solo se noto
+    (``reason``, già in italiano) e a quale squadra. Stesso tipo e stesso link delle notifiche
+    di partita (schermata «Partita» dello scontro): niente campi nuovi per l'app già installata."""
+    reason = params.get("reason")
+    team = params.get("team_name")
+    body = (
+        f"{subject} è stato annullato"
+        + (f" ({reason})" if reason else "")
+        + ". Il bonus è stato tolto"
+        + (f" a {team}" if team else "")
+        + "."
+    )
+    return NotificationContent(
+        title=title, body=body, deep_link=_resolved_deep_link(params, "/turni")
+    )
+
+
+def _with_club(subject: str, params: NotificationParams) -> str:
+    club = params.get("club_name")
+    return f"{subject} ({club})" if club else subject
+
+
+@register_template("risultati.gol_annullato", 1)
+def _render_risultati_gol_annullato(params: NotificationParams) -> NotificationContent:
+    return _retracted_content(
+        "Gol annullato", _with_club(f"Il gol di {_player(params)}", params), params
+    )
+
+
+@register_template("risultati.assist_annullato", 1)
+def _render_risultati_assist_annullato(params: NotificationParams) -> NotificationContent:
+    scorer = params.get("scorer")
+    subject = _with_club(f"L'assist di {_player(params)}", params)
+    return _retracted_content(
+        "Assist annullato", f"{subject} sul gol di {scorer}" if scorer else subject, params
+    )
 
 
 @register_template("risultati.ammonizione", 1)

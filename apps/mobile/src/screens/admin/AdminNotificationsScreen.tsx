@@ -11,6 +11,7 @@ import {
   type NotificationRecipient,
   type NotificationRecipientList,
   type TestSampleItem,
+  usersLabel,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useState } from "react";
@@ -331,8 +332,8 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
       });
       setDone(
         result.status === "scheduled"
-          ? `Programmata per ${result.recipientCount} utenti.`
-          : `Inviata a ${result.recipientCount} utenti (${result.pushCount} con push).`,
+          ? `Programmata per ${usersLabel(result.recipientCount)}.`
+          : `Inviata a ${usersLabel(result.recipientCount)} (${result.pushCount} con push).`,
       );
     } catch (e) {
       setError(getApiErrorMessage(e, "Invio non riuscito."));
@@ -412,7 +413,7 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
         {error ? <Text style={styles.error} testID="admin-notifications-error">{error}</Text> : null}
         {done ? <Text style={styles.done} testID="admin-notifications-done">{done}</Text> : null}
         <Pressable style={[base.button, busy && base.disabled]} disabled={busy} onPress={requestSend} testID="admin-notifications-send">
-          <Text style={base.buttonLabel}>{recipients === null ? "Invia" : `Invia a ${recipients} utenti`}</Text>
+          <Text style={base.buttonLabel}>{recipients === null ? "Invia" : `Invia a ${usersLabel(recipients)}`}</Text>
         </Pressable>
         <Pressable style={[base.secondaryButton, busy && base.disabled]} disabled={busy} onPress={() => void submit(true)} testID="admin-notifications-send-me">
           <Text style={base.secondaryButtonLabel}>Invia a me come prova</Text>
@@ -523,7 +524,7 @@ function TestTab({ accessToken }: { accessToken: string }) {
         </View>
         {toOthers ? (
           <Pressable style={styles.selected} onPress={() => setPickerOpen(true)}>
-            <Text style={styles.strong}>{`${users.size} utenti selezionati`}</Text>
+            <Text style={styles.strong}>{users.size === 1 ? "1 utente selezionato" : `${users.size} utenti selezionati`}</Text>
             <Text style={styles.link}>Scegli utenti ›</Text>
           </Pressable>
         ) : null}

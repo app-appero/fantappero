@@ -78,6 +78,10 @@ EVENT_DEFINITION_BY_KEY: dict[str, NotificationEventDefinition] = {
 EVENT_KEY_BY_TEMPLATE_KEY: dict[str, str] = {
     "risultati.gol": "calciatori.gol",
     "risultati.assist": "calciatori.assist",
+    # «Gol annullato» / «Assist annullato» (VAR, fuorigioco): stessi interruttori di «Gol» e
+    # «Assist», nessuna voce nuova nelle impostazioni (Rosario 28/11).
+    "risultati.gol_annullato": "calciatori.gol",
+    "risultati.assist_annullato": "calciatori.assist",
     "risultati.ammonizione": "calciatori.ammonizione",
     "risultati.espulsione": "calciatori.espulsione",
     "risultati.sostituzione": "calciatori.sostituzione",

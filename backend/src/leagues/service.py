@@ -35,6 +35,7 @@ from fantasy_turns.validators import (
     validate_turn_coverage_threshold,
 )
 from leagues.calendar_service import league_has_confirmed_calendar
+from leagues.capacity import members_label, pending_invites_label
 from leagues.market_open import read_market_open_map
 from leagues.models.competition import Competition
 from leagues.models.league import League
@@ -536,7 +537,7 @@ class LeagueService:
         if participant_count < members + pending:
             raise ValidationAuthError(
                 f"I partecipanti non possono essere meno di {members + pending}: "
-                f"ci sono già {members} iscritti e {pending} inviti in attesa.",
+                f"ci sono già {members_label(members)} e {pending_invites_label(pending)}.",
                 code="participant_count_below_members",
             )
 

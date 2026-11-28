@@ -9,9 +9,10 @@ Le formazioni previste arrivano da FotMob e restano separate dalle formazioni uf
 | `RAPIDAPI_KEY` | API e worker Railway | Header `x-rapidapi-key`. Se manca, il job risponde senza chiamare il provider. |
 | `FOTMOB_BASE_URL` | opzionale | Default `https://fotmob-api.p.rapidapi.com`. |
 | `PREDICTED_LINEUPS_ENABLED` | job automatici | Default acceso. Il pannello operatore può spegnerlo. |
-| `PREDICTED_LINEUPS_INTERVAL_SECONDS` | job automatici | Default 86400 (una volta al giorno). |
+| `PREDICTED_LINEUPS_INTERVAL_SECONDS` | job automatici | Default 3600: il job controlla ogni ora (sempre un intervallo: lo scheduler del pannello non sa fare i crontab). |
 | `FOTMOB_MAX_LINEUP_CALLS` | tetto per giro | Default 40 formazioni, più una chiamata per data. |
-| `PREDICTED_LINEUPS_MIN_AGE_HOURS` | cache | Default 20. Il pulsante manuale ignora questo limite. |
+| `PREDICTED_LINEUPS_DAILY_REFRESH_HOUR_UTC` | cache | Default 7: uno snapshot vale fino alle 07:00 UTC successive (dopo Soccer-Oracle delle 06:30), quindi il primo giro dopo quell'ora riscarica tutto e gli altri solo le partite senza dati dal mattino. Vuoto = età fissa qui sotto. |
+| `PREDICTED_LINEUPS_MIN_AGE_HOURS` | cache | Default 20, usato solo se l'ora del mattino è vuota. Il pulsante manuale ignora questo limite. |
 
 La chiave non va nel repository, nei log né nelle risposte HTTP. Su Railway va impostata sull'ambiente dell'API e del worker, poi si ridistribuisce.
 
@@ -40,7 +41,7 @@ Affidabilità, da controlli misurabili e non da una percentuale:
 
 ## Job
 
-Catalogo `sports-predicted-lineups`, task `sports_data.sync_predicted_lineups`. Prende le partite non iniziate dei turni europei nelle prossime 4 giorni. Il pulsante **Aggiorna probabili** nel pannello operatore (Turni) fa lo stesso giro su tutte le leghe, anche se lo snapshot è recente e anche se il job automatico è spento.
+Catalogo `sports-predicted-lineups`, task `sports_data.sync_predicted_lineups`, ogni ora. Prende le partite non iniziate dei turni europei nei prossimi 4 giorni e chiama il fornitore solo per quelle senza snapshot dal mattino: circa una chiamata per partita al giorno, come il vecchio giro giornaliero, e un beat riavviato recupera entro un'ora. Una partita che FotMob non collega si riprova a ogni giro (una chiamata «per data», condivisa). Il pulsante **Aggiorna probabili** nel pannello operatore (Turni) fa lo stesso giro su tutte le leghe, anche se lo snapshot è recente e anche se il job automatico è spento.
 
 Il log `fotmob_predicted_lineups_synced` riporta i conteggi, mai la chiave.
 

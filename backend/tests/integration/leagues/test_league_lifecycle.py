@@ -426,3 +426,50 @@ def test_auto_conclude_when_all_h2h_rounds_homologated(db_session: Session) -> N
         "source": "auto_season_complete",
     }
     assert try_conclude_league_if_season_complete(db_session, league.id) is False
+
+
+def _blocker_messages(client: TestClient, token: str, league_id: str) -> dict[str, str]:
+    panel = client.get(
+        f"/leagues/{league_id}/amministrazione",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert panel.status_code == 200, panel.text
+    return {row["code"]: row["message"] for row in panel.json()["lifecycle"]["blockers"]}
+
+
+def test_lifecycle_blockers_use_the_singular_with_one_team(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 28/11 (N1): con una sola squadra l'amministrazione diceva «1 squadre mancanti» e
+    «1 rose non valide o incomplete»."""
+    owner_token, _ = _register_and_login(client, "lifecycle.singular@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Singolare")
+
+    # Solo il presidente, con la sua rosa vuota: una rosa, al singolare.
+    assert _blocker_messages(client, owner_token, league_id)["fantasy_teams_not_configured"] == (
+        "Completa squadre e rose prima di avviare la stagione (1 rosa non valida o incompleta)."
+    )
+
+    # Un iscritto senza squadra: una squadra mancante e una rosa, entrambe al singolare.
+    _, first_id = _register_and_login(client, "lifecycle.singular.first@example.com")
+    db_session.add(
+        LeagueMembership(league_id=UUID(league_id), user_id=first_id, role=LeagueMemberRole.MEMBER)
+    )
+    db_session.commit()
+    assert _blocker_messages(client, owner_token, league_id)["fantasy_teams_not_configured"] == (
+        "Completa squadre e rose prima di avviare la stagione "
+        "(1 squadra mancante; 1 rosa non valida o incompleta)."
+    )
+
+    # Con due iscritti senza squadra il plurale resta quello di sempre.
+    _, second_id = _register_and_login(client, "lifecycle.singular.second@example.com")
+    db_session.add(
+        LeagueMembership(league_id=UUID(league_id), user_id=second_id, role=LeagueMemberRole.MEMBER)
+    )
+    db_session.commit()
+    assert _blocker_messages(client, owner_token, league_id)["fantasy_teams_not_configured"] == (
+        "Completa squadre e rose prima di avviare la stagione "
+        "(2 squadre mancanti; 1 rosa non valida o incompleta)."
+    )

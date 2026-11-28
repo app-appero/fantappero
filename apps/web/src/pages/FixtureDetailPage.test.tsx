@@ -169,6 +169,36 @@ describe("FixtureDetailBody (EP13-P04-quater)", () => {
     expect(html).toContain("Luca Bianchi");
   });
 
+  it("scrive gli eventi VAR in italiano e lascia com'è un testo del fornitore sconosciuto (QA 28/11, N6)", () => {
+    const varEvent = (id: string, eventDetail: string | null) => ({
+      ...detail().events[0]!,
+      id,
+      eventType: "Var",
+      eventDetail,
+      scoringKind: null,
+      athleteId: null,
+      athleteName: null,
+      relatedAthleteId: null,
+      relatedAthleteName: null,
+    });
+    const html = render(
+      detail({
+        events: [
+          varEvent("v1", "Goal cancelled"),
+          varEvent("v2", "Goal Disallowed - offside"),
+          varEvent("v3", "Check complete"),
+          varEvent("v4", null),
+        ],
+      }),
+    );
+    expect(html).toContain("VAR — Gol annullato");
+    expect(html).toContain("VAR — Gol annullato · fuorigioco");
+    expect(html).toContain("VAR — Check complete");
+    expect(html).toContain("VAR — Revisione");
+    expect(html).not.toContain("Goal cancelled");
+    expect(html).not.toContain("Disallowed");
+  });
+
   it("collega il badge gol al giocatore in formazione, per id e non per nome", () => {
     const html = render(detail());
     expect(html).toContain('data-testid="event-badge-goal"');

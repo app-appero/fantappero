@@ -89,6 +89,7 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
 import { formationTurnOptionLabel } from "../matchday/turnLabels";
+import { showsPageLockNote } from "../matchday/pageLockNote";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
@@ -1475,7 +1476,10 @@ export function FormationScreen() {
             ) : null}
           </View>
         </View>
-        {countdown && countdown.roundId === context.roundId ? (
+        {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia sotto
+            l'intestazione (LockCountdownBar), e qui non si ripete (Rosario, 28/11). Senza conto («Turno
+            non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il testo di stato. */}
+        {countdown && showsPageLockNote(countdown, context.roundId) ? (
           <LockCountdown
             state={countdown.state}
             nextLockAt={countdown.nextLockAt}

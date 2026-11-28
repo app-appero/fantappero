@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.fantasy_lineups.test_lineup_athlete_left_roster import _replace_in_roster
 from tests.integration.fantasy_lineups.test_lineup_departure_purge import (
+    _add_future_round,
     _bench,
     _close_round,
     _h2h_slot,
@@ -448,6 +449,80 @@ def test_without_anyone_of_the_role_the_place_stays_empty(
         )
     ).one()
     assert len(effective.effective_starter_ids) == 10
+
+
+# -- 4 bis. nessuna formazione: la copia del turno precedente con un posto vuoto si copre -----
+
+
+def test_previous_round_copy_with_a_departed_starter_is_filled_not_zeroed(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Voce 6.7 (28/11): la formazione automatica non va più «a zero».
+
+    Al turno 2 la squadra non ha né formazione né bozza; quella del turno 1 c'è, con un titolare
+    poi uscito dalla rosa. Prima la copia, incompleta, non si poteva confermare e la formazione
+    automatica era «a zero» (0 titolari), che la regola di inizio turno salta. Ora la copia si
+    salva con il posto vuoto e la regola di inizio turno lo copre dalla panchina.
+    """
+    setup = _trade_league(
+        client, db_session, competition_ids, prefix="ts.copia", id_offset=9_450_000
+    )
+    d = setup["roles_a"][FantasyRole.D]
+    payload = _payload(setup)
+    _save(client, setup, payload)
+    first_round = setup["round_id"]
+    _close_round(
+        db_session,
+        first_round,
+        started=datetime.now(UTC) - timedelta(hours=3),
+        homologated=True,
+    )
+    # Il titolare D2 (3° posto) esce dalla rosa: al suo posto un nuovo difensore.
+    newcomer = _replace_in_roster(db_session, setup, d[1], provider_id=9_459_999)
+    # Turno 2 al primo blocco (le partite iniziano tra 5 minuti, margine di lega 15 minuti),
+    # nessuna formazione né bozza salvata.
+    second_round = _add_future_round(
+        db_session,
+        setup,
+        number=2,
+        kickoff=datetime.now(UTC) + timedelta(minutes=5),
+        provider_offset=9_450_000 + 60_000,
+    )
+    second = {**setup, "round_id": second_round}
+
+    body = client.get(_url(second), headers=_headers(setup["token_a"])).json()
+
+    assert body["lineup"]["autoResolutionSource"] == "previous_round"
+    starters = {player["sortOrder"]: player["athleteId"] for player in body["lineup"]["starters"]}
+    expected = list(payload["starterAthleteIds"])
+    expected[2] = str(d[4])  # D5, primo difensore della panchina
+    assert starters == dict(enumerate(expected))
+    assert "missing_athlete" not in {issue["code"] for issue in body["issues"]}
+    stored = _stored(db_session, second_round, setup["team_a"])
+    assert _starters(stored) == [(index, UUID(item)) for index, item in enumerate(expected)]
+    assert d[1] not in {athlete_id for _, _, athlete_id in stored}
+    assert d[4] not in _bench_ids(stored)
+    assert newcomer in _bench_ids(stored)
+
+    audits = _turn_start_audits(db_session, second)
+    assert [audit["roundId"] for audit in audits] == [second_round]
+    assert [(fill["source"], fill["starterId"]) for fill in audits[0]["fills"]] == [
+        ("bench", str(d[4]))
+    ]
+    assert any(
+        message.startswith(f"All'inizio del turno 2 {_name(db_session, d[4])} è entrato")
+        for message in _left_roster_messages(body)
+    )
+
+    # Riaperta non cambia più; il turno 1 non si tocca.
+    client.get(_url(second), headers=_headers(setup["token_a"]))
+    assert _stored(db_session, second_round, setup["team_a"]) == stored
+    assert len(_turn_start_audits(db_session, second)) == 1
+    assert d[1] in {
+        athlete_id for _, _, athlete_id in _stored(db_session, first_round, setup["team_a"])
+    }
 
 
 # -- 5. formazione completa e in regola: invariata ----------------------------------------

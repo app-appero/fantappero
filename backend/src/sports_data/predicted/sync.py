@@ -171,6 +171,30 @@ def sync_predicted_lineups(
     return summary
 
 
+def snapshot_min_age(
+    now: datetime,
+    *,
+    min_age_hours: int,
+    daily_refresh_hour_utc: int | None,
+) -> timedelta:
+    """Età sotto la quale uno snapshot è ancora buono e la partita si salta.
+
+    Il job gira ogni ora. Con l'ora del mattino (default 07:00 UTC, dopo
+    l'aggiornamento di Soccer-Oracle delle 06:30) uno snapshot vale fino al
+    mattino successivo: il primo giro dopo quell'ora riscarica tutte le partite,
+    gli altri solo quelle ancora senza snapshot da allora. Così ogni partita costa
+    circa una chiamata al giorno, e un beat riavviato dopo le 07:00 recupera al
+    giro successivo invece di saltare la giornata. Senza ora: età fissa.
+    """
+    if daily_refresh_hour_utc is None:
+        return timedelta(hours=min_age_hours)
+    moment = now.astimezone(UTC)
+    anchor = moment.replace(hour=daily_refresh_hour_utc, minute=0, second=0, microsecond=0)
+    if anchor > moment:
+        anchor -= timedelta(days=1)
+    return moment - anchor
+
+
 class _LookupBudget:
     """Tetto alle chiamate extra ``/players/lookup`` per giro di sync — non
     vogliamo una lookup per ogni giocatore non abbinato, potrebbero essere

@@ -11,6 +11,7 @@ import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFr
   playerAvatarUrl,
   clubCrestUrl,
   absenceLine,
+  italianVarEventText,
 } from "@fantappero/contracts";
 import type { TimelineEntry } from "@fantappero/ui";
 import {
@@ -450,7 +451,7 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
   if (type === "var") {
     return {
       icon: <VarIcon />,
-      headline: <>VAR — {event.eventDetail ?? "Revisione"}</>,
+      headline: <>VAR — {italianVarEventText(event.eventDetail)}</>,
       detail: event.athleteId ? (
         <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName>
       ) : (

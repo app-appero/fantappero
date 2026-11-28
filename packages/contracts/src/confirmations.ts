@@ -21,21 +21,102 @@ export interface ConfirmCopy {
   cancelLabel: string;
 }
 
-function usersLabel(recipients: number | null): string {
+/**
+ * «12 utenti» / «1 utente» / «tutti gli utenti» (quando il numero non è noto): destinatari di
+ * notifiche ed email dell'operatore. Mai «1 utenti» (QA 28/11).
+ */
+export function usersLabel(recipients: number | null): string {
   if (recipients === null) {
     return "tutti gli utenti";
   }
   return `${recipients} ${recipients === 1 ? "utente" : "utenti"}`;
 }
 
-/** «Rimuovi» accanto a un partecipante della lega: nome del partecipante nella domanda. */
-export function removeMemberConfirmation(displayName: string): ConfirmCopy {
+/** Minimo di partecipanti ammesso dal server (`MIN_PARTICIPANTS`), se `participantMin` non è noto. */
+export const DEFAULT_PARTICIPANT_MIN = 4;
+
+/** Conteggi noti al client prima di «Rimuovi» (stessa regola del server). */
+export interface RemovalCounts {
+  /** Partecipanti previsti dal regolamento prima della rimozione; `null`/assente = non noti. */
+  participantCount: number | null | undefined;
+  /** Minimo ammesso per «Partecipanti» (`participantMin`); `null`/assente = quello predefinito. */
+  participantMin?: number | null;
+  /** Iscritti che restano dopo la rimozione. */
+  remaining: number;
+}
+
+/**
+ * Previsti dopo la rimozione di un partecipante: stessa regola di
+ * `_sync_participant_count_after_removal` del server. I previsti scendono agli iscritti rimasti
+ * solo se ne restano almeno `participantMin` (4 se non noto) e i previsti sono più degli iscritti;
+ * altrimenti restano quelli di prima.
+ */
+export function participantCountAfterRemoval(input: {
+  participantCount: number;
+  participantMin?: number | null;
+  remaining: number;
+}): number {
+  const min = input.participantMin ?? DEFAULT_PARTICIPANT_MIN;
+  if (input.remaining < min || input.participantCount <= input.remaining) {
+    return input.participantCount;
+  }
+  return input.remaining;
+}
+
+type RemovalOutcome =
+  | { kind: "unknown" }
+  | { kind: "aligned"; count: number }
+  | { kind: "unchanged"; count: number };
+
+function removalOutcome(counts: RemovalCounts | null | undefined): RemovalOutcome {
+  if (!counts || counts.participantCount == null) {
+    return { kind: "unknown" };
+  }
+  const after = participantCountAfterRemoval({
+    participantCount: counts.participantCount,
+    participantMin: counts.participantMin,
+    remaining: counts.remaining,
+  });
+  return after === counts.participantCount
+    ? { kind: "unchanged", count: after }
+    : { kind: "aligned", count: after };
+}
+
+/**
+ * «Rimuovi» accanto a un partecipante della lega: nome del partecipante nella domanda. Dice che
+ * i previsti si allineano solo se cambiano davvero (altrimenti dice che restano); senza conteggi
+ * noti non dice nulla sui previsti.
+ */
+export function removeMemberConfirmation(
+  displayName: string,
+  counts?: RemovalCounts | null,
+): ConfirmCopy {
+  const outcome = removalOutcome(counts);
+  const tail =
+    outcome.kind === "aligned"
+      ? " Il numero dei partecipanti previsti si allinea agli iscritti rimasti."
+      : outcome.kind === "unchanged"
+        ? ` I partecipanti previsti restano ${outcome.count}.`
+        : "";
   return {
     title: CONFIRM_TITLE,
-    message: `Vuoi rimuovere ${displayName} dalla lega? Il numero dei partecipanti previsti si allinea agli iscritti rimasti.`,
+    message: `Vuoi rimuovere ${displayName} dalla lega?${tail}`,
     confirmLabel: "Rimuovi",
     cancelLabel: CONFIRM_CANCEL_LABEL,
   };
+}
+
+/** Esito dopo «Rimuovi» e conferma: i previsti sono «allineati» solo se sono cambiati davvero. */
+export function memberRemovedMessage(displayName: string, counts?: RemovalCounts | null): string {
+  const outcome = removalOutcome(counts);
+  const base = `${displayName} è stato rimosso dalla lega.`;
+  if (outcome.kind === "aligned") {
+    return `${base} Il numero partecipanti previsti è stato allineato agli iscritti (${outcome.count}).`;
+  }
+  if (outcome.kind === "unchanged") {
+    return `${base} I partecipanti previsti restano ${outcome.count}.`;
+  }
+  return base;
 }
 
 export interface BroadcastConfirmInput {

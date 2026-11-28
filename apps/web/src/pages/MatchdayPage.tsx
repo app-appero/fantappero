@@ -922,7 +922,11 @@ export function MatchdayPage() {
                       {formatDateTime(selected.windowEndAt)} · Cutoff{" "}
                       {formatDateTime(selected.cutoffAt)}
                     </p>
-                    {countdown && countdown.roundId === selected.id ? (
+                    {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia
+                        dell'intestazione (AppLayout), e qui non si ripete (Rosario, 28/11). Senza conto
+                        («Turno non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il
+                        testo di stato: su telefono la fascia lo nasconde. */}
+                    {countdown && countdown.roundId === selected.id && countdown.state !== "counting_down" ? (
                       <LockCountdown
                         state={countdown.state}
                         nextLockAt={countdown.nextLockAt}

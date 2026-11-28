@@ -13,6 +13,7 @@ import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFr
   playerAvatarUrl,
   clubCrestUrl,
   absenceLine,
+  italianVarEventText,
 } from "@fantappero/contracts";
 import { darkColors, theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
@@ -452,7 +453,7 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
   if (type === "var") {
     return {
       icon: <MaterialCommunityIcons name="alert-decagram" size={16} color="#fff" />,
-      headline: `VAR — ${event.eventDetail ?? "Revisione"}`,
+      headline: `VAR — ${italianVarEventText(event.eventDetail)}`,
       detail: event.athleteId ? (
         <AthleteName athleteId={event.athleteId} style={styles.eventDetail}>
           {event.athleteName ?? "?"}

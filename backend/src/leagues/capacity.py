@@ -93,6 +93,11 @@ def league_is_full(session: Session, league_id: UUID) -> bool:
     return league_occupancy(session, league_id, include_pending=False).is_full
 
 
+def members_label(count: int) -> str:
+    """«1 iscritto», «2 iscritti»."""
+    return f"{count} iscritto" if count == 1 else f"{count} iscritti"
+
+
 def pending_invites_label(count: int) -> str:
     """«1 invito in attesa», «2 inviti in attesa»."""
     return f"{count} invito in attesa" if count == 1 else f"{count} inviti in attesa"

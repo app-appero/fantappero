@@ -1,5 +1,5 @@
 import type { LeagueStanding } from "@fantappero/contracts";
-import { avatarInitials, formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitials, countWithNoun, formatFantasyPoints } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -125,7 +125,7 @@ function StandingsPodium({ rows }: { rows: StandingsRow[] }) {
             ) : null}
           </span>
           <span className="fa-podium__meta">
-            {row.played} gare · GF:GS {row.goalsFor}:{row.goalsAgainst}
+            {countWithNoun(row.played, "gara", "gare")} · GF:GS {row.goalsFor}:{row.goalsAgainst}
           </span>
           <strong className="fa-podium__points">
             {row.points}

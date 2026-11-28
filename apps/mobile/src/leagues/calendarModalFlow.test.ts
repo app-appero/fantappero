@@ -6,6 +6,7 @@ import {
   calendarModalAfterError,
   calendarModalChecking,
   calendarProceedForce,
+  participantsShortcutTab,
 } from "./calendarModalFlow.ts";
 
 const TEAM = {
@@ -61,5 +62,11 @@ describe("finestra «Genera/Conferma calendario» nell'app (1.5)", () => {
     assert.equal(calendarButtonsDisabled({ working: false, modalOpen: false }), false);
     assert.equal(calendarButtonsDisabled({ working: true, modalOpen: false }), true);
     assert.equal(calendarButtonsDisabled({ working: false, modalOpen: true }), true);
+  });
+
+  it("«Vai a Partecipanti» apre «Invitati» solo a configurazione salvata (QA 28/11, D2)", () => {
+    assert.equal(participantsShortcutTab(true), "invitati");
+    // Configurazione mai salvata: «Invitati» è disattivata, si va a «Configurazione».
+    assert.equal(participantsShortcutTab(false), "configurazione");
   });
 });

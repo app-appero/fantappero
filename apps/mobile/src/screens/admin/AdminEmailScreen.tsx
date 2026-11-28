@@ -1,5 +1,5 @@
 import type { ConfirmCopy, OperatorEmailHistoryItem } from "@fantappero/contracts";
-import { operatorEmailConfirmation } from "@fantappero/contracts";
+import { operatorEmailConfirmation, usersLabel } from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { fetchOperatorEmails, sendOperatorEmail } from "../../api/notifications";
@@ -80,7 +80,7 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
             ? { mode: "all" }
             : { mode: "users", userIds: [...selected.keys()] },
       });
-      setDone(`Email inviata a ${result.recipientCount} utenti.`);
+      setDone(`Email inviata a ${usersLabel(result.recipientCount)}.`);
     } catch (e) {
       setError(getApiErrorMessage(e, "Invio non riuscito."));
     } finally {
@@ -125,7 +125,7 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
         {error ? <Text style={styles.error} testID="admin-email-error">{error}</Text> : null}
         {done ? <Text style={styles.done} testID="admin-email-done">{done}</Text> : null}
         <Pressable style={[base.button, busy && base.disabled]} disabled={busy} onPress={requestSend} testID="admin-email-send">
-          <Text style={base.buttonLabel}>{recipients === null ? "Invia" : `Invia a ${recipients} utenti`}</Text>
+          <Text style={base.buttonLabel}>{recipients === null ? "Invia" : `Invia a ${usersLabel(recipients)}`}</Text>
         </Pressable>
         <Pressable style={[base.secondaryButton, busy && base.disabled]} disabled={busy} onPress={() => void submit(true)} testID="admin-email-send-me">
           <Text style={base.secondaryButtonLabel}>Invia a me come prova</Text>

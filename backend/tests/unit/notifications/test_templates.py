@@ -375,6 +375,68 @@ def test_assist_v2_mentions_scorer() -> None:
     assert "assist per il gol di Lautaro" in content.body
 
 
+def test_goal_retracted_says_what_was_taken_away_and_why() -> None:
+    """Rosario 28/11: «Gol annullato: il gol di NOME (SQUADRA) è stato annullato (fuorigioco).
+    Il bonus è stato tolto.», con il motivo solo se noto."""
+    content = render_notification(
+        "risultati.gol_annullato",
+        1,
+        {
+            "player": "Lautaro Martinez",
+            "club_name": "Inter",
+            "reason": "fuorigioco",
+            "team_name": "Marco FC",
+            "minute": 23,
+        },
+    )
+    assert content.title == "Gol annullato"
+    assert content.body == (
+        "Il gol di Lautaro Martinez (Inter) è stato annullato (fuorigioco). "
+        "Il bonus è stato tolto a Marco FC."
+    )
+    assert content.deep_link == "/turni"
+
+
+def test_goal_retracted_omits_what_it_does_not_know() -> None:
+    content = render_notification("risultati.gol_annullato", 1, {"player": "Lautaro Martinez"})
+    assert content.title == "Gol annullato"
+    assert content.body == "Il gol di Lautaro Martinez è stato annullato. Il bonus è stato tolto."
+    assert "()" not in content.body
+
+
+def test_assist_retracted_names_the_scorer_when_known() -> None:
+    content = render_notification(
+        "risultati.assist_annullato",
+        1,
+        {
+            "player": "Dumfries",
+            "club_name": "Inter",
+            "scorer": "Lautaro Martinez",
+            "reason": "fallo di mano",
+            "team_name": "Marco FC",
+        },
+    )
+    assert content.title == "Assist annullato"
+    assert content.body == (
+        "L'assist di Dumfries (Inter) sul gol di Lautaro Martinez è stato annullato "
+        "(fallo di mano). Il bonus è stato tolto a Marco FC."
+    )
+    plain = render_notification("risultati.assist_annullato", 1, {"player": "Dumfries"})
+    assert plain.body == "L'assist di Dumfries è stato annullato. Il bonus è stato tolto."
+
+
+def test_retracted_notifications_link_like_the_other_match_ones() -> None:
+    """Stessa schermata delle altre notifiche di partita: scontro del destinatario se risolto,
+    altrimenti «/turni», sempre con la lega giusta."""
+    for key in ("risultati.gol_annullato", "risultati.assist_annullato"):
+        resolved = render_notification(
+            key, 1, {"player": "X", "deep_link": "/turni/scontro/abc-123", "league_id": "lega-1"}
+        )
+        assert resolved.deep_link == "/turni/scontro/abc-123?lega=lega-1"
+        generic = render_notification(key, 1, {"player": "X"})
+        assert generic.deep_link == "/turni"
+
+
 def test_trade_v2_says_who_and_what() -> None:
     content = render_notification(
         "mercato.scambio",

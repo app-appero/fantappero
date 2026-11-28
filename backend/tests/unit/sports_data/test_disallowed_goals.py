@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import pytest
+
 from sports_data.normalization import ScoringEventKind, normalize_scoring_events
 from sports_data.normalization.disallowed import (
     disallowed_goal_indexes,
+    disallowed_reason_it,
+    goal_disallowed_reason,
     without_disallowed_goals,
 )
 
@@ -91,3 +95,90 @@ def test_normalization_drops_goal_and_assist_of_disallowed_goal():
     result = normalize_scoring_events(fixture_id=1, events_payload=payload, players_payload=None)
     pairs = {(e.kind, e.player_id) for e in result.events}
     assert pairs == {(ScoringEventKind.GOAL, 13), (ScoringEventKind.ASSIST, 14)}
+
+
+# -- Motivo dell'annullamento, per la notifica «Gol annullato» ---------------------------------
+
+
+@pytest.mark.parametrize(
+    ("detail", "expected"),
+    [
+        ("Goal Disallowed - offside", "fuorigioco"),
+        ("Goal Disallowed - Offside", "fuorigioco"),
+        ("Goal Disallowed - handball", "fallo di mano"),
+        ("Goal Disallowed - hand ball", "fallo di mano"),
+        ("Goal Disallowed - foul", "fallo"),
+        # Senza motivo, o un motivo che non conosciamo: niente (la notifica lo omette).
+        ("Goal cancelled", None),
+        ("Goal Disallowed", None),
+        ("Goal Disallowed - ball out of play", None),
+        (None, None),
+        (12, None),
+    ],
+)
+def test_disallowed_reason_it(detail, expected):
+    assert disallowed_reason_it(detail) == expected
+
+
+def test_goal_disallowed_reason_matches_the_var_after_the_goal_by_player():
+    events = [_goal(15, 11, VENEZIA, assist=22), _var(16, 11, VENEZIA)]
+    reason = goal_disallowed_reason(
+        events, player_provider_id=11, club_provider_id=VENEZIA, minute=15
+    )
+    assert reason == "fuorigioco"
+
+
+def test_goal_disallowed_reason_works_when_the_goal_is_already_gone_from_the_events():
+    """Il fornitore toglie il gol e lascia solo il Var: il motivo si legge comunque."""
+    events = [
+        _row("Card", "Yellow Card", 14, 33, BOLOGNA),
+        _var(15, 11, VENEZIA, "Goal Disallowed - handball"),
+    ]
+    reason = goal_disallowed_reason(
+        events, player_provider_id=11, club_provider_id=VENEZIA, minute=15
+    )
+    assert reason == "fallo di mano"
+
+
+def test_goal_disallowed_reason_falls_back_to_team_and_prefers_the_player():
+    events = [
+        _var(16, 99, VENEZIA, "Goal Disallowed - foul"),
+        _var(18, 11, VENEZIA, "Goal Disallowed - offside"),
+    ]
+    # Stessa squadra, calciatore diverso: vale il Var della squadra (il primo).
+    assert (
+        goal_disallowed_reason(events, player_provider_id=12, club_provider_id=VENEZIA, minute=15)
+        == "fallo"
+    )
+    # Chi corrisponde per calciatore passa avanti, anche se più lontano nel tempo.
+    assert (
+        goal_disallowed_reason(events, player_provider_id=11, club_provider_id=VENEZIA, minute=15)
+        == "fuorigioco"
+    )
+
+
+def test_goal_disallowed_reason_ignores_other_team_var_and_var_outside_window():
+    events = [
+        _var(16, 99, BOLOGNA),  # altra squadra
+        _var(30, 11, VENEZIA),  # oltre la finestra del VAR
+        _var(14, 11, VENEZIA),  # prima del gol
+    ]
+    assert (
+        goal_disallowed_reason(events, player_provider_id=11, club_provider_id=VENEZIA, minute=15)
+        is None
+    )
+    # Minuto sconosciuto: niente motivo inventato.
+    assert (
+        goal_disallowed_reason(
+            [_var(16, 11, VENEZIA)], player_provider_id=11, club_provider_id=VENEZIA, minute=None
+        )
+        is None
+    )
+
+
+def test_goal_disallowed_reason_ignores_malformed_rows():
+    events = ["non è una riga", None, {"type": "Var"}, _var(16, 11, VENEZIA)]
+    assert (
+        goal_disallowed_reason(events, player_provider_id=11, club_provider_id=None, minute=15)
+        == "fuorigioco"
+    )

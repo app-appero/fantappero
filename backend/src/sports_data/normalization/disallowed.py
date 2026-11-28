@@ -119,6 +119,63 @@ def disallowed_goal_indexes(raw_events: Sequence[Any]) -> set[int]:
     return cancelled
 
 
+#: Parole del fornitore -> motivo in italiano (stesso lessico di ``italianVarEventText`` in
+#: ``packages/contracts``). Un motivo non riconosciuto non si inventa: la notifica lo omette.
+_REASON_KEYWORDS: tuple[tuple[str, str], ...] = (
+    ("offside", "fuorigioco"),
+    ("handball", "fallo di mano"),
+    ("hand ball", "fallo di mano"),
+    ("hand-ball", "fallo di mano"),
+    ("foul", "fallo"),
+)
+
+
+def disallowed_reason_it(detail: Any) -> str | None:
+    """Motivo in italiano di un ``Var`` di annullamento (``"Goal Disallowed - offside"`` →
+    ``"fuorigioco"``), o ``None`` se il fornitore non lo dice o non lo riconosciamo."""
+    text = _text(detail)
+    for keyword, reason in _REASON_KEYWORDS:
+        if keyword in text:
+            return reason
+    return None
+
+
+def goal_disallowed_reason(
+    raw_events: Sequence[Any],
+    *,
+    player_provider_id: int | None,
+    club_provider_id: int | None,
+    minute: int | None,
+) -> str | None:
+    """Motivo (in italiano) con cui un ``Var`` ha annullato questo gol, se il fornitore lo dice.
+
+    Serve alla notifica «Gol annullato» (gol già sparito dagli eventi, o ancora presente
+    accanto al ``Var``): stesso abbinamento prudente di ``disallowed_goal_indexes``, cioè
+    stesso calciatore (se no stessa squadra) e ``Var`` al massimo ``VAR_WINDOW_MINUTES`` dopo
+    il gol; fra più ``Var`` vale il più vicino. Senza un ``Var`` abbinabile, ``None``.
+    """
+    if minute is None:
+        return None
+    candidates: list[tuple[int, bool, Mapping[str, Any]]] = []
+    for row in raw_events:
+        if not isinstance(row, Mapping) or not is_goal_disallowed_var(row):
+            continue
+        var_minute = _minute(row)
+        if var_minute is None or not minute <= var_minute <= minute + VAR_WINDOW_MINUTES:
+            continue
+        same_player = (
+            player_provider_id is not None and _nested_id(row, "player") == player_provider_id
+        )
+        same_team = club_provider_id is not None and _nested_id(row, "team") == club_provider_id
+        if same_player or same_team:
+            candidates.append((var_minute - minute, not same_player, row))
+    if not candidates:
+        return None
+    # Prima chi corrisponde per calciatore, poi il più vicino al gol.
+    best = min(candidates, key=lambda item: (item[1], item[0]))
+    return disallowed_reason_it(best[2].get("detail"))
+
+
 def without_disallowed_goals(raw_events: Sequence[Any]) -> list[Any]:
     """Gli eventi senza i gol annullati dal VAR (gli eventi ``Var`` restano)."""
     cancelled = disallowed_goal_indexes(raw_events)

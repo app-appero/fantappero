@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import database.models  # noqa: F401 — register ORM mappers
@@ -12,7 +12,11 @@ from database.session import create_engine_from_url, create_session_factory, ses
 from observability.logging import get_logger
 from sports_data.predicted.client import FotmobClient
 from sports_data.predicted.oracle_client import SoccerOracleClient
-from sports_data.predicted.sync import PredictedSyncSummary, sync_predicted_lineups
+from sports_data.predicted.sync import (
+    PredictedSyncSummary,
+    snapshot_min_age,
+    sync_predicted_lineups,
+)
 
 logger = get_logger(__name__)
 
@@ -77,14 +81,20 @@ def run_predicted_lineup_sync(
     factory = create_session_factory(engine)
     try:
         with session_scope(factory) as session:
+            moment = datetime.now(UTC)
             summary = sync_predicted_lineups(
                 session,
                 client,
+                now=moment,
                 horizon=timedelta(days=4),
                 max_lineup_calls=settings.fotmob_max_lineup_calls,
                 force=force,
                 league_id=None if league_id is None else UUID(league_id),
-                min_age=timedelta(hours=settings.predicted_lineups_min_age_hours),
+                min_age=snapshot_min_age(
+                    moment,
+                    min_age_hours=settings.predicted_lineups_min_age_hours,
+                    daily_refresh_hour_utc=settings.predicted_lineups_daily_refresh_hour_utc,
+                ),
                 oracle=oracle,
                 oracle_min_confidence=settings.soccer_oracle_min_confidence,
                 oracle_max_lookup_calls=settings.soccer_oracle_max_lookup_calls,

@@ -67,6 +67,9 @@ def test_every_event_key_in_the_map_is_a_known_event() -> None:
 
 def test_event_key_for_template_known_and_unknown() -> None:
     assert event_key_for_template("risultati.gol") == "calciatori.gol"
+    # «Gol annullato» / «Assist annullato» usano gli interruttori di «Gol» e «Assist».
+    assert event_key_for_template("risultati.gol_annullato") == "calciatori.gol"
+    assert event_key_for_template("risultati.assist_annullato") == "calciatori.assist"
     assert event_key_for_template("mercato.esito_busta") == "sistema.asta"
     assert event_key_for_template("mercato.asta_live_iniziata") == "sistema.asta"
     # Non ancora granularizzato (inviti lega): resta governato dalla categoria.

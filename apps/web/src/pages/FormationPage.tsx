@@ -2185,7 +2185,11 @@ export function FormationPage() {
                 {/* Il «?» apre «Quando si blocca la formazione?» (FAQ 1.4). */}
                 <FaqHelpButton faqId={FAQ_HELP.lineupLock} data-testid="formation-lock-help" />
               </p>
-              {countdown && countdown.roundId === context.roundId ? (
+              {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia
+                  dell'intestazione (AppLayout), e qui non si ripete (Rosario, 28/11). Senza conto
+                  («Turno non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il
+                  testo di stato: su telefono la fascia lo nasconde. */}
+              {countdown && countdown.roundId === context.roundId && countdown.state !== "counting_down" ? (
                 <LockCountdown
                   state={countdown.state}
                   nextLockAt={countdown.nextLockAt}

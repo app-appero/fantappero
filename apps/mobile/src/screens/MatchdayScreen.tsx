@@ -46,6 +46,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
+import { showsPageLockNote } from "../matchday/pageLockNote";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { europeanTurnOptionLabel, turnSkipReason } from "../matchday/turnLabels";
 import type { RootStackParamList } from "../navigation/types";
@@ -406,7 +407,10 @@ export function MatchdayScreen() {
               </Text>
             ) : null}
             <Text style={styles.body}>Cutoff: {formatDateTime(selected.cutoffAt)}</Text>
-            {countdown && countdown.roundId === selected.id ? (
+            {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia sotto
+                l'intestazione (LockCountdownBar), e qui non si ripete (Rosario, 28/11). Senza conto («Turno
+                non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il testo di stato. */}
+            {countdown && showsPageLockNote(countdown, selected.id) ? (
               <LockCountdown
                 state={countdown.state}
                 nextLockAt={countdown.nextLockAt}

@@ -1,6 +1,7 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
 import {
   avatarInitials,
+  memberRemovedMessage,
   missingMembersLabel,
   pendingInvitesLabel,
   removeMemberConfirmation,
@@ -48,6 +49,11 @@ const DEMO_MEMBERS: LeagueMember[] = [
     joinedAt: "2026-08-03T10:00:00Z",
   },
 ];
+
+type LoadMembersOptions = {
+  /** Non azzera il messaggio di esito: il ricaricamento segue un'azione appena riuscita. */
+  keepSuccess?: boolean;
+};
 
 type LeagueMembersPanelProps = {
   leagueId: string | null;
@@ -113,9 +119,16 @@ export function LeagueMembersPanel({
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const onMembersLoadedRef = useRef(onMembersLoaded);
   onMembersLoadedRef.current = onMembersLoaded;
+  // Dopo un'azione riuscita il pannello avvisa il genitore (`onMembersChanged`), che cambia
+  // `reloadToken` e fa ricaricare gli iscritti: quel ricaricamento non deve cancellare il
+  // messaggio di esito appena mostrato (QA 28/11, N3). Un ricaricamento chiesto da fuori
+  // (una nuova iscrizione dalla directory, un invito) lo azzera come prima.
+  const keepSuccessOnReloadRef = useRef(false);
 
-  const loadMembers = useCallback(async () => {
-    setSuccess(null);
+  const loadMembers = useCallback(async ({ keepSuccess = false }: LoadMembersOptions = {}) => {
+    if (!keepSuccess) {
+      setSuccess(null);
+    }
     if (isDemoMode) {
       setLoading(demoState === "loading");
       setError(
@@ -154,8 +167,26 @@ export function LeagueMembersPanel({
   }, [demoState, isDemoMode, leagueId]);
 
   useEffect(() => {
-    void loadMembers();
+    const keepSuccess = keepSuccessOnReloadRef.current;
+    keepSuccessOnReloadRef.current = false;
+    void loadMembers({ keepSuccess });
   }, [loadMembers, reloadToken]);
+
+  // Il consenso a tenere il messaggio vale per il solo ricaricamento che segue l'azione: se il
+  // genitore non ha cambiato `reloadToken`, a fine rendering cade e non resta addosso a un
+  // ricaricamento successivo chiesto da fuori. Va dichiarato dopo l'effetto che lo legge.
+  useEffect(() => {
+    keepSuccessOnReloadRef.current = false;
+  });
+
+  /** Avvisa il genitore di un cambio riuscito, chiedendo che il ricaricamento tenga l'esito. */
+  function notifyMembersChanged() {
+    if (!onMembersChanged) {
+      return;
+    }
+    keepSuccessOnReloadRef.current = true;
+    onMembersChanged();
+  }
 
   // Amministratori: passare il controllo, condividerlo (co-admin) o toglierlo a un co-admin.
   const [adminOpen, setAdminOpen] = useState(false);
@@ -177,8 +208,8 @@ export function LeagueMembersPanel({
     try {
       setSuccess(await action());
       setAdminOpen(false);
-      await loadMembers();
-      onMembersChanged?.();
+      await loadMembers({ keepSuccess: true });
+      notifyMembersChanged();
     } catch (adminFailure) {
       setAdminError(getApiErrorMessage(adminFailure, "Impossibile modificare gli amministratori."));
     } finally {
@@ -217,6 +248,11 @@ export function LeagueMembersPanel({
     });
   }
 
+  /** Previsti e iscritti rimasti dopo «Rimuovi»: servono a dire se i previsti cambiano davvero. */
+  function removalCounts(remaining: number) {
+    return { participantCount, participantMin, remaining };
+  }
+
   async function onRemove(target: LeagueMember) {
     setError(null);
     setSuccess(null);
@@ -224,7 +260,7 @@ export function LeagueMembersPanel({
       const next = members.filter((member) => member.userId !== target.userId);
       setMembers(next);
       onMembersLoadedRef.current?.(next.length);
-      setSuccess(`${target.displayName} è stato rimosso dalla lega.`);
+      setSuccess(memberRemovedMessage(target.displayName, removalCounts(next.length)));
       onMembersChanged?.();
       return;
     }
@@ -239,10 +275,8 @@ export function LeagueMembersPanel({
       const next = members.filter((member) => member.userId !== removed.userId);
       setMembers(next);
       onMembersLoadedRef.current?.(next.length);
-      setSuccess(
-        `${removed.displayName} è stato rimosso dalla lega. Il numero partecipanti previsti è stato allineato agli iscritti.`,
-      );
-      onMembersChanged?.();
+      setSuccess(memberRemovedMessage(removed.displayName, removalCounts(next.length)));
+      notifyMembersChanged();
     } catch (removeError) {
       setError(getApiErrorMessage(removeError, "Impossibile rimuovere il partecipante."));
     } finally {
@@ -308,8 +342,8 @@ export function LeagueMembersPanel({
         `${joined.displayName} è subentrato a ${from.displayName}: squadra, rosa e punti restano invariati.`,
       );
       setReplaceOpen(false);
-      await loadMembers();
-      onMembersChanged?.();
+      await loadMembers({ keepSuccess: true });
+      notifyMembersChanged();
     } catch (replaceFailure) {
       setReplaceError(
         getApiErrorMessage(replaceFailure, "Impossibile sostituire il fantallenatore."),
@@ -361,7 +395,7 @@ export function LeagueMembersPanel({
   }
 
   const removeConfirmation = removeTarget
-    ? removeMemberConfirmation(removeTarget.displayName)
+    ? removeMemberConfirmation(removeTarget.displayName, removalCounts(members.length - 1))
     : null;
 
   return (
