@@ -211,3 +211,53 @@ def test_inactive_anomalous_and_other_players_events_are_ignored():
     assert (data.goals, data.assists, data.penalty_missed) == (0, 0, 0)
     assert data.yellow_card is False and data.red_card is False
     assert result.total == 0.0
+
+
+# --- partita finita: niente piu' gol/assist di quelli della squadra (QA 28/11) ---
+
+HOME = "home-club"
+AWAY = "away-club"
+
+
+def _run_final(stats_json: dict, events: list, *, status: str, home: int | None, away: int | None):
+    stat = SimpleNamespace(stats_json=stats_json, athlete_provider_id=PLAYER, club_id=HOME)
+    fixture = SimpleNamespace(
+        home_club_id=HOME,
+        away_club_id=AWAY,
+        home_goals=home,
+        away_goals=away,
+        status_short=status,
+    )
+    data = bonus_input_from_stat(
+        fixture=fixture,
+        stat=stat,
+        role="C",
+        own_goal_counts={},
+        event_counts=event_bonus_counts(events),
+    )
+    return data, compute_bonus_malus(data, default_bonus_config(), eligible=True)
+
+
+def test_finished_nil_nil_gives_no_goal_or_assist_even_with_stale_data():
+    """Venezia–Bologna 0-0: assist rimasto nelle statistiche o negli eventi dopo il VAR."""
+    events = [_event(ScoringEventKind.ASSIST), _event(ScoringEventKind.GOAL)]
+    data, result = _run_final(
+        {"goals": {"total": 1, "assists": 1}}, events, status="FT", home=0, away=0
+    )
+    assert (data.goals, data.assists) == (0, 0)
+    assert {c.id for c in result.components} == set()
+
+
+def test_finished_match_caps_at_team_goals_not_below():
+    data, _ = _run_final({"goals": {"total": 3, "assists": 2}}, [], status="AET", home=2, away=0)
+    assert (data.goals, data.assists) == (2, 2)
+
+
+def test_live_match_is_not_capped_by_lagging_score():
+    data, _ = _run_final({"goals": {"total": 1, "assists": 1}}, [], status="2H", home=0, away=0)
+    assert (data.goals, data.assists) == (1, 1)
+
+
+def test_finished_match_without_score_is_not_capped():
+    data, _ = _run_final({"goals": {"total": 1}}, [], status="FT", home=None, away=None)
+    assert data.goals == 1

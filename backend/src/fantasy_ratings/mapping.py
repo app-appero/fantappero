@@ -235,6 +235,26 @@ def team_goals_conceded(fixture: Fixture, club_id: UUID | None) -> int | None:
     )
 
 
+_FINISHED_FIXTURE_STATUSES = frozenset({"FT", "AET", "PEN"})
+
+
+def team_goals_scored_if_final(fixture: Fixture, club_id: UUID | None) -> int | None:
+    """Gol fatti dalla squadra di ``club_id``, solo a partita finita con risultato noto.
+
+    Durante la partita il risultato puo' arrivare dopo gli eventi: li' non si usa.
+    """
+    status = str(getattr(fixture, "status_short", "") or "").upper()
+    if status not in _FINISHED_FIXTURE_STATUSES:
+        return None
+    if club_id is None:
+        return None
+    if club_id == fixture.home_club_id:
+        return fixture.home_goals
+    if club_id == fixture.away_club_id:
+        return fixture.away_goals
+    return None
+
+
 def goals_conceded_by_club(
     *,
     club_id: UUID | None,
@@ -268,9 +288,18 @@ def bonus_input_from_stat(
     counts = event_counts or EventBonusCounts()
     pid = stat.athlete_provider_id
     # Valore piu' alto tra statistica ed eventi (vedi ``EventBonusCounts``).
+    goal_count = max(_as_int(goals.get("total")), counts.goals.get(pid, 0))
+    assist_count = max(_as_int(goals.get("assists")), counts.assists.get(pid, 0))
+    scored = team_goals_scored_if_final(fixture, stat.club_id)
+    if scored is not None:
+        # Rete di sicurezza (QA 28/11, gol annullato in una partita finita 0-0): a
+        # partita finita nessun calciatore ha piu' gol o assist di quanti ne ha fatti
+        # la sua squadra. Una statistica o un evento rimasti indietro non danno bonus.
+        goal_count = min(goal_count, scored)
+        assist_count = min(assist_count, scored)
     return BonusMalusInput(
-        goals=max(_as_int(goals.get("total")), counts.goals.get(pid, 0)),
-        assists=max(_as_int(goals.get("assists")), counts.assists.get(pid, 0)),
+        goals=goal_count,
+        assists=assist_count,
         yellow_card=_as_int(cards.get("yellow")) > 0 or counts.yellow_cards.get(pid, 0) > 0,
         red_card=_as_int(cards.get("red")) > 0 or counts.red_cards.get(pid, 0) > 0,
         own_goals=own_goal_counts.get(pid, 0),

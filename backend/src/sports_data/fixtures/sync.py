@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -24,6 +24,7 @@ from sports_data.fixtures.models import (
     OfficialLineupEntry,
     PlayerMatchStat,
 )
+from sports_data.normalization.disallowed import without_disallowed_goals
 from sports_data.normalization.events import normalize_scoring_events
 from sports_data.provider.client import ApiFootballClient
 from sports_data.provider.constants import MVP_LEAGUE_IDS, PROVIDER_NAME
@@ -416,18 +417,56 @@ def retract_missing_events(
             continue
         if row.provider_event_key in seen_keys:
             continue
-        # Scoring-only keys (assist siblings / stats) are managed separately.
-        if "|goal" in row.provider_event_key or "|assist" in row.provider_event_key:
-            if row.provider_event_key.startswith("players|"):
-                continue
-        if row.provider_event_key.startswith("players|"):
-            continue
+        # Solo le righe di cronologia (``|primary``): gli eventi di punteggio derivati
+        # (gol, assist, rigori...) li ritira ``retract_missing_scoring_events``.
         if not row.provider_event_key.endswith("|primary"):
             continue
-        row.is_active = False
-        row.retracted_at = now
-        _touch_updated_at(row)
-        counters.incr_entity("events", "retracted")
+        _retract(row, now=now, counters=counters)
+
+
+def _retract(row: MatchEvent, *, now: datetime, counters: FixtureSyncCounters) -> None:
+    row.is_active = False
+    row.retracted_at = now
+    _touch_updated_at(row)
+    counters.incr_entity("events", "retracted")
+
+
+def retract_missing_scoring_events(
+    session: Session,
+    *,
+    fixture_id: UUID,
+    seen_keys: set[str],
+    counters: FixtureSyncCounters,
+    include_penalty_outcomes: bool,
+) -> None:
+    """Ritira gli eventi di punteggio ricavati dagli eventi che l'ultima normalizzazione
+    non ha più prodotto (QA 28/11: gol annullato, l'assist restava a punteggio).
+
+    Tocca solo le chiavi ``events|…`` con ``scoring_kind``: quelle ``players|…`` (rigori
+    parati dedotti dalle statistiche) dipendono dal feed giocatori. L'esito di un rigore
+    sbagliato (``|outcome=saved`` / ``off_target``) dipende anche da quel feed, quindi si
+    ritira solo quando è arrivato (``include_penalty_outcomes``). Idempotente; un evento
+    che ricompare torna attivo con ``upsert_match_event``.
+    """
+    rows = (
+        session.execute(
+            select(MatchEvent).where(
+                MatchEvent.fixture_id == fixture_id,
+                MatchEvent.is_active.is_(True),
+                MatchEvent.scoring_kind.is_not(None),
+                MatchEvent.provider_event_key.startswith("events|"),
+            ),
+        )
+        .scalars()
+        .all()
+    )
+    now = datetime.now(UTC)
+    for row in rows:
+        if row.provider_event_key in seen_keys:
+            continue
+        if "|outcome=" in row.provider_event_key and not include_penalty_outcomes:
+            continue
+        _retract(row, now=now, counters=counters)
 
 
 def upsert_official_lineup(
@@ -618,8 +657,14 @@ def sync_fixture_details(
             "parameters": events_envelope.parameters,
         }
         seen: set[str] = set()
-        for mapped in map_match_events(
+        # Un gol annullato dal VAR che il fornitore lascia ancora negli eventi non resta
+        # attivo in cronologia: non va scritto, e se c'era già si ritira qui sotto.
+        timeline_envelope = replace(
             events_envelope,
+            response=without_disallowed_goals(events_envelope.response),
+        )
+        for mapped in map_match_events(
+            timeline_envelope,
             fixture_provider_id=fixture.provider_id,
         ):
             seen.add(mapped.provider_event_key)
@@ -657,7 +702,9 @@ def sync_fixture_details(
             events_payload=events_payload,
             players_payload=players_payload,
         )
+        scoring_seen: set[str] = set()
         for event in normalized.events:
+            scoring_seen.add(event.provider_event_key)
             upsert_normalized_scoring_event(
                 session,
                 fixture=fixture,
@@ -674,6 +721,16 @@ def sync_fixture_details(
                 sources=list(event.sources),
                 anomaly_codes=[code.value for code in event.anomaly_codes],
                 counters=c,
+            )
+        # Solo con gli eventi in mano, e non vuoti: una risposta vuota (errore o buco
+        # del fornitore) non deve cancellare i gol di una partita.
+        if events_envelope is not None and events_envelope.response:
+            retract_missing_scoring_events(
+                session,
+                fixture_id=fixture.id,
+                seen_keys=scoring_seen,
+                counters=c,
+                include_penalty_outcomes=players_payload is not None,
             )
     return result
 
