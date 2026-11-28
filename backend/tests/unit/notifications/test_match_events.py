@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -205,6 +206,213 @@ def test_goal_resolves_deep_link_per_recipient_team(monkeypatch: pytest.MonkeyPa
     assert seen_calls[0]["fallback"] == "/turni"
     call_params = _FakeService.calls[0]["params"]
     assert call_params["deep_link"] == f"/turni/scontro/{seen_calls[0]['team_id']}"
+
+
+# -- «Gol annullato» / «Assist annullato» (Rosario 28/11) --------------------------------------
+
+
+def _fixture(status: str = "2H", hours_since_kickoff: float | None = 1.0) -> SimpleNamespace:
+    kickoff = (
+        None
+        if hours_since_kickoff is None
+        else datetime.now(UTC) - timedelta(hours=hours_since_kickoff)
+    )
+    return SimpleNamespace(status_short=status, kickoff_at=kickoff)
+
+
+@pytest.fixture
+def original_filters(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Il filtro «chi ha ricevuto l'originale» e quello sul turno omologato, finti: passano
+    tutti i proprietari. Ritorna i prefissi dei codici delle notifiche originali cercate."""
+    prefixes: list[str] = []
+
+    def fake_originals(session: object, owners: dict, prefix: str) -> dict:
+        prefixes.append(prefix)
+        return owners
+
+    monkeypatch.setattr(match_events, "_owners_with_original", fake_originals)
+    monkeypatch.setattr(match_events, "_round_homologated", lambda session, **kwargs: False)
+    return prefixes
+
+
+def _retracted_goal(**overrides: object) -> SimpleNamespace:
+    values: dict[str, object] = {
+        "scoring_kind": "goal",
+        "club": SimpleNamespace(name="Inter"),
+        "fixture_id": uuid4(),
+        **overrides,
+    }
+    return _event(**values)
+
+
+def test_retracted_goal_notifies_only_who_got_the_original(original_filters: list[str]) -> None:
+    event = _retracted_goal()
+    sent = match_events.notify_match_event_retracted(
+        _session(), event=event, fixture=_fixture(), reason="fuorigioco"
+    )
+    assert sent == 1
+    call = _FakeService.calls[0]
+    assert call["template_key"] == "risultati.gol_annullato"
+    assert call["template_version"] == 1
+    assert call["category"] == match_events.NotificationCategory.RISULTATI
+    assert call["params"]["reason"] == "fuorigioco"
+    assert call["params"]["club_name"] == "Inter"
+    assert call["params"]["player"] == "Mario Rossi"
+    assert call["params"]["deep_link"] == "/turni"
+    # Nuovo codice anti-duplicato, e l'originale cercata con quello del «Gol di…».
+    assert str(call["dedup_key"]).startswith(f"match_event_retracted:{event.id}:")
+    assert original_filters == [f"match_event:{event.id}"]
+
+
+def test_retracted_goal_without_a_known_reason_sends_no_reason(
+    original_filters: list[str],
+) -> None:
+    sent = match_events.notify_match_event_retracted(
+        _session(), event=_retracted_goal(), fixture=_fixture()
+    )
+    assert sent == 1
+    assert "reason" not in _FakeService.calls[0]["params"]
+
+
+def test_retracted_goal_with_assist_notifies_the_assist_owner_too(
+    original_filters: list[str],
+) -> None:
+    event = _retracted_goal(related_athlete_id=uuid4())
+    sent = match_events.notify_match_event_retracted(
+        _session(), event=event, fixture=_fixture(), reason="fallo di mano"
+    )
+    assert sent == 2
+    goal, assist = _FakeService.calls
+    assert goal["template_key"] == "risultati.gol_annullato"
+    assert assist["template_key"] == "risultati.assist_annullato"
+    assert assist["params"]["scorer"] == "Mario Rossi"
+    assert assist["params"]["reason"] == "fallo di mano"
+    # Codici diversi per gol e assist: chi ha entrambi riceve entrambi gli avvisi, come prima.
+    assert str(goal["dedup_key"]).startswith(f"match_event_retracted:{event.id}:")
+    assert str(assist["dedup_key"]).startswith(f"match_event_retracted_assist:{event.id}:")
+    assert original_filters == [f"match_event:{event.id}", f"match_event_assist:{event.id}"]
+
+
+def test_goal_only_corrected_by_the_provider_is_not_announced_as_cancelled(
+    original_filters: list[str],
+) -> None:
+    """Minuto o assist corretti dal fornitore: la riga cambia chiave ma il gol c'è ancora."""
+    event = _retracted_goal(related_athlete_id=uuid4())
+    sent = match_events.notify_match_event_retracted(
+        _session(), event=event, fixture=_fixture(), goal_still_valid=True
+    )
+    assert sent == 1
+    assert _FakeService.calls[0]["template_key"] == "risultati.assist_annullato"
+
+    _FakeService.calls = []
+    sent = match_events.notify_match_event_retracted(
+        _session(),
+        event=event,
+        fixture=_fixture(),
+        goal_still_valid=True,
+        assist_still_valid=True,
+    )
+    assert sent == 0
+    assert _FakeService.calls == []
+
+
+def test_retracted_goal_is_sent_once_even_if_it_is_retracted_again(
+    monkeypatch: pytest.MonkeyPatch, original_filters: list[str]
+) -> None:
+    """Il gol torna valido e viene annullato di nuovo: stesso evento, stesso codice, nessun
+    secondo avviso (limite documentato)."""
+    monkeypatch.setattr(match_events, "NotificationService", _DedupService)
+    owner = uuid4()
+    team = uuid4()
+    monkeypatch.setattr(match_events, "user_ids_for_teams", lambda s, ids: {team: owner})
+    event = _retracted_goal()
+    first = match_events.notify_match_event_retracted(_session(), event=event, fixture=_fixture())
+    again = match_events.notify_match_event_retracted(_session(), event=event, fixture=_fixture())
+    assert (first, again) == (1, 0)
+    assert len(_FakeService.calls) == 1
+    assert _FakeService.calls[0]["dedup_key"] == f"match_event_retracted:{event.id}:{owner}:{team}"
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        _fixture(status="NS"),
+        _fixture(status="PST"),
+        _fixture(status="CANC"),
+        _fixture(status="FT", hours_since_kickoff=30),
+        _fixture(status="2H", hours_since_kickoff=None),
+    ],
+    ids=["non iniziata", "rinviata", "annullata", "finita da più di un giorno", "senza orario"],
+)
+def test_retraction_is_not_notified_for_old_or_not_played_matches(
+    original_filters: list[str], fixture: SimpleNamespace
+) -> None:
+    sent = match_events.notify_match_event_retracted(
+        _session(), event=_retracted_goal(related_athlete_id=uuid4()), fixture=fixture
+    )
+    assert sent == 0
+    assert _FakeService.calls == []
+
+
+@pytest.mark.parametrize("status", ["1H", "HT", "2H", "ET", "P", "FT", "AET", "PEN"])
+def test_retraction_is_notified_while_live_and_just_after_the_end(
+    original_filters: list[str], status: str
+) -> None:
+    sent = match_events.notify_match_event_retracted(
+        _session(), event=_retracted_goal(), fixture=_fixture(status=status, hours_since_kickoff=3)
+    )
+    assert sent == 1
+
+
+@pytest.mark.parametrize("scoring_kind", ["assist", "own_goal", "penalty_missed", None])
+def test_only_goals_and_scored_penalties_have_a_retraction_notification(
+    original_filters: list[str], scoring_kind: str | None
+) -> None:
+    event = _retracted_goal(scoring_kind=scoring_kind, related_athlete_id=uuid4())
+    assert (
+        match_events.notify_match_event_retracted(_session(), event=event, fixture=_fixture()) == 0
+    )
+    assert _FakeService.calls == []
+
+
+def test_retracted_scored_penalty_is_notified_as_a_goal(original_filters: list[str]) -> None:
+    event = _retracted_goal(scoring_kind="penalty_scored")
+    assert (
+        match_events.notify_match_event_retracted(_session(), event=event, fixture=_fixture()) == 1
+    )
+    assert _FakeService.calls[0]["template_key"] == "risultati.gol_annullato"
+
+
+def test_retraction_without_original_notification_sends_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nessuno aveva ricevuto «Gol di…» (partita già finita all'arrivo del gol, interruttore
+    spento, giocatore preso dopo): nessun avviso di annullamento."""
+    monkeypatch.setattr(match_events, "_owners_with_original", lambda session, owners, prefix: {})
+    monkeypatch.setattr(match_events, "_round_homologated", lambda session, **kwargs: False)
+    event = _retracted_goal(related_athlete_id=uuid4())
+    assert (
+        match_events.notify_match_event_retracted(_session(), event=event, fixture=_fixture()) == 0
+    )
+    assert _FakeService.calls == []
+
+
+def test_retraction_is_not_sent_to_a_team_whose_round_is_already_homologated(
+    monkeypatch: pytest.MonkeyPatch, original_filters: list[str]
+) -> None:
+    monkeypatch.setattr(match_events, "_round_homologated", lambda session, **kwargs: True)
+    event = _retracted_goal()
+    assert (
+        match_events.notify_match_event_retracted(_session(), event=event, fixture=_fixture()) == 0
+    )
+    assert _FakeService.calls == []
+
+
+def test_retraction_failure_never_propagates(original_filters: list[str]) -> None:
+    session = _session()
+    session.get.side_effect = RuntimeError("boom")
+    event = _retracted_goal()
+    assert match_events.notify_match_event_retracted(session, event=event, fixture=_fixture()) == 0
 
 
 def test_availability_resolves_deep_link_with_formation_fallback(

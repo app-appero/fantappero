@@ -84,7 +84,7 @@ fallire per colpa del deep link.
 
 | Evento | Fallback senza scontro risolto |
 | --- | --- |
-| Gol, assist, ammonizione, espulsione, sostituzione | `/turni` |
+| Gol, assist, ammonizione, espulsione, sostituzione, gol annullato, assist annullato | `/turni` |
 | Infortunio, squalifica (solo se la disponibilità è legata a una fixture) | `/formazione` |
 
 `risultati.infortunio`/`risultati.squalifica` nascono da
@@ -92,6 +92,60 @@ fallire per colpa del deep link.
 `fixture_id` si tenta comunque la risoluzione allo scontro di quella
 giornata, altrimenti resta `/formazione` (il posto giusto da cui togliere
 il giocatore, comunque).
+
+## «Gol annullato» e «Assist annullato» (28/11)
+
+Se un gol o un assist già notificato («Gol di…», «Assist di…») viene poi tolto dal
+sistema, chi aveva ricevuto l'originale riceve un secondo avviso, perché non creda di
+avere ancora il bonus. Template `risultati.gol_annullato` e `risultati.assist_annullato`
+(v1), categoria `risultati`, stesso link delle altre notifiche di partita (scontro del
+destinatario, altrimenti `/turni`), nessun campo nuovo nel payload: l'app 1.4 le mostra
+come le altre.
+
+Esempio: titolo «Gol annullato», testo «Il gol di Michail Antonio (West Ham) è stato
+annullato (fuorigioco). Il bonus è stato tolto a Giulia United.»; per l'assist «L'assist di
+James Ward-Prowse (West Ham) sul gol di Michail Antonio è stato annullato (fuorigioco). Il
+bonus è stato tolto a Giulia United.». Il motivo fra parentesi c'è solo se il fornitore lo
+dice con un evento Var («Goal Disallowed - offside» → «fuorigioco», «handball» → «fallo di
+mano», «foul» → «fallo»); con «Goal cancelled», o se il gol sparisce senza Var, il testo
+non ha il motivo.
+
+**Quando parte.** `sports_data/fixtures/sync.py`, `retract_missing_scoring_events`: nel
+momento in cui la sincronizzazione ritira una riga di punteggio `goal` o `penalty_scored`
+(il fornitore non dà più il gol, oppure un Var «Goal Disallowed»/«Goal cancelled» lo toglie,
+`normalization/disallowed.py`), chiama `notifications.match_events.notify_match_event_retracted`.
+Le righe `assist` non hanno notifica propria: l'avviso «Assist annullato» nasce dal gol
+ritirato, per chi aveva ricevuto «Assist di…» di quel gol. Mai bloccante per la sync.
+
+**A chi.** Solo ai proprietari attuali del calciatore (stessa squadra e stesso utente) che
+hanno già la notifica originale, cercata con il suo codice anti-duplicato
+(`match_event:{evento}:{utente}:{squadra}` per il gol, `match_event_assist:{evento}:…` per
+l'assist, dove `{evento}` è il gol). Niente originale (partita già finita quando il gol è
+stato registrato, interruttore spento allora, calciatore comprato dopo) = niente avviso.
+
+**Preferenze e canali.** Stessi interruttori di «Gol» e «Assist» (`calciatori.gol`,
+`calciatori.assist`): nessuna voce nuova nelle impostazioni. Il passaggio è lo stesso
+`NotificationService.create_notification` delle altre notifiche di partita, quindi valgono
+anche push, interruttore push per evento, orari di silenzio e interruttori globali.
+
+**Un solo avviso per evento.** Codice anti-duplicato `match_event_retracted:{evento}:
+{utente}:{squadra}` per il gol e `match_event_retracted_assist:{evento}:…` per l'assist
+(distinti, così chi ha sia chi segna sia chi fa l'assist li riceve entrambi, come gli
+originali). Una sincronizzazione ripetuta non rimanda nulla; se un gol annullato torna
+valido e viene annullato di nuovo, **non** si rimanda (limite accettato), e non c'è un avviso
+«gol tornato valido».
+
+**Quando NON parte.**
+- partita non in corso né finita (`1H`…`PEN`), o iniziata da più di 24 ore
+  (`RETRACTION_NOTIFY_WINDOW` in `notifications/match_events.py`): una correzione tardiva del
+  fornitore (fino a 72 ore) o la riconciliazione di una partita vecchia non manda avvisi a
+  giorni di distanza (il gol resta comunque ritirato e il bonus tolto);
+- il turno della lega del destinatario che comprende la partita è già omologato (lì vale la
+  «correzione» del turno, `risultati.correzione`);
+- il fornitore ha solo ricodificato il gol (minuto o assist corretti: la riga cambia chiave,
+  la vecchia si ritira e ne compare una nuova dello stesso marcatore entro 5 minuti): non è
+  un gol annullato; se è cambiato solo l'assist, parte solo «Assist annullato»;
+- una risposta vuota del fornitore non ritira nulla (già così), quindi non avvisa.
 
 ## Preferenze granulari per evento (TASK5)
 
@@ -105,8 +159,8 @@ evento, canali in-app e push indipendenti — definito in
 
 | Categoria evento | Evento | `template_key` coperti |
 | --- | --- | --- |
-| `calciatori` | `calciatori.gol` | `risultati.gol` |
-| `calciatori` | `calciatori.assist` | `risultati.assist` |
+| `calciatori` | `calciatori.gol` | `risultati.gol`, `risultati.gol_annullato` |
+| `calciatori` | `calciatori.assist` | `risultati.assist`, `risultati.assist_annullato` |
 | `calciatori` | `calciatori.ammonizione` | `risultati.ammonizione` |
 | `calciatori` | `calciatori.espulsione` | `risultati.espulsione` |
 | `calciatori` | `calciatori.sostituzione` | `risultati.sostituzione` |
@@ -255,7 +309,7 @@ ticket immediato), è un miglioramento futuro, non un bug noto.
 
 ### Cosa manca ancora, in generale (fuori da questo giro)
 
-- Eventi live (`notifications/match_events.py`, categoria `risultati`): gol/rigore segnato e cartellino rosso durante la partita, infortunio/squalifica alla creazione della disponibilità. Solo a chi ha il giocatore in rosa; dedup per evento e utente; mai bloccante per la sync dati. Autogol e gialli ignorati.
+- Eventi live (`notifications/match_events.py`, categoria `risultati`): gol/rigore segnato e cartellino rosso durante la partita, infortunio/squalifica alla creazione della disponibilità. Solo a chi ha il giocatore in rosa; dedup per evento e utente; mai bloccante per la sync dati. Autogol e gialli ignorati. Gol o assist poi annullati: «Gol annullato» / «Assist annullato» (§ sopra).
 - Nessun web push (service worker/VAPID) per `apps/web` — solo mobile per ora.
 - Nessun realtime in-app (SSE/WebSocket): il centro notifiche web fa polling ogni 20s (`useNotificationCenter.ts`), il contatore si aggiorna al ritorno di focus, non istantaneamente.
 

@@ -33,7 +33,7 @@ vuole dare risalto esplicito (invio manuale).
 | 12 | Sorpasso in asta live | `market/live_service.py:1353-1365` (`mercato.asta_live_sorpassato`) | DISATTIVATA (routine) |
 | 13 | Stato di una proposta di scambio (proposta/accettata/rifiutata/controproposta) | `market/trade_service.py:596-610` (`mercato.scambio`) | DISATTIVATA (routine) |
 | 14 | Reminder scadenza formazione | `notifications/reminder_service.py:70-90` (`formazione.scadenza_turno`) | DISATTIVATA (routine) |
-| 15 | Gol/rigore segnato (giocatore in rosa) | `notifications/match_events.py:95-110` (`risultati.gol`, `risultati.assist`) | DISATTIVATA (routine) |
+| 15 | Gol/rigore segnato (giocatore in rosa); poi, se annullato, «Gol annullato» / «Assist annullato» (28/11) | `notifications/match_events.py:95-110` (`risultati.gol`, `risultati.assist`) e `notify_match_event_retracted` (`risultati.gol_annullato`, `risultati.assist_annullato`) | DISATTIVATA (routine) |
 | 16 | Espulsione / ammonizione | `notifications/match_events.py:111-135` (`risultati.espulsione`, `risultati.ammonizione`) | DISATTIVATA (routine) |
 | 17 | Sostituzione in campo | `notifications/match_events.py:149-156` (`risultati.sostituzione`) | DISATTIVATA (routine) |
 | 18 | Infortunio / squalifica (creazione disponibilità) | `notifications/match_events.py:171-178` (`risultati.infortunio`, `risultati.squalifica`) | DISATTIVATA (routine) |

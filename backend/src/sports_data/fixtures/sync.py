@@ -24,8 +24,13 @@ from sports_data.fixtures.models import (
     OfficialLineupEntry,
     PlayerMatchStat,
 )
-from sports_data.normalization.disallowed import without_disallowed_goals
+from sports_data.normalization.disallowed import (
+    VAR_WINDOW_MINUTES,
+    goal_disallowed_reason,
+    without_disallowed_goals,
+)
 from sports_data.normalization.events import normalize_scoring_events
+from sports_data.normalization.types import ScoringEventKind
 from sports_data.provider.client import ApiFootballClient
 from sports_data.provider.constants import MVP_LEAGUE_IDS, PROVIDER_NAME
 from sports_data.provider.mapping import (
@@ -431,6 +436,95 @@ def _retract(row: MatchEvent, *, now: datetime, counters: FixtureSyncCounters) -
     counters.incr_entity("events", "retracted")
 
 
+#: Gol e rigori segnati: gli eventi di punteggio che hanno una notifica «Gol di…» da annullare.
+_NOTIFIED_GOAL_KINDS = frozenset(
+    {ScoringEventKind.GOAL.value, ScoringEventKind.PENALTY_SCORED.value}
+)
+
+
+@dataclass(frozen=True)
+class FreshGoal:
+    """Un gol comparso (o tornato attivo) in questa sincronizzazione: chi, con quale assist,
+    a che minuto. Serve a riconoscere un gol solo ricodificato dal fornitore (minuto o assist
+    corretti, quindi chiave nuova) da un gol davvero annullato."""
+
+    scorer_provider_id: int | None
+    assist_provider_id: int | None
+    minute: int | None
+
+
+def _total_minute(elapsed: int | None, extra: int | None) -> int | None:
+    return None if elapsed is None else elapsed + (extra or 0)
+
+
+def _take_fresh_goal(row: MatchEvent, fresh_goals: list[FreshGoal]) -> FreshGoal | None:
+    """Toglie da ``fresh_goals`` e restituisce il gol nuovo che prende il posto di ``row``:
+    stesso marcatore, a non più di ``VAR_WINDOW_MINUTES`` di distanza (minuto sconosciuto
+    = vicino)."""
+    if row.athlete_provider_id is None:
+        return None
+    minute = _total_minute(row.minute_elapsed, row.minute_extra)
+    for index, fresh in enumerate(fresh_goals):
+        if fresh.scorer_provider_id != row.athlete_provider_id:
+            continue
+        if (
+            minute is not None
+            and fresh.minute is not None
+            and abs(fresh.minute - minute) > VAR_WINDOW_MINUTES
+        ):
+            continue
+        return fresh_goals.pop(index)
+    return None
+
+
+def _notify_retracted_goal(
+    session: Session,
+    row: MatchEvent,
+    *,
+    fixture: Fixture,
+    raw_events: Sequence[Any],
+    fresh_goals: list[FreshGoal],
+) -> None:
+    """«Gol annullato» / «Assist annullato» per un gol appena ritirato (mai bloccante)."""
+    try:
+        from notifications.match_events import notify_match_event_retracted
+
+        replacement = _take_fresh_goal(row, fresh_goals)
+        reason = goal_disallowed_reason(
+            raw_events,
+            player_provider_id=row.athlete_provider_id,
+            club_provider_id=row.club_provider_id,
+            minute=_total_minute(row.minute_elapsed, row.minute_extra),
+        )
+        notify_match_event_retracted(
+            session,
+            event=row,
+            fixture=fixture,
+            reason=reason,
+            goal_still_valid=replacement is not None,
+            assist_still_valid=(
+                replacement is not None
+                and replacement.assist_provider_id is not None
+                and replacement.assist_provider_id == row.related_athlete_provider_id
+            ),
+        )
+    except Exception:
+        logger.warning("retracted_goal_notification_failed", exc_info=True)
+
+
+def _active_scoring_keys(session: Session, fixture_id: UUID) -> set[str]:
+    return set(
+        session.scalars(
+            select(MatchEvent.provider_event_key).where(
+                MatchEvent.fixture_id == fixture_id,
+                MatchEvent.is_active.is_(True),
+                MatchEvent.scoring_kind.is_not(None),
+                MatchEvent.provider_event_key.startswith("events|"),
+            )
+        ).all()
+    )
+
+
 def retract_missing_scoring_events(
     session: Session,
     *,
@@ -438,6 +532,9 @@ def retract_missing_scoring_events(
     seen_keys: set[str],
     counters: FixtureSyncCounters,
     include_penalty_outcomes: bool,
+    fixture: Fixture | None = None,
+    raw_events: Sequence[Any] = (),
+    fresh_goals: Sequence[FreshGoal] = (),
 ) -> None:
     """Ritira gli eventi di punteggio ricavati dagli eventi che l'ultima normalizzazione
     non ha più prodotto (QA 28/11: gol annullato, l'assist restava a punteggio).
@@ -447,6 +544,11 @@ def retract_missing_scoring_events(
     sbagliato (``|outcome=saved`` / ``off_target``) dipende anche da quel feed, quindi si
     ritira solo quando è arrivato (``include_penalty_outcomes``). Idempotente; un evento
     che ricompare torna attivo con ``upsert_match_event``.
+
+    Con ``fixture`` ogni gol o rigore segnato ritirato manda «Gol annullato» (e «Assist
+    annullato») a chi aveva ricevuto l'originale (``notifications.match_events``).
+    ``raw_events`` (gli eventi del fornitore) dà il motivo del VAR, ``fresh_goals`` i gol
+    comparsi in questo stesso giro: un gol solo ricodificato dal fornitore non è annullato.
     """
     rows = (
         session.execute(
@@ -461,12 +563,17 @@ def retract_missing_scoring_events(
         .all()
     )
     now = datetime.now(UTC)
+    fresh = list(fresh_goals)
     for row in rows:
         if row.provider_event_key in seen_keys:
             continue
         if "|outcome=" in row.provider_event_key and not include_penalty_outcomes:
             continue
         _retract(row, now=now, counters=counters)
+        if fixture is not None and row.scoring_kind in _NOTIFIED_GOAL_KINDS:
+            _notify_retracted_goal(
+                session, row, fixture=fixture, raw_events=raw_events, fresh_goals=fresh
+            )
 
 
 def upsert_official_lineup(
@@ -703,8 +810,21 @@ def sync_fixture_details(
             players_payload=players_payload,
         )
         scoring_seen: set[str] = set()
+        active_before = _active_scoring_keys(session, fixture.id)
+        fresh_goals: list[FreshGoal] = []
         for event in normalized.events:
             scoring_seen.add(event.provider_event_key)
+            if (
+                event.kind.value in _NOTIFIED_GOAL_KINDS
+                and event.provider_event_key not in active_before
+            ):
+                fresh_goals.append(
+                    FreshGoal(
+                        scorer_provider_id=event.player_id,
+                        assist_provider_id=event.related_player_id,
+                        minute=_total_minute(event.minute_elapsed, event.minute_extra),
+                    )
+                )
             upsert_normalized_scoring_event(
                 session,
                 fixture=fixture,
@@ -731,6 +851,9 @@ def sync_fixture_details(
                 seen_keys=scoring_seen,
                 counters=c,
                 include_penalty_outcomes=players_payload is not None,
+                fixture=fixture,
+                raw_events=events_envelope.response,
+                fresh_goals=fresh_goals,
             )
     return result
 

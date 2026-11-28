@@ -27,6 +27,8 @@ Fuori scope: scheduler polling oltre le sync on-demand (EP04-06 — [`sports_sch
 
 Eventi timeline assenti nel payload successivo vengono marcati `is_active=false` + `retracted_at` (correzione). Un re-sync che li riporta li riattiva (`events_corrected`).
 
+Un gol (o rigore segnato) di punteggio che viene ritirato manda «Gol annullato» / «Assist annullato» a chi aveva ricevuto la notifica originale (dettagli, finestra di 24 ore e limiti in `docs/api/notifications.md`, § «Gol annullato» e «Assist annullato»).
+
 Stagioni storiche assenti nel catalogo corrente possono essere **create al bisogno** (`is_current=false`) quando il calendario referencia un `season` non ancora in `sport_seasons`.
 
 ## Flusso
