@@ -224,6 +224,30 @@ class AdminRoundCalculationResultResponse(ApiModel):
     errors: list[dict[str, str]] = Field(default_factory=list)
 
 
+class AdminTurniBatchOperationResponse(ApiModel):
+    """Una operazione di «Esegui tutti» nei Turni e il suo esito."""
+
+    key: str
+    label: str
+    #: ``pending`` (da fare), ``running``, ``ok``, ``failed`` o ``skipped`` (job già in corso).
+    status: str
+    message: str | None = None
+
+
+class AdminTurniBatchResponse(ApiModel):
+    """Avanzamento di «Esegui tutti» nei Turni (le operazioni girano una dopo l'altra)."""
+
+    batch_id: str = Field(alias="batchId")
+    #: ``queued``, ``running``, ``completed`` o ``failed`` (il blocco si è interrotto).
+    status: str
+    operations: list[AdminTurniBatchOperationResponse]
+    ok: int
+    failed: int
+    skipped: int
+    started_at: str | None = Field(default=None, alias="startedAt")
+    finished_at: str | None = Field(default=None, alias="finishedAt")
+
+
 class AdminHistoricalRepairRequest(ApiModel):
     # Come per la correzione di un turno: niente NUL né surrogati nel motivo (QA 19/11).
     reason: NoNulStr = Field(min_length=1)

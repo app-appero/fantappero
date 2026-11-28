@@ -23,6 +23,11 @@ class SystemJobSpec:
     max_interval_seconds: int
     default_enabled: bool = True
     kwargs: dict[str, object] = field(default_factory=dict)
+    #: Il giro chiama il fornitore sportivo (API-Football, FotMob): consuma la sua quota. Il
+    #: pannello lo dice nella finestra «Sei sicuro?» di «Esegui» e «Esegui tutti».
+    uses_provider_quota: bool = False
+    #: Il giro può mandare avvisi (app, push) ai fantallenatori.
+    sends_notifications: bool = False
 
 
 SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
@@ -40,6 +45,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         min_interval_seconds=15,
         max_interval_seconds=3600,
         default_enabled=False,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="sports-poll-pre",
@@ -55,6 +61,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         min_interval_seconds=60,
         max_interval_seconds=7200,
         default_enabled=False,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="sports-poll-post",
@@ -71,6 +78,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         min_interval_seconds=60,
         max_interval_seconds=7200,
         default_enabled=False,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="sports-poll-late",
@@ -86,6 +94,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         min_interval_seconds=300,
         max_interval_seconds=86400,
         default_enabled=False,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="fantasy-turns-ensure-upcoming",
@@ -100,6 +109,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=3600,
         min_interval_seconds=300,
         max_interval_seconds=86400,
+        sends_notifications=True,
     ),
     SystemJobSpec(
         key="fantasy-turns-refresh-full-calendar",
@@ -114,6 +124,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=21_600,
         min_interval_seconds=3600,
         max_interval_seconds=604_800,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="fantasy-lineups-generate-ai",
@@ -142,6 +153,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=900,
         min_interval_seconds=60,
         max_interval_seconds=86400,
+        sends_notifications=True,
     ),
     SystemJobSpec(
         key="notifications-lineup-lock-reminders",
@@ -156,6 +168,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=300,
         min_interval_seconds=60,
         max_interval_seconds=86400,
+        sends_notifications=True,
     ),
     SystemJobSpec(
         key="market-trade-expiry",
@@ -170,6 +183,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=300,
         min_interval_seconds=60,
         max_interval_seconds=86400,
+        sends_notifications=True,
     ),
     SystemJobSpec(
         key="notifications-broadcast-dispatch",
@@ -181,6 +195,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=60,
         min_interval_seconds=30,
         max_interval_seconds=3600,
+        sends_notifications=True,
     ),
     SystemJobSpec(
         key="sports-data-sync-catalog",
@@ -195,6 +210,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=86_400,
         min_interval_seconds=3600,
         max_interval_seconds=604_800,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="sports-data-sync-fixtures",
@@ -210,6 +226,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         min_interval_seconds=3600,
         max_interval_seconds=604_800,
         kwargs={"include_details": False},
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="sports-predicted-lineups",
@@ -226,6 +243,7 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         default_interval_seconds=3600,
         min_interval_seconds=3600,
         max_interval_seconds=604_800,
+        uses_provider_quota=True,
     ),
     SystemJobSpec(
         key="market-values-refresh",

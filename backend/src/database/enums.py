@@ -158,6 +158,8 @@ class LeagueAuditAction(str, enum.Enum):
     PLATFORM_OPERATOR_REVOKED = "platform_operator_revoked"
     ROSTER_TRANSFER_REVIEWED = "roster_transfer_reviewed"
     USER_IMPERSONATION_STARTED = "user_impersonation_started"
+    #: Job lanciato a mano dal pannello operatore («Esegui», «Esegui tutti», Turni, 1.5).
+    SYSTEM_JOB_RUN_MANUAL = "system_job_run_manual"
 
 
 class FantasyTurnStatus(str, enum.Enum):

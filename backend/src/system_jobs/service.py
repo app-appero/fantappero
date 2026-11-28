@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -13,9 +13,24 @@ from config.settings.loader import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
 from observability.logging import get_logger
 from system_jobs.catalog import SYSTEM_JOBS, SYSTEM_JOBS_BY_KEY, SystemJobSpec
-from system_jobs.models import SystemJob
+from system_jobs.models import SystemJob, SystemJobRun
+from system_jobs.running import current_task_id, is_manual_run
+from system_jobs.running import read_many as read_running_many
+from system_jobs.runs import latest_runs
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class SystemJobLastRun:
+    """Esito dell'ultimo giro finito di un job (``system_job_runs``)."""
+
+    outcome: str
+    finished_at: datetime
+    reason: str | None
+
+    def as_dict(self) -> dict[str, object]:
+        return {"outcome": self.outcome, "finishedAt": self.finished_at, "reason": self.reason}
 
 
 @dataclass(frozen=True)
@@ -30,6 +45,11 @@ class SystemJobView:
     max_interval_seconds: int
     last_started_at: datetime | None
     next_run_at: datetime | None
+    uses_provider_quota: bool = False
+    sends_notifications: bool = False
+    #: Il job sta girando adesso (segno su Redis, ``system_jobs.running``).
+    running: bool = False
+    last_run: SystemJobLastRun | None = field(default=None)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -43,6 +63,10 @@ class SystemJobView:
             "maxIntervalSeconds": self.max_interval_seconds,
             "lastStartedAt": self.last_started_at,
             "nextRunAt": self.next_run_at,
+            "usesProviderQuota": self.uses_provider_quota,
+            "sendsNotifications": self.sends_notifications,
+            "running": self.running,
+            "lastRun": None if self.last_run is None else self.last_run.as_dict(),
         }
 
 
@@ -68,7 +92,14 @@ def ensure_defaults(session: Session, settings: object | None = None) -> None:
 def list_jobs(session: Session) -> list[SystemJobView]:
     ensure_defaults(session)
     rows = {row.key: row for row in session.scalars(select(SystemJob)).all()}
-    return [_to_view(spec, rows[spec.key]) for spec in SYSTEM_JOBS if spec.key in rows]
+    running, last_runs = _live_state(session, [spec.key for spec in SYSTEM_JOBS])
+    return [
+        _to_view(
+            spec, rows[spec.key], running=spec.key in running, last_run=last_runs.get(spec.key)
+        )
+        for spec in SYSTEM_JOBS
+        if spec.key in rows
+    ]
 
 
 def update_job(
@@ -98,7 +129,8 @@ def update_job(
     if enabled is not None:
         row.enabled = enabled
     session.flush()
-    return _to_view(spec, row)
+    running, last_runs = _live_state(session, [spec.key])
+    return _to_view(spec, row, running=spec.key in running, last_run=last_runs.get(spec.key))
 
 
 def beat_schedule_dict(session: Session) -> dict[str, dict[str, object]]:
@@ -157,6 +189,11 @@ def allow_periodic(key: str, env_default: bool) -> bool:
 
 
 def _allow_periodic(key: str, env_default: bool) -> bool:
+    if is_manual_run(key, current_task_id()):
+        # Lanciato a mano dal pannello («Esegui»): vale anche a job spento, una volta sola. Non
+        # tocca `last_started_at`: la «prossima partenza» del beat resta quella di prima.
+        logger.info(f"system_job_manual_run_allowed job_key={key}", extra={"job_key": key})
+        return True
     enabled = env_default
     try:
         settings = get_api_settings()
@@ -187,7 +224,26 @@ def _touch_started(session: Session, key: str) -> None:
     session.flush()
 
 
-def _to_view(spec: SystemJobSpec, row: SystemJob) -> SystemJobView:
+def _live_state(session: Session, keys: list[str]) -> tuple[set[str], dict[str, SystemJobLastRun]]:
+    """Job che girano adesso (Redis) e ultimo esito di ciascuno (database)."""
+    running = set(read_running_many(keys))
+    last_runs = {
+        key: _last_run_view(run) for key, run in latest_runs(session, job_keys=keys).items()
+    }
+    return running, last_runs
+
+
+def _last_run_view(run: SystemJobRun) -> SystemJobLastRun:
+    return SystemJobLastRun(outcome=run.outcome, finished_at=run.finished_at, reason=run.reason)
+
+
+def _to_view(
+    spec: SystemJobSpec,
+    row: SystemJob,
+    *,
+    running: bool = False,
+    last_run: SystemJobLastRun | None = None,
+) -> SystemJobView:
     next_run = None
     if row.enabled and row.last_started_at is not None:
         next_run = row.last_started_at + timedelta(seconds=row.interval_seconds)
@@ -202,6 +258,10 @@ def _to_view(spec: SystemJobSpec, row: SystemJob) -> SystemJobView:
         max_interval_seconds=spec.max_interval_seconds,
         last_started_at=row.last_started_at,
         next_run_at=next_run,
+        uses_provider_quota=spec.uses_provider_quota,
+        sends_notifications=spec.sends_notifications,
+        running=running,
+        last_run=last_run,
     )
 
 

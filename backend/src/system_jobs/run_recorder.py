@@ -18,6 +18,7 @@ from typing import Any
 from celery.signals import task_failure, task_postrun, task_prerun
 
 from observability.logging import get_logger
+from system_jobs.running import current_task_id, mark_started_by_worker, release
 from system_jobs.runs import (
     OUTCOME_FAILED,
     RunOutcome,
@@ -45,21 +46,9 @@ def _task_name(task: Any, sender: Any = None) -> str | None:
     return None
 
 
-def _current_task_id() -> str | None:
-    try:
-        from celery import current_task
-
-        if not current_task:
-            return None
-        task_id = getattr(current_task.request, "id", None)
-    except Exception:  # noqa: BLE001 — fuori da un task non c'è niente da segnare
-        return None
-    return str(task_id) if task_id else None
-
-
 def mark_current_run_skipped() -> None:
     """Il giro in corso non conta: il job è spento (chiamato da ``allow_periodic``)."""
-    task_id = _current_task_id()
+    task_id = current_task_id()
     if task_id is not None and task_id in _running:
         _skipped.add(task_id)
 
@@ -81,6 +70,8 @@ def _on_task_prerun(
             _skipped.discard(stale)
             _failures.pop(stale, None)
     _running[task_id] = (job_key, datetime.now(UTC), time.perf_counter())
+    # Redis dice al pannello (e al lancio a mano) che il job sta girando.
+    mark_started_by_worker(job_key, task_id)
 
 
 @task_failure.connect
@@ -105,6 +96,10 @@ def _on_task_postrun(
 ) -> None:
     if not task_id:
         return
+    job_key = job_key_for_task(_task_name(task, sender))
+    if job_key is not None:
+        # Anche un giro saltato (job spento) o non finito toglie il suo segno «in esecuzione».
+        release(job_key, task_id)
     started = _running.pop(task_id, None)
     skipped = task_id in _skipped
     _skipped.discard(task_id)

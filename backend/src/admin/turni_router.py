@@ -32,13 +32,31 @@ from admin.schemas import (
     AdminSeasonImportJobResponse,
     AdminSeasonImportProgressResponse,
     AdminSeasonImportResultResponse,
+    AdminTurniBatchOperationResponse,
+    AdminTurniBatchResponse,
     AdminTurniSyncResultResponse,
+)
+from admin.turni_batch import (
+    AUDIT_OPERATION_BATCH,
+    BATCH_OPERATIONS,
+    BatchProgress,
+    BatchUnavailableError,
+    acquire_lock,
+    new_batch_id,
+    new_progress,
+    release_lock,
+)
+from admin.turni_batch import (
+    load_progress as load_batch_progress,
+)
+from admin.turni_batch import (
+    save_progress as save_batch_progress,
 )
 from admin.turni_service import list_league_turn_status
 from auth.dependencies import get_db_session
 from auth.models.user import User
 from authorization.dependencies import require_permissions
-from database.enums import Permission
+from database.enums import LeagueAuditAction, Permission
 from fantasy_turns.calendar_refresh_progress import (
     CalendarRefreshProgress,
     load_progress,
@@ -47,8 +65,11 @@ from fantasy_turns.calendar_refresh_progress import (
 )
 from fantasy_turns.schemas import PredictedLineupSyncResponse
 from fantasy_turns.service import FantasyTurnService
+from leagues.models.league_audit_event import LeagueAuditEvent
+from observability.logging import get_logger
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+logger = get_logger(__name__)
 
 _PLATFORM_SCOPE = "platform"
 
@@ -438,3 +459,119 @@ def get_historical_repair_progress(
         errorCode=progress.error_code,
         result=result,
     )
+
+
+def _batch_response(progress: BatchProgress) -> AdminTurniBatchResponse:
+    return AdminTurniBatchResponse(
+        batchId=progress.batch_id,
+        status=progress.status,
+        operations=[
+            AdminTurniBatchOperationResponse(
+                key=operation.key,
+                label=operation.label,
+                status=operation.status,
+                message=operation.message,
+            )
+            for operation in progress.operations
+        ],
+        ok=progress.count("ok"),
+        failed=progress.count("failed"),
+        skipped=progress.count("skipped"),
+        startedAt=progress.started_at,
+        finishedAt=progress.finished_at,
+    )
+
+
+@router.post("/turni/esegui-tutti", response_model=AdminTurniBatchResponse)
+def start_turni_batch(
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> AdminTurniBatchResponse | JSONResponse:
+    """«Esegui tutti»: lancia in sequenza le operazioni dei turni che si possono rilanciare.
+
+    Importa calendario stagione, Genera calendario, Sincronizza turni, Aggiorna probabili e Genera
+    formazioni IA, una dopo l'altra in un task del worker; un errore non ferma le altre. Restano
+    fuori omologazioni, «Ricalcola storico» e le azioni per singola lega. Un solo blocco alla
+    volta (409 se ce n'è già uno in corso); l'avanzamento si legge dal GET con lo stesso id.
+    """
+    batch_id = new_batch_id()
+    try:
+        acquired = acquire_lock(batch_id)
+    except BatchUnavailableError:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "message": (
+                    "Non riesco a controllare se le operazioni sono già in corso "
+                    "(Redis non risponde). Riprova tra poco."
+                ),
+                "code": "turni_batch_lock_unavailable",
+            },
+        )
+    if not acquired:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "message": (
+                    "Le operazioni dei turni sono già in corso: aspetta che finiscano "
+                    "prima di rilanciarle."
+                ),
+                "code": "turni_batch_already_running",
+            },
+        )
+    progress = new_progress(batch_id, str(operator.id))
+    save_batch_progress(progress)
+    session.add(
+        LeagueAuditEvent(
+            league_id=None,
+            actor_id=operator.id,
+            action=LeagueAuditAction.SYSTEM_JOB_RUN_MANUAL,
+            details={
+                "operation": AUDIT_OPERATION_BATCH,
+                "batchId": batch_id,
+                "operations": [spec.key for spec in BATCH_OPERATIONS],
+            },
+        )
+    )
+    session.commit()
+    logger.info(
+        f"turni_batch_started batch_id={batch_id} actor_id={operator.id}",
+        extra={"batch_id": batch_id, "actor_id": str(operator.id)},
+    )
+    from admin.turni_batch_tasks import run_turni_batch_task
+
+    try:
+        run_turni_batch_task.apply_async(
+            kwargs={"batch_id": batch_id, "actor_id": str(operator.id)},
+            task_id=batch_id,
+        )
+    except Exception:  # noqa: BLE001 — il broker o il worker non rispondono
+        logger.exception(f"turni_batch_dispatch_failed batch_id={batch_id}")
+        release_lock(batch_id)
+        return JSONResponse(
+            status_code=502,
+            content={
+                "message": (
+                    "Non riesco a mettere in coda le operazioni dei turni. Riprova tra poco."
+                ),
+                "code": "turni_batch_dispatch_failed",
+            },
+        )
+    return _batch_response(load_batch_progress(batch_id) or progress)
+
+
+@router.get("/turni/esegui-tutti/{batch_id}", response_model=AdminTurniBatchResponse)
+def get_turni_batch_progress(
+    batch_id: str,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+) -> AdminTurniBatchResponse | JSONResponse:
+    progress = load_batch_progress(batch_id)
+    if progress is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "message": "Blocco di operazioni non trovato (o scaduto).",
+                "code": "turni_batch_not_found",
+            },
+        )
+    return _batch_response(progress)

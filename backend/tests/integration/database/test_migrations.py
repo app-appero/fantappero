@@ -12,6 +12,7 @@ from tests.integration.database.helpers import (
     create_engine_for_url,
     downgrade_one,
     reset_to_base,
+    run_alembic,
     table_exists,
     upgrade_head,
 )
@@ -109,10 +110,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a c3e8a5f17b24 (sostituto dopo uno scambio sbilanciato, 1.5);
-            # prima bed6529e6ba1 (sito da Android in user_app_usage, 1.4). Aggiornare questa
-            # costante ad ogni nuova migrazione in coda.
-            assert version == "a4d7c2e9f610"
+            # Head aggiornata a d2b6f4a8c013 (audit dei job lanciati a mano, 1.5); prima
+            # a4d7c2e9f610 (formazioni probabili ogni ora) e c3e8a5f17b24 (sostituto dopo uno
+            # scambio sbilanciato). Aggiornare questa costante ad ogni nuova migrazione in coda.
+            assert version == "d2b6f4a8c013"
             assert table_exists(engine, "trade_replacements")
             assert table_exists(engine, "system_job_runs")
             assert table_exists(engine, "listone_updates")
@@ -208,13 +209,22 @@ def test_last_migration_applies_cleanly_to_a_populated_database(clean_db: str) -
     assert check.returncode == 0, check.stderr
 
 
+def downgrade_to(url: str, revision: str) -> None:
+    result = run_alembic("downgrade", revision, env={"DATABASE_URL": url})
+    if result.returncode != 0:
+        pytest.fail(f"alembic downgrade {revision} failed:\n{result.stdout}\n{result.stderr}")
+
+
 @pytest.mark.parametrize(("saved", "expected"), [(86_400, 3600), (21_600, 21_600)])
 def test_predicted_lineups_job_moves_from_daily_to_hourly(
     clean_db: str, saved: int, expected: int
 ) -> None:
     """Il vecchio default giornaliero passa a ogni ora; una frequenza scelta a mano resta."""
+    # Revisione prima di quella delle formazioni probabili ogni ora (non «la penultima»: le
+    # migrazioni in coda a questa, come l'audit dei job lanciati a mano, non c'entrano).
+    before_hourly = "c3e8a5f17b24"
     upgrade_head(clean_db)
-    downgrade_one(clean_db)
+    downgrade_to(clean_db, before_hourly)
     engine = create_engine_for_url(clean_db)
     select_interval = text(
         "SELECT interval_seconds FROM system_jobs WHERE key = 'sports-predicted-lineups'"
@@ -237,7 +247,7 @@ def test_predicted_lineups_job_moves_from_daily_to_hourly(
             assert conn.execute(select_interval).scalar_one() == expected
     finally:
         engine.dispose()
-    downgrade_one(clean_db)
+    downgrade_to(clean_db, before_hourly)
     engine = create_engine_for_url(clean_db)
     try:
         with engine.connect() as conn:
