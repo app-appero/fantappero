@@ -59,6 +59,8 @@ Il 28/11 entra anche 7.11 (gol o assist annullato dal VAR che lasciava il bonus,
 
 Il 28/11 entra anche 11.4 (area job/Operatore: giro delle formazioni probabili che non partiva alle 07:00 UTC, correzione del server): DA FARE su API e W1280 appena pubblicata su dev.
 
+Il 28/11 entra anche 8.10 (notifica «Gol annullato» / «Assist annullato», novità del server approvata da Rosario): DA FARE su API appena pubblicata su dev; chiede una partita in corso con un gol notificato.
+
 Il 28/11 entrano 13.13-13.16 (quattro piccole correzioni della verifica QA del 28/11: plurale delle rose e delle squadre nell'amministrazione della lega, «1 gare» nel podio della classifica, messaggio di «Rimuovi» che spariva, eventi VAR in italiano): DA FARE appena pubblicate su dev, ciascuna sulle piattaforme indicate.
 
 **Problemi nuovi della notte 23→24/11:**
@@ -223,6 +225,7 @@ Le correzioni del 23/11 sono pubblicate su dev e riprovate OK nella notte 23→2
 | 8.7 | Notifica di una lega eliminata: apre Scambi senza lega | – | OK | – | OK | OK | 23/11 | KI-12: corretto il 21/11 (pilota-1.2). «Lega eliminata» ha link `/` e apre la Home di una lega esistente senza errori: sito il 22/11, EMU il 22/11 (M4), MobB il 23/11 (corsa 03:03) |
 | 8.8 | Push ed email reali | – | – | – | – | NV | – | l'emulatore non ha Play Store, quindi niente push (confermato il 21/11: `pushCount 0`): da vedere su un telefono vero |
 | 8.9 | **Nuova (21/11, KI-12).** Tocco su una notifica di un'altra lega: l'app passa a quella lega | – | OK | – | OK | OK | 22/11 | EMU 21/11 (M4: con `QA-PREP-PARI` attiva, «Blocco formazione in arrivo «QA-PREP-DISPARI»» apre Formazione e cambia lega); MobB 22/11 (7 tipi); W1280 22/11 (lega giusta nel selettore). Con la push: NV (8.8) |
+| 8.10 | **Nuova (28/11).** La notifica di gol/assist annullato arriva una volta a chi aveva l'originale (API e notifiche, dev) [PREP][VIVO] | DA FARE | – | – | – | – | – | con una partita in corso e un gol notificato («Gol di…», e «Assist di…» a chi ha l'assistente) che poi il fornitore toglie o annulla con un Var: chi aveva ricevuto l'originale riceve **una sola** «Gol annullato» (e «Assist annullato» se aveva l'assist), nell'elenco `GET /notifications` con categoria `risultati`, testo «Il gol di NOME (CLUB) è stato annullato (fuorigioco). Il bonus è stato tolto a NOME-SQUADRA.» (motivo solo se il Var lo dice) e link alla schermata della partita/scontro come «Gol di…»; chi non aveva ricevuto l'originale (interruttore «Gol» spento allora, calciatore preso dopo il gol, partita già finita) non riceve nulla; con «Gol» spento dopo l'originale non arriva «Gol annullato», con «Assist» spento non arriva «Assist annullato» (stessi interruttori, nessuna voce nuova nelle impostazioni); una sincronizzazione ripetuta non rimanda nulla; push e orari di silenzio come le altre notifiche di partita (la push vera è NV, 8.8). Niente avviso se la partita è finita da più di 24 ore o il turno è omologato. Il 28/11 provato solo con test automatici; da provare su dev dopo la pubblicazione, con un utente di prova e una partita vera (non inventare gol sul fornitore reale) |
 
 ## Area 9 – Web
 
