@@ -39,14 +39,12 @@ import {
   fetchPendingFixtures,
 } from "../api/leagues";
 import { OptionPicker } from "../components/OptionPicker";
-import { LockCountdown } from "../components/LockCountdown";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
-import { useLockCountdown } from "../matchday/useLockCountdown";
 import { europeanTurnOptionLabel, turnSkipReason } from "../matchday/turnLabels";
 import type { RootStackParamList } from "../navigation/types";
 import { MatchdayH2HPanel } from "./matchday/MatchdayH2HPanel";
@@ -145,7 +143,6 @@ export function MatchdayScreen() {
   const [competitionTab, setCompetitionTab] = useState("");
   const [excluding, setExcluding] = useState(false);
   const [pendingFixtures, setPendingFixtures] = useState<PendingFixtureSummary[]>([]);
-  const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
 
   const loadH2H = useCallback(async () => {
     if (!canView || !accessToken || !activeLeagueId) {
@@ -406,14 +403,8 @@ export function MatchdayScreen() {
               </Text>
             ) : null}
             <Text style={styles.body}>Cutoff: {formatDateTime(selected.cutoffAt)}</Text>
-            {countdown && countdown.roundId === selected.id ? (
-              <LockCountdown
-                state={countdown.state}
-                nextLockAt={countdown.nextLockAt}
-                roundStatus={countdown.roundStatus}
-                onExpire={refetchCountdown}
-              />
-            ) : null}
+            {/* «Prossimo blocco»: una sola riga, la fascia sotto l'intestazione (LockCountdownBar); qui non
+                si ripete (Rosario, 28/11). */}
             {selected.fixtures.some((fixture) => fixture.lockLatchedAt) ? (
               <Text style={styles.body} testID="matchday-cutoff-latch">
                 Un rinvio non sblocca le partite il cui kickoff originale è già trascorso. Le mosse

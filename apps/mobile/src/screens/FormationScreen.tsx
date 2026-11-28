@@ -80,7 +80,6 @@ import {
   clearLineupConfirmMessage,
   clearLineupSuccessMessage,
 } from "./formation/clearLineup";
-import { LockCountdown } from "../components/LockCountdown";
 import { FaqHelpButton } from "../components/FaqHelpButton";
 import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
@@ -89,7 +88,6 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
 import { formationTurnOptionLabel } from "../matchday/turnLabels";
-import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
 import { italianAbsenceText } from "@fantappero/contracts";
@@ -143,7 +141,6 @@ export function FormationScreen() {
   const isAdmin = can(["league:admin"]);
   const isOperator = can(["global:operate"]);
   const canChangeTurn = isAdmin || isOperator;
-  const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
   const [lockNow, setLockNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setLockNow(new Date()), 1000);
@@ -1475,15 +1472,8 @@ export function FormationScreen() {
             ) : null}
           </View>
         </View>
-        {countdown && countdown.roundId === context.roundId ? (
-          <LockCountdown
-            state={countdown.state}
-            nextLockAt={countdown.nextLockAt}
-            roundStatus={countdown.roundStatus}
-            onExpire={refetchCountdown}
-            testID="formation-lock-countdown"
-          />
-        ) : null}
+        {/* «Prossimo blocco»: una sola riga, la fascia sotto l'intestazione (LockCountdownBar); qui non
+            si ripete (Rosario, 28/11). Scorrendo, la fascia si unisce alle mosse (setMovesDock). */}
         {!context.modificationAllowed ? (
           <Text style={styles.meta} testID="formation-lock-hint">
             Nessun calciatore è più modificabile.
