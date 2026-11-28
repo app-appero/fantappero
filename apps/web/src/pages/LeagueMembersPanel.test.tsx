@@ -1,5 +1,5 @@
 import type { LeagueMember } from "@fantappero/contracts";
-import { act, createElement } from "react";
+import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,12 +9,18 @@ import { LeagueMembersPanel } from "./LeagueMembersPanel";
 const fetchLeagueMembersMock = vi.fn();
 const fetchManagerDirectoryMock = vi.fn();
 const removeLeagueMemberMock = vi.fn();
+const revokeLeagueAdminMock = vi.fn();
+const ensureFantasyTeamsMock = vi.fn();
+const assignRandomAiRosterMock = vi.fn();
 
 // Per la finestra «Sostituisci» e per «Rimuovi» (fuori demo): niente chiamate vere all'API.
 vi.mock("../api/leagues", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/leagues")>()),
   fetchLeagueMembers: (...args: unknown[]) => fetchLeagueMembersMock(...args),
   removeLeagueMember: (...args: unknown[]) => removeLeagueMemberMock(...args),
+  revokeLeagueAdmin: (...args: unknown[]) => revokeLeagueAdminMock(...args),
+  ensureFantasyTeams: (...args: unknown[]) => ensureFantasyTeamsMock(...args),
+  assignRandomAiRoster: (...args: unknown[]) => assignRandomAiRosterMock(...args),
 }));
 vi.mock("../api/managerInvites", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/managerInvites")>()),
@@ -331,5 +337,180 @@ describe("LeagueMembersPanel — «Rimuovi»: «allineato agli iscritti» solo s
     expect(byTestId("league-members-success")?.textContent).toContain(
       "Fantallenatore 1 è stato rimosso dalla lega.",
     );
+  });
+});
+
+describe("LeagueMembersPanel — il messaggio di esito resta dopo il ricaricamento del genitore (QA 28/11, N3)", () => {
+  const ADMIN: LeagueMember = {
+    userId: "demo-admin",
+    displayName: "Marco",
+    email: "marco@example.com",
+    userType: "human",
+    role: "league_admin",
+    joinedAt: "2026-08-01T10:00:00Z",
+  };
+  const CO_ADMIN: LeagueMember = {
+    userId: "admin-2",
+    displayName: "Elena",
+    email: "elena@example.com",
+    userType: "human",
+    role: "league_admin",
+    joinedAt: "2026-08-01T11:00:00Z",
+  };
+  const MEMBER_1: LeagueMember = {
+    userId: "member-1",
+    displayName: "Giulia",
+    email: "giulia@example.com",
+    userType: "human",
+    role: "member",
+    joinedAt: "2026-08-02T10:00:00Z",
+  };
+  const MEMBER_2: LeagueMember = {
+    userId: "member-2",
+    displayName: "Paolo",
+    email: "paolo@example.com",
+    userType: "human",
+    role: "member",
+    joinedAt: "2026-08-03T10:00:00Z",
+  };
+  const AI_MEMBER: LeagueMember = {
+    userId: "ai-1",
+    displayName: "Allenatore IA 01",
+    email: "ia-01@example.com",
+    userType: "ai",
+    role: "member",
+    joinedAt: "2026-08-04T10:00:00Z",
+  };
+  let container: HTMLDivElement;
+  let root: Root;
+  let current: LeagueMember[];
+
+  const byTestId = (id: string) => container.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+
+  async function flush() {
+    for (let i = 0; i < 4; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+  }
+
+  async function click(id: string) {
+    const element = byTestId(id);
+    expect(element, id).not.toBeNull();
+    await act(async () => {
+      element!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    await flush();
+  }
+
+  /** Come LeagueAdminPage: ogni cambio riuscito (o richiesto da fuori) cambia `reloadToken`. */
+  function ReloadingHost() {
+    const [reloadToken, setReloadToken] = useState(0);
+    return createElement(
+      "div",
+      null,
+      createElement(
+        "button",
+        {
+          type: "button",
+          "data-testid": "host-external-reload",
+          onClick: () => setReloadToken((value) => value + 1),
+        },
+        "Ricarica da fuori",
+      ),
+      createElement(LeagueMembersPanel, {
+        leagueId: "league-1",
+        isDemoMode: false,
+        search: "",
+        participantCount: 8,
+        participantMin: 4,
+        reloadToken,
+        onMembersChanged: () => setReloadToken((value) => value + 1),
+      }),
+    );
+  }
+
+  beforeEach(async () => {
+    current = [ADMIN, CO_ADMIN, MEMBER_1, MEMBER_2, AI_MEMBER];
+    ensureFantasyTeamsMock.mockReset().mockResolvedValue({ teams: [{ id: "team-ai", userId: "ai-1" }] });
+    assignRandomAiRosterMock.mockReset().mockResolvedValue({ filledSlots: 35, rosterSize: 35 });
+    fetchLeagueMembersMock.mockReset().mockImplementation(async () => [...current]);
+    removeLeagueMemberMock.mockReset().mockImplementation(async (_token: string, _league: string, userId: string) => {
+      const removed = current.find((member) => member.userId === userId);
+      current = current.filter((member) => member.userId !== userId);
+      return removed;
+    });
+    revokeLeagueAdminMock.mockReset().mockImplementation(async (_token: string, _league: string, userId: string) => {
+      current = current.map((member) =>
+        member.userId === userId ? { ...member, role: "member" as const } : member,
+      );
+    });
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/lega/amministrazione"],
+          children: createElement(ReloadingHost),
+        }),
+      );
+    });
+    await flush();
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("«Rimuovi»: «… è stato rimosso dalla lega» resta a schermo dopo che il genitore ricarica gli iscritti", async () => {
+    expect(fetchLeagueMembersMock).toHaveBeenCalledTimes(1);
+
+    await click("league-member-remove-member-1");
+    await click("league-members-remove-confirm");
+
+    expect(removeLeagueMemberMock).toHaveBeenCalledWith("token-admin", "league-1", "member-1");
+    // Il genitore ha ricaricato davvero gli iscritti (secondo giro) e l'elenco è aggiornato...
+    expect(fetchLeagueMembersMock.mock.calls.length).toBeGreaterThan(1);
+    expect(byTestId("league-member-remove-member-1")).toBeNull();
+    // ...ma l'esito non si è cancellato.
+    expect(byTestId("league-members-success")?.textContent).toContain(
+      "Giulia è stato rimosso dalla lega.",
+    );
+
+    // Il consenso a tenerlo valeva per quel solo ricaricamento: uno successivo, chiesto da
+    // fuori, lo toglie.
+    await click("host-external-reload");
+    expect(byTestId("league-members-success")).toBeNull();
+  });
+
+  it("«Amministratori»: «… non è più amministratore» resta a schermo dopo il ricaricamento", async () => {
+    await click("league-members-admin-open");
+    await click("league-members-admin-revoke-admin-2");
+
+    expect(revokeLeagueAdminMock).toHaveBeenCalledWith("token-admin", "league-1", "admin-2");
+    expect(fetchLeagueMembersMock.mock.calls.length).toBeGreaterThan(1);
+    expect(byTestId("league-members-success")?.textContent).toContain(
+      "Elena non è più amministratore.",
+    );
+  });
+
+  it("un ricaricamento chiesto da fuori azzera ancora il messaggio", async () => {
+    // «Assegna rosa random» mostra un esito senza chiedere il ricaricamento al genitore.
+    await click("league-members-random-ai-ai-1");
+    expect(byTestId("league-members-success")?.textContent).toContain(
+      "Rosa random assegnata a Allenatore IA 01: 35/35 giocatori.",
+    );
+    const callsAfterAction = fetchLeagueMembersMock.mock.calls.length;
+
+    // Una nuova iscrizione o un invito dalla directory: cambia `reloadToken` senza che sia
+    // un'azione del pannello, quindi l'esito vecchio non ha più motivo di restare.
+    await click("host-external-reload");
+
+    expect(fetchLeagueMembersMock.mock.calls.length).toBeGreaterThan(callsAfterAction);
+    expect(byTestId("league-members-success")).toBeNull();
   });
 });
