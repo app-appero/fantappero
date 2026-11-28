@@ -1011,3 +1011,4 @@ export {
 } from "./tradeReplacement.js";
 
 export { absenceKindLabel, absenceLine, italianAbsenceText } from "./providerAbsence.js";
+export { italianVarEventText } from "./providerEventText.js";
