@@ -114,6 +114,15 @@ docker compose --env-file infra/local/.env.example exec worker \
   celery -A app.worker.celery_app call sports_data.poll_live_window
 ```
 
+## Lancio a mano dal pannello operatore (1.5)
+
+Operatore › **Job**: «Esegui» su ogni job e «Esegui tutti» (solo i job accesi); Operatore › **Turni**: «Esegui tutti». Tutti chiedono «Sei sicuro?» e avvisano quando un giro usa la quota del fornitore sportivo (campo `uses_provider_quota` del catalogo `system_jobs/catalog.py`).
+
+- **Job** (`POST /admin/job/{chiave}/esegui`, `POST /admin/job/esegui-tutti`, solo `global:operate`): mandano al worker lo stesso task del beat con i `kwargs` di catalogo; frequenze e orari non cambiano. Un job spento si lancia lo stesso, una volta sola e con un avviso (`allow_periodic` lo lascia passare perché il lancio è segnato come manuale, senza toccare `last_started_at`). Ogni lancio scrive una riga di audit di piattaforma (`league_audit_events`, `league_id` nullo, azione `system_job_run_manual`: chi, quando, quale job).
+- **Doppio lancio:** il job si prenota su Redis (`fantappero:system_jobs:running:<chiave>`, `SET NX` con scadenza 30 minuti, `system_jobs/running.py`); il worker segna e toglie lo stesso segno a ogni giro, anche del beat, e lo toglie dopo aver scritto l'esito in `system_job_runs`. Un job già in esecuzione risponde 409 (`system_job_already_running`), in «Esegui tutti» è «già in esecuzione, non rilanciato». Senza Redis il lancio a mano è rifiutato (503). `GET /admin/job` dice `running` e `lastRun`.
+- **Turni** (`POST /admin/turni/esegui-tutti`, avanzamento con `GET …/{id}`): un task Celery (`admin.run_turni_batch`) lancia in sequenza Importa calendario stagione, Genera calendario, Sincronizza turni, Aggiorna probabili e Genera formazioni IA (le stesse logiche dei pulsanti «Azioni massive»); un errore non ferma le altre. Restano fuori «Calcola giornata corrente» e «Recupera risultati» (omologano i turni), «Ricalcola storico» (riapre turni omologati e avvisa gli utenti) e le azioni per singola lega. Un solo blocco alla volta (`fantappero:admin:turni_batch:lock`, 409 `turni_batch_already_running`); un'operazione si salta se il job automatico che fa la stessa cosa sta girando.
+- Un job che richiedesse argomenti non sarebbe lanciabile a mano: `tests/unit/system_jobs/test_manual_run_catalog.py` controlla che ogni task del catalogo parta con i soli `kwargs` di catalogo.
+
 ## Verifica
 
 ```bash
