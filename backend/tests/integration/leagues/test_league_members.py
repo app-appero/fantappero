@@ -576,6 +576,36 @@ def _put_rules(client: TestClient, token: str, league_id: str, *, participants: 
     )
 
 
+def test_participants_below_members_message_uses_the_singular_for_one_invite(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 28/11 (N1): con un solo invito in attesa il messaggio diceva «1 inviti in attesa»."""
+    owner_token, _ = _register_and_login(client, "rules28.owner@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Regole 28")
+    assert (
+        _put_rules(client, owner_token, league_id, participants=8, credits=1000).status_code == 200
+    )
+    for index in range(3):  # con il presidente, 4 iscritti
+        _, member_id = _register_and_login(client, f"rules28.member{index}@example.com")
+        _add_member(db_session, league_id, member_id)
+    _, invited_id = _register_and_login(client, "rules28.invited@example.com")
+    invited = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"recipientUserId": str(invited_id)},
+    )
+    assert invited.status_code == 201, invited.text
+
+    one_invite = _put_rules(client, owner_token, league_id, participants=4, credits=1000)
+    assert one_invite.status_code == 400
+    assert one_invite.json()["code"] == "participant_count_below_members"
+    assert one_invite.json()["message"] == (
+        "I partecipanti non possono essere meno di 5: ci sono già 4 iscritti e 1 invito in attesa."
+    )
+
+
 def test_rules_keep_participants_above_members_and_realign_unspent_credits(
     client: TestClient,
     db_session: Session,
@@ -620,6 +650,9 @@ def test_rules_keep_participants_above_members_and_realign_unspent_credits(
     too_few = _put_rules(client, owner_token, league_id, participants=4, credits=1000)
     assert too_few.status_code == 400
     assert too_few.json()["code"] == "participant_count_below_members"
+    assert too_few.json()["message"] == (
+        "I partecipanti non possono essere meno di 5: ci sono già 5 iscritti e 0 inviti in attesa."
+    )
 
     realigned = _put_rules(client, owner_token, league_id, participants=8, credits=500)
     assert realigned.status_code == 200, realigned.text

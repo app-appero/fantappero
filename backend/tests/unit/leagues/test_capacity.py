@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from leagues.capacity import LeagueOccupancy, league_not_full_message, pending_invites_label
+from leagues.capacity import (
+    LeagueOccupancy,
+    league_not_full_message,
+    members_label,
+    pending_invites_label,
+)
 
 
 def test_league_is_full_only_when_every_seat_is_taken() -> None:
@@ -35,3 +40,12 @@ def test_pending_invites_are_shown_next_to_the_count_but_do_not_fill_the_league(
     )
     assert pending_invites_label(1) == "1 invito in attesa"
     assert pending_invites_label(2) == "2 inviti in attesa"
+
+
+def test_counts_in_messages_use_the_singular_with_one() -> None:
+    """QA 28/11 (N1): «1 iscritto» e «1 invito in attesa», mai «1 iscritti» / «1 inviti»."""
+    assert members_label(1) == "1 iscritto"
+    assert members_label(0) == "0 iscritti"
+    assert members_label(5) == "5 iscritti"
+    assert pending_invites_label(1) == "1 invito in attesa"
+    assert pending_invites_label(0) == "0 inviti in attesa"

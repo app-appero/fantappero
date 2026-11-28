@@ -1060,6 +1060,25 @@ def _compact_extra_slots(session: Session, *, team: FantasyTeam, roster_size: in
     return changed
 
 
+def missing_teams_label(count: int) -> str:
+    """«1 squadra mancante», «2 squadre mancanti»."""
+    return "1 squadra mancante" if count == 1 else f"{count} squadre mancanti"
+
+
+def invalid_rosters_label(count: int) -> str:
+    """«1 rosa non valida o incompleta», «2 rose non valide o incomplete»."""
+    if count == 1:
+        return "1 rosa non valida o incompleta"
+    return f"{count} rose non valide o incomplete"
+
+
+def invalid_credits_label(count: int) -> str:
+    """«1 conto assente o non valido», «2 conti assenti o non validi»."""
+    if count == 1:
+        return "1 conto assente o non valido"
+    return f"{count} conti assenti o non validi"
+
+
 def activation_roster_and_credit_blockers(
     session: Session,
     league: League,
@@ -1110,9 +1129,9 @@ def activation_roster_and_credit_blockers(
     if missing_teams or invalid_rosters:
         detail_parts: list[str] = []
         if missing_teams:
-            detail_parts.append(f"{missing_teams} squadre mancanti")
+            detail_parts.append(missing_teams_label(missing_teams))
         if invalid_rosters:
-            detail_parts.append(f"{invalid_rosters} rose non valide o incomplete")
+            detail_parts.append(invalid_rosters_label(invalid_rosters))
         blockers.append(
             LifecycleBlocker(
                 code="fantasy_teams_not_configured",
@@ -1129,7 +1148,7 @@ def activation_roster_and_credit_blockers(
                 code="credits_not_configured",
                 message=(
                     "Verifica i crediti di tutte le squadre prima di avviare la stagione "
-                    f"({missing_credits} conti assenti o non validi)."
+                    f"({invalid_credits_label(missing_credits)})."
                 ),
                 action_hint="teams",
             )
