@@ -56,6 +56,7 @@ import {
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
+import { pitchHalo } from "./formation/pitchHalo";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
 import { formationRoundToLoad } from "./formation/roundSelection";
@@ -1170,6 +1171,8 @@ export function FormationScreen() {
         const tone = probableTone(row);
         return tone === "starter" ? null : tone;
       })() : null,
+      // Nessun dato dalla formazione probabile: alone neutro, voce «Nessuna informazione» (27/11).
+      noInfo: row ? pitchHalo(probableTone(row)) === "none" : false,
       photoUrl: row ? playerAvatarUrl(row.athleteId, row.realTeamName) : null,
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,

@@ -45,6 +45,8 @@ import {
   moveBenchToIndex,
   orderBenchForActiveRoles,
   orderedBenchFromRoster,
+  PITCH_HALO_LEGEND,
+  pitchHaloOf,
   planModuleChange,
   preserveLockedStarters,
   TURN_DISPLAY_LABEL,
@@ -1904,8 +1906,11 @@ export function FormationPage() {
         return playerVoteState(row).kind === "voted" ? ("final" as const) : null;
       })(),
       probableState: (() => {
-        const state = athleteId ? probableState(roster, athleteId) : null;
-        return state === "bench" || state === "expelled" || state === "unavailable" ? state : null;
+        const row = athleteId ? roster.find((entry) => entry.athleteId === athleteId) : undefined;
+        if (!row) return null;
+        // Senza dato della formazione probabile: alone neutro («Nessuna informazione», 27/11).
+        const halo = pitchHaloOf(row);
+        return halo === "starter" ? null : halo;
       })(),
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       locked: athleteId ? playerLocked(roster, athleteId, clock, lockMarginMinutes) : false,
@@ -2513,10 +2518,12 @@ export function FormationPage() {
           </div>
 
           <div className="fa-formation-legend" data-testid="formation-legend" aria-label="Legenda formazioni probabili">
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--starter" />Titolare probabile</span>
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--bench" />Possibile panchina</span>
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--expelled" />Espulso / squalificato (non selezionabile)</span>
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--unavailable" />Indisponibile</span>
+            {PITCH_HALO_LEGEND.map((item) => (
+              <span key={item.halo} className="fa-formation-legend__item" data-testid={`formation-legend-${item.halo}`}>
+                <span className={`fa-formation-legend__dot fa-formation-legend__dot--${item.halo}`} />
+                {item.label}
+              </span>
+            ))}
           </div>
 
           <div className="fa-formation-layout__pitch-row">

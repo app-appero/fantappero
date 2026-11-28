@@ -753,8 +753,8 @@ export {
 } from "./faq.js";
 export type { FaqGroup, FaqHelpId, FaqItem } from "./faq.js";
 
-export { probableToneOf } from "./probableTone.js";
-export type { ProbableTone } from "./probableTone.js";
+export { NO_INFO_LABEL, PITCH_HALO_LEGEND, pitchHaloOf, probableToneOf } from "./probableTone.js";
+export type { PitchHalo, ProbableTone } from "./probableTone.js";
 
 export {
   KNOWN_CLUB_KEYS,
