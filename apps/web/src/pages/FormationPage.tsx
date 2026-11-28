@@ -2185,8 +2185,19 @@ export function FormationPage() {
                 {/* Il «?» apre «Quando si blocca la formazione?» (FAQ 1.4). */}
                 <FaqHelpButton faqId={FAQ_HELP.lineupLock} data-testid="formation-lock-help" />
               </p>
-              {/* «Prossimo blocco»: una sola riga, la fascia dell'intestazione (AppLayout); qui non si
-                  ripete (Rosario, 28/11). Solo scorrendo la barra delle mosse ne prende il posto. */}
+              {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia
+                  dell'intestazione (AppLayout), e qui non si ripete (Rosario, 28/11). Senza conto
+                  («Turno non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il
+                  testo di stato: su telefono la fascia lo nasconde. */}
+              {countdown && countdown.roundId === context.roundId && countdown.state !== "counting_down" ? (
+                <LockCountdown
+                  state={countdown.state}
+                  nextLockAt={countdown.nextLockAt}
+                  roundStatus={countdown.roundStatus}
+                  onExpire={refetchCountdown}
+                  data-testid="formation-lock-countdown"
+                />
+              ) : null}
               <p data-testid="formation-lock-hint">
                 {context.modificationAllowed
                   ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."

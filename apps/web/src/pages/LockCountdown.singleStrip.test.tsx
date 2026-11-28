@@ -14,9 +14,11 @@ import stylesCss from "../styles.css?raw";
 
 // 28/11, decisione di Rosario: una sola riga «Prossimo blocco». La fascia dell'intestazione
 // (`header-lock-strip`, in AppLayout) resta; la seconda riga sotto il titolo di Turni e di
-// Formazione non c'è più. Il test monta l'app vera (intestazione + pagina), con un conto alla
-// rovescia che riguarda proprio il turno mostrato dalla pagina: è il caso in cui prima le
-// righe erano due.
+// Formazione non c'è più quando c'è il conto alla rovescia. Quando il conto non c'è («Turno non
+// ancora aperto», «Turno saltato», «Formazione confermata») il testo di stato della pagina
+// resta, perché su telefono la fascia lo nasconde. Il test monta l'app vera (intestazione +
+// pagina), con un conto alla rovescia che riguarda proprio il turno mostrato dalla pagina: è il
+// caso in cui prima le righe erano due.
 
 const fetchMeMock = vi.fn();
 const fetchMyLeaguesMock = vi.fn();
@@ -102,6 +104,30 @@ function countdownFor(roundId: string): LineupLockCountdown {
     serverNow: new Date().toISOString(),
   };
 }
+
+/** Nessun conto alla rovescia: la risposta del server porta solo lo stato (e lo stato del turno). */
+function idleCountdownFor(
+  roundId: string,
+  state: LineupLockCountdown["state"],
+  roundStatus: string,
+): LineupLockCountdown {
+  return {
+    leagueId: "league-1",
+    roundId,
+    roundNumber: 12,
+    roundStatus,
+    state,
+    nextLockAt: null,
+    serverNow: new Date().toISOString(),
+  };
+}
+
+/** I tre testi che la pagina non deve perdere (su telefono la fascia in alto non li mostra). */
+const IDLE_CASES = [
+  { state: "turn_not_open", roundStatus: "scheduled", label: "Turno non ancora aperto" },
+  { state: "turn_not_open", roundStatus: "skipped", label: "Turno saltato" },
+  { state: "no_pending_lock", roundStatus: "open", label: "Formazione confermata" },
+] as const;
 
 const SUMMARY: FantasyTurnSummary = {
   id: ROUND_ID,
@@ -219,7 +245,7 @@ describe("Una sola riga «Prossimo blocco»: la fascia dell'intestazione (28/11,
     vi.unstubAllGlobals();
   });
 
-  it("Turni: il conto alla rovescia del turno mostrato c'è solo nella fascia in alto", async () => {
+  it("Turni: con il conto alla rovescia, «Prossimo blocco» c'è solo nella fascia in alto", async () => {
     await renderAppAt("/turni?tab=europei");
 
     // La pagina mostra proprio il turno del conto alla rovescia (il caso delle due righe).
@@ -228,7 +254,7 @@ describe("Una sola riga «Prossimo blocco»: la fascia dell'intestazione (28/11,
     expectOnlyHeaderStrip();
   });
 
-  it("Formazione: il conto alla rovescia del turno mostrato c'è solo nella fascia in alto", async () => {
+  it("Formazione: con il conto alla rovescia, «Prossimo blocco» c'è solo nella fascia in alto", async () => {
     await renderAppAt("/formazione");
 
     expect(container.querySelector('[data-testid="wireframe-formation-success"]')).not.toBeNull();
@@ -239,6 +265,44 @@ describe("Una sola riga «Prossimo blocco»: la fascia dell'intestazione (28/11,
       /^Mosse usate \d+\/\d+$/,
     );
     expectOnlyHeaderStrip();
+  });
+
+  describe.each(IDLE_CASES)(
+    "senza conto alla rovescia, «$label»: il testo di stato della pagina resta",
+    ({ state, roundStatus, label }) => {
+      beforeEach(() => {
+        fetchLineupLockCountdownMock.mockResolvedValue(idleCountdownFor(ROUND_ID, state, roundStatus));
+      });
+
+      it("Turni: il testo c'è nella pagina e non compare nessun «Prossimo blocco»", async () => {
+        await renderAppAt("/turni?tab=europei");
+
+        expect(container.querySelector('[data-testid="matchday-turn-detail"] h2')?.textContent).toBe("Turno 12");
+        const main = container.querySelector("#main-content");
+        const note = main?.querySelector('[data-testid="lock-countdown"]');
+        expect(note?.textContent).toBe(label);
+        expect(note?.getAttribute("data-state")).toBe(state);
+        expect(occurrences(container)).toBe(0);
+      });
+
+      it("Formazione: il testo c'è nella pagina e non compare nessun «Prossimo blocco»", async () => {
+        await renderAppAt("/formazione");
+
+        expect(container.querySelector('[data-testid="wireframe-formation-success"]')).not.toBeNull();
+        const note = container.querySelector('#main-content [data-testid="formation-lock-countdown"]');
+        expect(note?.textContent).toBe(label);
+        expect(note?.getAttribute("data-state")).toBe(state);
+        expect(occurrences(container)).toBe(0);
+      });
+    },
+  );
+
+  it("senza conto, la pagina di un altro turno non mostra il testo del turno di riferimento", async () => {
+    // Come prima: il testo di stato riguarda il turno del conto alla rovescia, non quello scelto.
+    fetchLineupLockCountdownMock.mockResolvedValue(idleCountdownFor("turn-13", "turn_not_open", "scheduled"));
+    await renderAppAt("/turni?tab=europei");
+
+    expect(container.querySelector('#main-content [data-testid="lock-countdown"]')).toBeNull();
   });
 
   it("Formazione, barra delle mosse agganciata: un solo «Prossimo blocco» alla volta (la barra prende il posto della fascia)", async () => {

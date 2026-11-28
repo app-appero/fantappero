@@ -26,6 +26,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  LockCountdown,
   MatchCard,
   PageContainer,
   Select,
@@ -51,6 +52,7 @@ import { loadStoredSession } from "../auth/sessionStorage";
 import { FaqHelpButton } from "../components/FaqHelpButton";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { LeagueCalendarPanel } from "./LeagueCalendarPanel";
@@ -325,6 +327,9 @@ export function MatchdayPage() {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const initialTab = resolveMatchdayTab(params.get("tab"));
   const [tab, setTab] = useState(initialTab);
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    !isDemoMode ? activeLeagueId : null,
+  );
 
   const [h2hCalendar, setH2hCalendar] = useState<H2HCalendar | null>(() => {
     if (isDemoMode && demoState === "success") {
@@ -917,7 +922,18 @@ export function MatchdayPage() {
                       {formatDateTime(selected.windowEndAt)} · Cutoff{" "}
                       {formatDateTime(selected.cutoffAt)}
                     </p>
-                    {/* «Prossimo blocco»: una sola riga, la fascia dell'intestazione (AppLayout); qui non si ripete (Rosario, 28/11). */}
+                    {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia
+                        dell'intestazione (AppLayout), e qui non si ripete (Rosario, 28/11). Senza conto
+                        («Turno non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il
+                        testo di stato: su telefono la fascia lo nasconde. */}
+                    {countdown && countdown.roundId === selected.id && countdown.state !== "counting_down" ? (
+                      <LockCountdown
+                        state={countdown.state}
+                        nextLockAt={countdown.nextLockAt}
+                        roundStatus={countdown.roundStatus}
+                        onExpire={refetchCountdown}
+                      />
+                    ) : null}
                   </div>
                   <div className="fa-matchday-toolbar__badges">
                     <Badge

@@ -80,6 +80,7 @@ import {
   clearLineupConfirmMessage,
   clearLineupSuccessMessage,
 } from "./formation/clearLineup";
+import { LockCountdown } from "../components/LockCountdown";
 import { FaqHelpButton } from "../components/FaqHelpButton";
 import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
@@ -88,6 +89,8 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
 import { formationTurnOptionLabel } from "../matchday/turnLabels";
+import { showsPageLockNote } from "../matchday/pageLockNote";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
 import { italianAbsenceText } from "@fantappero/contracts";
@@ -141,6 +144,7 @@ export function FormationScreen() {
   const isAdmin = can(["league:admin"]);
   const isOperator = can(["global:operate"]);
   const canChangeTurn = isAdmin || isOperator;
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
   const [lockNow, setLockNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setLockNow(new Date()), 1000);
@@ -1472,8 +1476,18 @@ export function FormationScreen() {
             ) : null}
           </View>
         </View>
-        {/* «Prossimo blocco»: una sola riga, la fascia sotto l'intestazione (LockCountdownBar); qui non
-            si ripete (Rosario, 28/11). Scorrendo, la fascia si unisce alle mosse (setMovesDock). */}
+        {/* «Prossimo blocco»: con il conto alla rovescia in corso c'è una sola riga, la fascia sotto
+            l'intestazione (LockCountdownBar), e qui non si ripete (Rosario, 28/11). Senza conto («Turno
+            non ancora aperto», «Turno saltato», «Formazione confermata»…) resta il testo di stato. */}
+        {countdown && showsPageLockNote(countdown, context.roundId) ? (
+          <LockCountdown
+            state={countdown.state}
+            nextLockAt={countdown.nextLockAt}
+            roundStatus={countdown.roundStatus}
+            onExpire={refetchCountdown}
+            testID="formation-lock-countdown"
+          />
+        ) : null}
         {!context.modificationAllowed ? (
           <Text style={styles.meta} testID="formation-lock-hint">
             Nessun calciatore è più modificabile.
