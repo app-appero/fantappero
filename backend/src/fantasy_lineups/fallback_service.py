@@ -33,10 +33,12 @@ from database.enums import (
 )
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import (
+    CopyLineupResult,
     LineupPlayerRef,
     copy_previous_lineup,
     drop_role_quota_excess_from_tribuna,
     evaluate_lineup,
+    fill_lineup_holes_at_turn_start,
     parse_module,
 )
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
@@ -289,14 +291,67 @@ def _resolve_team_lineup(
             excess_athlete_ids=excess_ids,
             role_unresolved_athlete_ids=unresolved_ids,
         )
-        if copied.can_confirm:
+        # Una copia con un posto vuoto (un titolare non più in rosa) non va a zero: la si salva
+        # così, ogni titolare al suo posto, e il posto vuoto lo copre la regola di inizio turno
+        # (``turn_start``) subito dopo, come per le formazioni salvate (voce 6.7 del 28/11).
+        if copied.can_confirm or _fillable_at_turn_start(
+            copied,
+            roles_by_id=roles_by_id,
+            roster_str_ids=roster_str_ids,
+            excess_ids=excess_ids,
+            unresolved_ids=unresolved_ids,
+        ):
             module = parse_module(copied.module)
             assert module is not None
-            starter_ids = [str(item) for item in copied.starter_ids if item not in {None, ""}]
+            starter_ids = [
+                str(item) if item not in {None, ""} else "" for item in copied.starter_ids
+            ]
             bench_ids = [str(item) for item in copied.bench_ids if item not in {None, ""}]
             return module, starter_ids, bench_ids, LineupAutoResolutionSource.PREVIOUS_ROUND
 
     return None
+
+
+def _fillable_at_turn_start(
+    copied: CopyLineupResult,
+    *,
+    roles_by_id: dict[str, FantasyRole | None],
+    roster_str_ids: list[str],
+    excess_ids: set[str],
+    unresolved_ids: set[str],
+) -> bool:
+    """Vero se la copia, coperti i posti vuoti come all'inizio del turno, è valida.
+
+    Stessa funzione pura di ``turn_start`` (``fill_lineup_holes_at_turn_start``), senza chi non
+    prende il voto (qui non lo si sa): se poi all'inizio del turno quel panchinaro non è
+    schierabile, entra il successivo dello stesso ruolo o il posto resta vuoto, comunque meglio
+    di una formazione a zero. Falso se la copia è già completa (allora il problema è un altro),
+    se nessun posto viene coperto o se, coperti i posti, la formazione non è valida (nessun
+    calciatore di quel ruolo, panchina fuori quota): quei casi restano a zero.
+    """
+    if all(item not in {None, ""} for item in copied.starter_ids):
+        return False
+
+    def ref(athlete_id: object) -> LineupPlayerRef:
+        key = str(athlete_id) if athlete_id not in {None, ""} else ""
+        return LineupPlayerRef(athlete_id=key, role=roles_by_id.get(key) if key else None)
+
+    outcome = fill_lineup_holes_at_turn_start(
+        module=copied.module,
+        starters=[(position, ref(item)) for position, item in enumerate(copied.starter_ids)],
+        bench=[ref(item) for item in copied.bench_ids if item not in {None, ""}],
+        unavailable_ids=excess_ids | unresolved_ids,
+    )
+    if not any(fill.starter_athlete_id is not None for fill in outcome.fills):
+        return False
+    return evaluate_lineup(
+        module=copied.module,
+        starters=[player for _, player in outcome.starters],
+        bench=list(outcome.bench),
+        roster_athlete_ids=roster_str_ids,
+        excess_athlete_ids=excess_ids,
+        role_unresolved_athlete_ids=unresolved_ids,
+    ).valid
 
 
 def _load_previous_submission(

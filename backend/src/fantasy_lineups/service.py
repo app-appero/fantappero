@@ -217,6 +217,11 @@ class FantasyLineupService:
                 )
                 self._session.flush()
                 logger.info("fantasy_lineup_materialized_at_first_lock")
+                # La formazione automatica ha ``submitted_at`` di adesso, dopo ``now``: la regola
+                # di inizio turno che la sistema subito dopo deve risultare successiva, o
+                # l'avviso «All'inizio del turno …» (solo per ciò che segue l'ultimo salvataggio)
+                # non comparirebbe mai (voce 6.7 del 28/11).
+                now = max(now, datetime.now(UTC))
         settle_lineups_at_turn_start(
             self._session, fantasy_round=fantasy_round, now=now, team_ids={team.id}
         )

@@ -1196,10 +1196,22 @@ def test_copy_previous_lineup_revalidates_roster_and_rejects_out_of_time(
     )
     assert unavailable.status_code == 200
     unavailable_body = unavailable.json()
-    assert str(locked_gk.id) not in [
-        item for item in unavailable_body["draft"]["starterAthleteIds"] if item
-    ]
-    assert any(
+    # Primo blocco del turno 2 raggiunto senza formazione confermata: arriva subito quella
+    # automatica, la copia del turno 1 (voce 6.7 del 28/11: non più «a zero» per il titolare
+    # uscito dalla rosa). Il portiere bloccato vi è già titolare confermato, quindi la copia lo
+    # tiene e non lo segnala come non disponibile. Il posto del difensore uscito resta vuoto: i
+    # panchinari di questo test non hanno una partita nel turno (non prendono il voto), quindi
+    # la regola di inizio turno non ha nessuno da far entrare.
+    auto_lineup = unavailable_body["lineup"]
+    assert auto_lineup is not None
+    assert auto_lineup["autoResolutionSource"] == "previous_round"
+    auto_starters = [player["athleteId"] for player in auto_lineup["starters"]]
+    assert str(locked_gk.id) in auto_starters
+    assert dropped_starter not in auto_starters
+    assert len(auto_starters) == 10
+    assert str(locked_gk.id) in unavailable_body["draft"]["starterAthleteIds"]
+    assert dropped_starter not in unavailable_body["draft"]["starterAthleteIds"]
+    assert not any(
         issue["code"] == "copied_athlete_unavailable" for issue in unavailable_body["copyIssues"]
     )
 
