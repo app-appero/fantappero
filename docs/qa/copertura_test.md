@@ -37,14 +37,14 @@ Giudizio per voce: **fatto** se tutte le piattaforme che la riguardano sono OK; 
 | 3. Rosa, listone, crediti | 15 | 13 | 0 | 1 | 0 | 1 |
 | 4. Mercato: scambi | 13 | 8 | 3 | 0 | 1 | 1 |
 | 5. Mercato: aste e svincolati | 13 | 8 | 2 | 1 | 1 | 1 |
-| 6. Formazione | 8 | 7 | 1 | 0 | 0 | 0 |
+| 6. Formazione | 10 | 7 | 3 | 0 | 0 | 0 |
 | 7. Turni, calendario, classifica | 8 | 5 | 1 | 2 | 0 | 0 |
 | 8. Notifiche | 9 | 8 | 0 | 0 | 0 | 1 |
 | 9. Web | 5 | 4 | 0 | 1 | 0 | 0 |
 | 10. App mobile (browser ed emulatore) | 11 | 8 | 1 | 0 | 1 | 1 |
 | 11. Salute e prestazioni | 3 | 3 | 0 | 0 | 0 | 0 |
 | 12. App Android: azioni sull'app (solo EMU) | 25 | 20 | 5 | 0 | 0 | 0 |
-| **Totale** | **138** | **107** | **13** | **5** | **6** | **7** |
+| **Totale** | **140** | **107** | **15** | **5** | **6** | **7** |
 | Totale al 18/11 | 124 | 33 | 66 | 12 | 5 | 8 |
 
 Il 25/11 entrano 4.12, 4.13 e 10.11 (sostituto dopo uno scambio sbilanciato, 1.5): tutte DA FARE appena pubblicate su dev; nell'app sull'emulatore con l'APK 1.5.
@@ -179,6 +179,8 @@ Le correzioni del 23/11 sono pubblicate su dev e riprovate OK nella notte 23→2
 | 6.6 | Esubero di ruolo in formazione [PREP] | OK | – | – | – | – | 22/11 | `athlete_exceeds_role_quota` con il nome; in tribuna viene tolto senza errore |
 | 6.7 | Blocco progressivo, mosse tattiche, formazione automatica al primo blocco [PREP][VIVO] | DA FARE | – | – | – | – | 21/11 | 21/11: blocco progressivo del turno 11 OK in lettura; formazione automatica e margine di blocco ancora da vedere. Prossimo turno vivo: #12, blocco il 27/11 alle 20:30 |
 | 6.8 | Formazione dell'operatore [OPER] | OK | – | – | – | – | 21/11 |  |
+| 6.9 | Formazione migliore non schiera indisponibili [PREP] | – | DA FARE | DA FARE | DA FARE | – | – | 28/11 (285ac2f): «Applica formazione migliore» e il cambio modulo non mettono titolare chi in campo è grigio (assente nella formazione probabile, anche solo in dubbio; partita rinviata; nessuna partita). Con pochi disponibili per il modulo compare «Formazione migliore non applicata: per il modulo … mancano calciatori disponibili (…)» e la bozza non cambia. Serve un turno con formazioni probabili scaricate e un indisponibile in rosa |
+| 6.10 | Alone neutro con legenda quando manca il dato [PREP] | – | DA FARE | DA FARE | DA FARE | – | – | 28/11 (f2396f9): in campo chi non ha dato dalla formazione probabile ha un alone chiaro e la legenda ha la quinta voce «Nessuna informazione»; verde, giallo, rosso e grigio come prima |
 
 ## Area 7 – Turni, calendario, classifica
 
