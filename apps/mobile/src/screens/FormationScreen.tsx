@@ -874,7 +874,8 @@ export function FormationScreen() {
    * Cambio modulo senza bloccati in campo (decisione del 19/11): i migliori per ruolo sul nuovo
    * modulo, con lo stesso criterio di «Formazione migliore». Il server salva solo la bozza: niente
    * mosse tattiche consumate, niente conferma. Se la richiesta fallisce restano i compatibili già
-   * mostrati; il messaggio compare solo per un errore vero, non per rosa insufficiente o turno chiuso.
+   * mostrati; il messaggio compare per un errore vero e quando mancano disponibili (messaggio del
+   * server), non per turno chiuso.
    */
   async function applyBestForModule(code: FantasyModule) {
     if (!accessToken || !activeLeagueId || !selectedRoundId) {

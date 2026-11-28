@@ -28,7 +28,8 @@ selezione.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
+from dataclasses import replace
 from datetime import datetime
 from uuid import UUID
 
@@ -54,12 +55,46 @@ from fantasy_lineups.rules import (
 )
 
 __all__ = [
+    "best_lineup_incomplete_message",
     "compute_best_lineup_for_team",
     "compute_best_lineup_respecting_locks",
     "select_best_module",
 ]
 
 _ROLE_ORDER = (FantasyRole.P, FantasyRole.D, FantasyRole.C, FantasyRole.A)
+
+_ROLE_NAMES: dict[FantasyRole, tuple[str, str]] = {
+    FantasyRole.P: ("portiere", "portieri"),
+    FantasyRole.D: ("difensore", "difensori"),
+    FantasyRole.C: ("centrocampista", "centrocampisti"),
+    FantasyRole.A: ("attaccante", "attaccanti"),
+}
+
+_INCOMPLETE_FALLBACK_MESSAGE = (
+    "La rosa non permette di completare il modulo con la formula automatica."
+)
+
+
+def best_lineup_incomplete_message(module_code: str, unfilled_roles: Sequence[FantasyRole]) -> str:
+    """Il messaggio quando la formazione migliore non completa il modulo.
+
+    Dice quanti disponibili mancano per ruolo: la formula non riempie il buco con un
+    indisponibile, quindi chi allena deve saperlo (Rosario, 27/11).
+    """
+    counts = Counter(unfilled_roles)
+    parts = []
+    for role in _ROLE_ORDER:
+        missing = counts.get(role, 0)
+        if missing:
+            singular, plural = _ROLE_NAMES[role]
+            parts.append(f"{missing} {singular if missing == 1 else plural}")
+    if not parts:
+        return _INCOMPLETE_FALLBACK_MESSAGE
+    return (
+        f"Formazione migliore non applicata: per il modulo {module_code} mancano "
+        f"calciatori disponibili ({', '.join(parts)}). Gli indisponibili non vengono messi "
+        "titolari: scegli tu chi schierare o cambia modulo."
+    )
 
 
 def compute_best_lineup_for_team(
@@ -71,6 +106,7 @@ def compute_best_lineup_for_team(
     season_year: int,
     module: FantasyModule,
     decided_at: datetime,
+    unavailable_athlete_ids: Collection[UUID] = (),
 ) -> LineupPlan:
     """Stessa euristica ``ai_lineup_v1``, applicata on-demand a una squadra qualunque.
 
@@ -79,14 +115,21 @@ def compute_best_lineup_for_team(
     progressivo e persistenza resta al chiamante
     (``FantasyLineupService.apply_best_lineup``), che riusa la pipeline di
     salvataggio umana — questa funzione è pura selezione, nessuna scrittura.
+
+    ``unavailable_athlete_ids``: chi la formazione mostra in grigio (indisponibile). Non entra
+    tra i titolari; se senza di loro il modulo non si completa il piano resta incompleto e il
+    servizio lo dice, invece di riempire il buco con un indisponibile.
     """
-    candidates = collect_candidates_for_team(
-        session,
-        league_id=league_id,
-        round_id=round_id,
-        team_id=team_id,
-        season_year=season_year,
-        decided_at=decided_at,
+    candidates = _mark_unavailable(
+        collect_candidates_for_team(
+            session,
+            league_id=league_id,
+            round_id=round_id,
+            team_id=team_id,
+            season_year=season_year,
+            decided_at=decided_at,
+        ),
+        unavailable_athlete_ids,
     )
     return build_lineup_plan(candidates, _role_targets(module), decided_at=decided_at)
 
@@ -103,6 +146,7 @@ def compute_best_lineup_respecting_locks(
     locked_athlete_ids: set[UUID],
     confirmed_starter_ids: set[UUID],
     confirmed_bench_order: Sequence[UUID],
+    unavailable_athlete_ids: Collection[UUID] = (),
 ) -> LineupPlan:
     """Come `compute_best_lineup_for_team`, ma vincola i calciatori già
     bloccati (partita iniziata) al ruolo già confermato — mai promuove un
@@ -118,14 +162,20 @@ def compute_best_lineup_respecting_locks(
     umano può riordinare la panchina attorno a un bloccato senza scavalcarlo,
     qui si preferisce non toccare affatto l'ordine esistente piuttosto che
     rischiare di scavalcarlo per errore.
+
+    Gli indisponibili (``unavailable_athlete_ids``) non entrano tra i titolari liberi; un
+    titolare bloccato resta dov'è anche se indisponibile (la sua partita è già iniziata).
     """
-    candidates = collect_candidates_for_team(
-        session,
-        league_id=league_id,
-        round_id=round_id,
-        team_id=team_id,
-        season_year=season_year,
-        decided_at=decided_at,
+    candidates = _mark_unavailable(
+        collect_candidates_for_team(
+            session,
+            league_id=league_id,
+            round_id=round_id,
+            team_id=team_id,
+            season_year=season_year,
+            decided_at=decided_at,
+        ),
+        unavailable_athlete_ids,
     )
     # Davanti a un bloccato in panchina (o in tribuna) non si entra e non si esce
     # (`assert_bench_order_lock`): chi è in panchina fino all'ultimo bloccato resta al suo
@@ -220,6 +270,20 @@ def compute_best_lineup_respecting_locks(
         used_fallback=free_plan.used_fallback,
         unfilled_roles=free_plan.unfilled_roles,
     )
+
+
+def _mark_unavailable(
+    candidates: list[CandidateInput],
+    unavailable_athlete_ids: Collection[UUID],
+) -> list[CandidateInput]:
+    """Segna chi la formazione mostra indisponibile: ``is_eligible`` lo esclude dai titolari."""
+    unavailable = set(unavailable_athlete_ids)
+    if not unavailable:
+        return candidates
+    return [
+        replace(candidate, unavailable=True) if candidate.athlete_id in unavailable else candidate
+        for candidate in candidates
+    ]
 
 
 def _role_aware_new_arrivals(

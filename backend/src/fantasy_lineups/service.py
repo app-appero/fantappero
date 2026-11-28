@@ -28,8 +28,9 @@ from database.enums import (
 )
 from fantasy_lineups.ai_selection import LineupPlan
 from fantasy_lineups.ai_service import DEFAULT_MODULE
-from fantasy_lineups.availability import no_vote_reasons, probable_hints
+from fantasy_lineups.availability import no_vote_reasons, probable_hints, shown_unavailable_ids
 from fantasy_lineups.best_lineup_service import (
+    best_lineup_incomplete_message,
     compute_best_lineup_for_team,
     compute_best_lineup_respecting_locks,
     select_best_module,
@@ -902,6 +903,15 @@ class FantasyLineupService:
             }
         )
 
+        # Chi in campo è grigio (indisponibile) non entra tra i titolari: stessa regola del
+        # contesto mandato a sito e app (Rosario, 27/11).
+        roster_athlete_ids = [row.athlete_id for row in roster]
+        unavailable_ids = shown_unavailable_ids(
+            roster_athlete_ids,
+            kickoffs,
+            self._probable_hints(fantasy_round.id, roster_athlete_ids),
+        )
+
         if mode == "best_module":
             module, plan = self._best_module_plan(
                 league_access=league_access,
@@ -911,6 +921,7 @@ class FantasyLineupService:
                 locked_ids=locked_ids,
                 submission=submission,
                 fallback_module=current_module,
+                unavailable_ids=unavailable_ids,
             )
         else:
             module = current_module
@@ -922,6 +933,7 @@ class FantasyLineupService:
                 now=now,
                 locked_ids=locked_ids,
                 submission=submission,
+                unavailable_ids=unavailable_ids,
             )
         if not plan.is_complete:
             get_metrics().incr(
@@ -929,7 +941,7 @@ class FantasyLineupService:
                 labels={"result": "incomplete"},
             )
             raise ValidationAuthError(
-                "La rosa non permette di completare il modulo con la formula automatica.",
+                best_lineup_incomplete_message(module.value, plan.unfilled_roles),
                 code="ai_lineup_incomplete",
             )
 
@@ -979,6 +991,7 @@ class FantasyLineupService:
         now: datetime,
         locked_ids: set[UUID],
         submission: LineupSubmission | None,
+        unavailable_ids: set[UUID] | None = None,
     ) -> LineupPlan:
         """Un piano per un modulo specifico — stessa scelta tra le due euristiche
         (libera o a blocchi rispettati) già usata da ``apply_best_lineup``,
@@ -992,6 +1005,7 @@ class FantasyLineupService:
                 season_year=league_access.league.season_year,
                 module=module,
                 decided_at=now,
+                unavailable_athlete_ids=unavailable_ids or (),
             )
         confirmed_slots = self._slots_from_submission(submission)
         confirmed_starter_ids = {
@@ -1013,6 +1027,7 @@ class FantasyLineupService:
             locked_athlete_ids=locked_ids,
             confirmed_starter_ids=confirmed_starter_ids,
             confirmed_bench_order=confirmed_bench_order,
+            unavailable_athlete_ids=unavailable_ids or (),
         )
 
     def _best_module_plan(
@@ -1025,6 +1040,7 @@ class FantasyLineupService:
         locked_ids: set[UUID],
         submission: LineupSubmission | None,
         fallback_module: FantasyModule,
+        unavailable_ids: set[UUID] | None = None,
     ) -> tuple[FantasyModule, LineupPlan]:
         """Il modulo approvato (tra tutti quelli del catalogo) che massimizza il
         punteggio totale degli undici titolari scelti, vincoli di blocco
@@ -1048,6 +1064,7 @@ class FantasyLineupService:
                     now=now,
                     locked_ids=locked_ids,
                     submission=submission,
+                    unavailable_ids=unavailable_ids,
                 ),
             )
             for module in APPROVED_MODULES
@@ -1063,6 +1080,7 @@ class FantasyLineupService:
             now=now,
             locked_ids=locked_ids,
             submission=submission,
+            unavailable_ids=unavailable_ids,
         )
 
     def save_my_draft(

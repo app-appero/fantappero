@@ -13,7 +13,10 @@ from uuid import UUID, uuid4
 
 from database.enums import FantasyModule, FantasyRole
 from fantasy_lineups.ai_selection import LineupPlan, ScoredCandidate
-from fantasy_lineups.best_lineup_service import select_best_module
+from fantasy_lineups.availability import shown_unavailable_ids
+from fantasy_lineups.best_lineup_service import best_lineup_incomplete_message, select_best_module
+from fantasy_lineups.kickoffs import KickoffRef
+from sports_data.predicted.read import AthleteProbable
 
 DECIDED_AT = datetime(2026, 10, 26, 18, 0, tzinfo=UTC)
 
@@ -164,3 +167,43 @@ def test_only_the_chosen_starters_count_towards_the_score() -> None:
     assert result is not None
     module, _plan = result
     assert module is FantasyModule.M442
+
+
+def test_incomplete_message_names_the_missing_available_players_by_role() -> None:
+    message = best_lineup_incomplete_message("4-3-3", (FantasyRole.D, FantasyRole.C, FantasyRole.C))
+    assert "modulo 4-3-3" in message
+    assert "1 difensore, 2 centrocampisti" in message
+    assert "indisponibili non vengono messi titolari" in message
+
+
+def test_incomplete_message_without_unfilled_roles_keeps_the_generic_text() -> None:
+    assert best_lineup_incomplete_message("4-3-3", ()) == (
+        "La rosa non permette di completare il modulo con la formula automatica."
+    )
+
+
+def test_shown_unavailable_matches_the_grey_rule_of_web_and_app() -> None:
+    """Grigio = motivo senza voto (assenza certa, nessuna partita, rinvio) o assenza nella
+    formazione probabile anche solo in dubbio. Titolare probabile e senza dato no."""
+    kickoff = KickoffRef(kickoff_at=DECIDED_AT, status_short="NS")
+    certain, doubtful, no_match, postponed, starter, nothing = (uuid4() for _ in range(6))
+    probable = {
+        certain: AthleteProbable(
+            hint="unavailable", note="Infortunato", blocked=True, absence="injured"
+        ),
+        doubtful: AthleteProbable(
+            hint="unavailable", note="In dubbio", blocked=False, absence="other"
+        ),
+        starter: AthleteProbable(hint="starter", note="Titolare probabile", blocked=False),
+    }
+    kickoffs = {
+        certain: kickoff,
+        doubtful: kickoff,
+        postponed: KickoffRef(kickoff_at=DECIDED_AT, status_short="PST"),
+        starter: kickoff,
+        nothing: kickoff,
+    }
+    result = shown_unavailable_ids(
+        [certain, doubtful, no_match, postponed, starter, nothing], kickoffs, probable
+    )
+    assert result == {certain, doubtful, no_match, postponed}

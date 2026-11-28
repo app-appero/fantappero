@@ -382,12 +382,20 @@ const BEST_LINEUP_EXPECTED_REFUSALS: ReadonlySet<string> = new Set([
   "turn_modification_closed",
 ]);
 
-/** Messaggio quando al cambio modulo la formazione migliore non arriva: solo per un errore vero. */
+/**
+ * Messaggio quando al cambio modulo la formazione migliore non arriva: per un errore vero il
+ * messaggio breve; per «mancano disponibili» (`ai_lineup_incomplete`) quello del server, che dice
+ * quanti disponibili mancano per ruolo (gli indisponibili non entrano titolari, 28/11); niente
+ * per gli altri rifiuti previsti. Stessa regola dell'app (`moduleChange.ts`).
+ */
 function moduleChangeFallbackNotice(error: unknown): string | null {
   const code =
     error && typeof error === "object" && "code" in error && typeof error.code === "string"
       ? error.code
       : null;
+  if (code === "ai_lineup_incomplete") {
+    return error instanceof Error && error.message ? error.message : null;
+  }
   return code && BEST_LINEUP_EXPECTED_REFUSALS.has(code) ? null : MODULE_CHANGE_FALLBACK_MESSAGE;
 }
 
@@ -1239,8 +1247,8 @@ export function FormationPage() {
    * Cambio modulo senza bloccati in campo (decisione del 19/11): i migliori per ruolo sul nuovo
    * modulo, con lo stesso criterio di «Applica formazione migliore». Il server salva solo la
    * bozza: niente mosse tattiche consumate, niente conferma. Se la richiesta fallisce restano i
-   * compatibili già mostrati; il messaggio compare solo per un errore vero, non per rosa
-   * insufficiente o turno chiuso.
+   * compatibili già mostrati; il messaggio compare per un errore vero e quando mancano
+   * disponibili (messaggio del server), non per turno chiuso.
    */
   async function applyBestForModule(next: FantasyModule) {
     const session = loadStoredSession();

@@ -20,7 +20,7 @@ from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
 
 logger = get_logger(__name__)
 
-__all__ = ["no_vote_reasons", "probable_hints"]
+__all__ = ["no_vote_reasons", "probable_hints", "shown_unavailable_ids"]
 
 
 def probable_hints(
@@ -74,3 +74,25 @@ def no_vote_reasons(
             if hint is not None and hint.blocked:
                 reasons[athlete_id] = hint.note
     return reasons
+
+
+def shown_unavailable_ids(
+    athlete_ids: list[UUID],
+    kickoffs: dict[UUID, KickoffRef],
+    probable: dict[UUID, AthleteProbable],
+) -> set[UUID]:
+    """Chi la formazione mostra indisponibile (in grigio), con la stessa regola di sito e app.
+
+    Il contesto della formazione manda ``probableHint = "unavailable"`` a chi ha un motivo
+    per non prendere il voto (``no_vote_reasons``) e a chi la formazione probabile segna
+    assente, anche se l'assenza non blocca la scelta (in dubbio, rientro previsto). Sito e app
+    lo colorano di grigio (``probableTone``). «Applica formazione migliore» non lo mette
+    titolare (Rosario, 27/11: Muñoz e Schlotterbeck in campo da indisponibili).
+    """
+    unavailable = set(no_vote_reasons(athlete_ids, kickoffs, probable))
+    unavailable.update(
+        athlete_id
+        for athlete_id in athlete_ids
+        if (hint := probable.get(athlete_id)) is not None and hint.hint == "unavailable"
+    )
+    return unavailable

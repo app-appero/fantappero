@@ -37,6 +37,7 @@ from mail.capture import get_captured_emails
 from sports_data.catalog.models import Club, SportSeason
 from sports_data.fixtures.models import Fixture
 from sports_data.listone.models import RoleAssignment
+from sports_data.predicted.models import PredictedLineupPlayer, PredictedLineupSnapshot
 from sports_data.roster.models import Athlete
 
 
@@ -704,3 +705,155 @@ def test_saving_is_not_blocked_by_a_role_reclassified_after_kickoff(
         },
     )
     assert response.status_code == 200, response.json()
+
+
+def _seed_predicted_absences(
+    db_session: Session,
+    *,
+    round_id: UUID,
+    absences: list[tuple[Athlete, bool, str]],
+) -> None:
+    """Formazione probabile validata con gli assenti dati: (atleta, blocca la scelta, etichetta)."""
+    fixture_id = db_session.scalars(
+        select(FantasyRoundFixture.fixture_id).where(FantasyRoundFixture.round_id == round_id)
+    ).one()
+    snapshot = PredictedLineupSnapshot(
+        fixture_id=fixture_id,
+        fotmob_match_id=None,
+        lineup_type="predicted",
+        source="fotmob",
+        reliability="validated",
+        warning_codes=[],
+        fetched_at=datetime.now(UTC) - timedelta(hours=1),
+        home_formation="4-3-3",
+        players=[
+            PredictedLineupPlayer(
+                athlete_id=athlete.id,
+                side="home",
+                display_name=athlete.canonical_name,
+                is_starter=False,
+                is_unavailable=True,
+                unavailability_type="injury" if blocks else "doubtful",
+                unavailability_label=label,
+                blocks_selection=blocks,
+                sort_order=index,
+            )
+            for index, (athlete, blocks, label) in enumerate(absences, start=1)
+        ],
+    )
+    db_session.add(snapshot)
+    db_session.commit()
+
+
+def _first_by_id(athletes: list[Athlete]) -> Athlete:
+    """Il preferito della formula a parità di segnali (ordine per id, `ai_selection._sort_key`)."""
+    return min(athletes, key=lambda athlete: str(athlete.id))
+
+
+def test_apply_best_lineup_never_fields_a_player_shown_unavailable(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Rosario, 27/11 (Lega Tester, turno europeo): dopo «Applica formazione migliore» in campo
+    c'erano Muñoz e Schlotterbeck, grigi. La formula guardava solo `Athlete.injured` e la
+    partita nel turno, non le assenze della formazione probabile che sito e app mostrano in
+    grigio. Qui il difensore e il centrocampista che la formula sceglierebbe per primi sono
+    assenti (uno certo, uno in dubbio): restano in panchina, al loro posto entrano i
+    disponibili dello stesso ruolo."""
+    token, _ = _register_and_login(client, "apply.best.unavailable@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Grigi")
+    fantasy_round, home_club_id = _create_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_565_000,
+        competition_ids=competition_ids,
+    )
+    grouped = _seed_roster_athletes(db_session, id_offset=2_560_000, club_id=home_club_id)
+    _fill_validated_roster(db_session, league_id, grouped)
+    defender = _first_by_id(grouped["D"])
+    midfielder = _first_by_id(grouped["C"])
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione/migliore"
+
+    # Senza assenze la formula li sceglie: è proprio il caso segnalato.
+    before = client.post(url, headers=headers)
+    assert before.status_code == 200, before.json()
+    assert str(defender.id) in before.json()["draft"]["starterAthleteIds"]
+    assert str(midfielder.id) in before.json()["draft"]["starterAthleteIds"]
+
+    _seed_predicted_absences(
+        db_session,
+        round_id=fantasy_round.id,
+        absences=[(defender, True, "Infortunato"), (midfielder, False, "In dubbio")],
+    )
+
+    response = client.post(url, headers=headers)
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    starters = body["draft"]["starterAthleteIds"]
+    assert len(starters) == 11
+    assert str(defender.id) not in starters
+    assert str(midfielder.id) not in starters
+    # Restano in rosa: in panchina, non spariti.
+    assert {str(defender.id), str(midfielder.id)} <= set(body["draft"]["benchAthleteIds"])
+    role_by_id = {
+        str(athlete.id): role for role, athletes in grouped.items() for athlete in athletes
+    }
+    assert [role_by_id[athlete_id] for athlete_id in starters] == (
+        ["P"] + ["D"] * 4 + ["C"] * 3 + ["A"] * 3
+    )
+    # Stessa regola del grigio in campo: il contesto li manda come indisponibili.
+    hints = {row["athleteId"]: row["probableHint"] for row in body["roster"]}
+    assert hints[str(defender.id)] == "unavailable"
+    assert hints[str(midfielder.id)] == "unavailable"
+    assert all(hints[athlete_id] != "unavailable" for athlete_id in starters)
+
+
+def test_apply_best_lineup_says_which_roles_lack_available_players(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Se senza gli indisponibili il modulo non si completa, la formula non riempie il buco
+    con un grigio: rifiuta e dice quanti disponibili mancano per ruolo, senza toccare la bozza."""
+    token, _ = _register_and_login(client, "apply.best.unavailable-short@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Corta")
+    fantasy_round, home_club_id = _create_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_575_000,
+        competition_ids=competition_ids,
+    )
+    grouped = _seed_roster_athletes(db_session, id_offset=2_570_000, club_id=home_club_id)
+    _fill_validated_roster(db_session, league_id, grouped)
+    # 11 difensori, 8 assenti (certi o in dubbio): ne restano 3 per un 4-3-3.
+    _seed_predicted_absences(
+        db_session,
+        round_id=fantasy_round.id,
+        absences=[
+            (athlete, index % 2 == 0, "Infortunato")
+            for index, athlete in enumerate(grouped["D"][:8])
+        ],
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.post(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione/migliore",
+        headers=headers,
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["code"] == "ai_lineup_incomplete"
+    assert "4-3-3" in body["message"]
+    assert "1 difensore" in body["message"]
+    assert "indisponibili" in body["message"].lower()
+
+    context = client.get(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+    )
+    assert context.status_code == 200
+    assert context.json()["draft"] is None

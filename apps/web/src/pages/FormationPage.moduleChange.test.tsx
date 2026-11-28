@@ -216,10 +216,12 @@ describe("FormationPage — cambio modulo con la formazione migliore (decisione 
     );
   });
 
-  it("con la rosa insufficiente tiene i compatibili senza mostrare errori", async () => {
-    apiRequestMock.mockRejectedValue(
-      new ApiError("La rosa non permette di completare il modulo con la formula automatica.", 422, "ai_lineup_incomplete"),
-    );
+  it("con pochi disponibili tiene i compatibili e mostra il messaggio del server", async () => {
+    // 28/11: gli indisponibili non entrano titolari, quindi chi allena deve sapere cosa manca.
+    const message =
+      "Formazione migliore non applicata: per il modulo 4-4-2 mancano calciatori disponibili (1 centrocampista). " +
+      "Gli indisponibili non vengono messi titolari: scegli tu chi schierare o cambia modulo.";
+    apiRequestMock.mockRejectedValue(new ApiError(message, 400, "ai_lineup_incomplete"));
     await render();
 
     await chooseModule("4-4-2");
@@ -229,6 +231,17 @@ describe("FormationPage — cambio modulo con la formazione migliore (decisione 
     expect(starterName(8)).toBe("Seleziona calciatore");
     expect(starterName(10)).toBe("Giocatore A2");
     expect(toastText()).not.toContain("Non è stato possibile");
-    expect(toastText()).not.toContain("La rosa non permette");
+    expect(toastText()).toContain("mancano calciatori disponibili (1 centrocampista)");
+  });
+
+  it("tace sugli altri rifiuti previsti (turno chiuso)", async () => {
+    apiRequestMock.mockRejectedValue(new ApiError("Turno chiuso.", 400, "turn_modification_closed"));
+    await render();
+
+    await chooseModule("4-4-2");
+
+    expect(moduleSelect()?.value).toBe("4-4-2");
+    expect(toastText()).not.toContain("Non è stato possibile");
+    expect(toastText()).not.toContain("Turno chiuso");
   });
 });
