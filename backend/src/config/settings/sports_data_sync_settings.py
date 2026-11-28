@@ -47,14 +47,18 @@ class SportsDataSyncSettingsMixin:
     predicted_lineups_enabled: bool = Field(
         default=True,
         validation_alias="PREDICTED_LINEUPS_ENABLED",
-        description="When true, Celery beat refreshes FotMob probable lineups once a day.",
+        description="When true, Celery beat refreshes probable lineups (hourly check).",
     )
     predicted_lineups_interval_seconds: int = Field(
-        default=86_400,
+        default=3600,
         validation_alias="PREDICTED_LINEUPS_INTERVAL_SECONDS",
         ge=3600,
         le=604_800,
-        description="How often probable lineups are refreshed (default daily).",
+        description=(
+            "How often the probable lineups job checks for stale fixtures (default hourly). "
+            "Each fixture is still fetched about once a day: see "
+            "PREDICTED_LINEUPS_MIN_AGE_HOURS and PREDICTED_LINEUPS_DAILY_REFRESH_HOUR_UTC."
+        ),
     )
     market_values_refresh_enabled: bool = Field(
         default=True,
@@ -106,6 +110,18 @@ class SportsDataSyncSettingsMixin:
         le=72,
         description=(
             "Skip a fixture whose latest snapshot is newer than this, unless the run is manual."
+        ),
+    )
+    predicted_lineups_daily_refresh_hour_utc: int | None = Field(
+        default=7,
+        validation_alias="PREDICTED_LINEUPS_DAILY_REFRESH_HOUR_UTC",
+        ge=0,
+        le=23,
+        description=(
+            "Morning refresh (UTC hour, after Soccer-Oracle's 06:30 update): the first run at "
+            "or after this hour refreshes every fixture whose snapshot is older than it; the "
+            "other runs only fetch fixtures with no snapshot since then (about one fetch per "
+            "fixture per day). Empty = use PREDICTED_LINEUPS_MIN_AGE_HOURS instead."
         ),
     )
     soccer_oracle_base_url: str | None = Field(
@@ -183,6 +199,13 @@ class SportsDataSyncSettingsMixin:
             return None
         value = self.soccer_oracle_players_key.get_secret_value().strip()
         return value or None
+
+    @field_validator("predicted_lineups_daily_refresh_hour_utc", mode="before")
+    @classmethod
+    def _empty_hour_is_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator(
         "sports_data_catalog_sync_enabled",

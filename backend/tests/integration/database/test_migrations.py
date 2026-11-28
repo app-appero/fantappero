@@ -208,6 +208,44 @@ def test_last_migration_applies_cleanly_to_a_populated_database(clean_db: str) -
     assert check.returncode == 0, check.stderr
 
 
+@pytest.mark.parametrize(("saved", "expected"), [(86_400, 3600), (21_600, 21_600)])
+def test_predicted_lineups_job_moves_from_daily_to_hourly(
+    clean_db: str, saved: int, expected: int
+) -> None:
+    """Il vecchio default giornaliero passa a ogni ora; una frequenza scelta a mano resta."""
+    upgrade_head(clean_db)
+    downgrade_one(clean_db)
+    engine = create_engine_for_url(clean_db)
+    select_interval = text(
+        "SELECT interval_seconds FROM system_jobs WHERE key = 'sports-predicted-lineups'"
+    )
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO system_jobs (key, enabled, interval_seconds) "
+                    "VALUES ('sports-predicted-lineups', true, :saved)"
+                ),
+                {"saved": saved},
+            )
+    finally:
+        engine.dispose()
+    upgrade_head(clean_db)
+    engine = create_engine_for_url(clean_db)
+    try:
+        with engine.connect() as conn:
+            assert conn.execute(select_interval).scalar_one() == expected
+    finally:
+        engine.dispose()
+    downgrade_one(clean_db)
+    engine = create_engine_for_url(clean_db)
+    try:
+        with engine.connect() as conn:
+            assert conn.execute(select_interval).scalar_one() == saved
+    finally:
+        engine.dispose()
+
+
 def test_utc_timestamps_and_constraints(migrated_engine) -> None:
     from sqlalchemy.orm import Session
 

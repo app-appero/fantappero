@@ -15,7 +15,7 @@ def sports_data_beat_schedule(
     fixtures_enabled: bool,
     fixtures_interval_seconds: int = 259_200,
     predicted_lineups_enabled: bool = True,
-    predicted_lineups_interval_seconds: int = 86_400,
+    predicted_lineups_interval_seconds: int = 3600,
     market_values_enabled: bool = False,
     market_values_interval_seconds: int = 3600,
 ) -> dict[str, dict]:
@@ -38,18 +38,16 @@ def sports_data_beat_schedule(
             "options": {"expires": float(fixtures_interval_seconds)},
         }
     if predicted_lineups_enabled:
-        from celery.schedules import crontab
-
-        # Con l'intervallo giornaliero di default il giro parte a ora fissa (07:00 UTC, dopo
-        # quello di Soccer-Oracle delle 06:30): con un semplice "ogni 24 ore" l'orario
-        # slittava a ogni riavvio. Un intervallo diverso resta un intervallo.
+        # Sempre un intervallo, mai un crontab: lo scheduler del pannello
+        # (system_jobs.scheduler) riscrive ogni voce come intervallo con la frequenza
+        # salvata, e un crontab diventava in silenzio "ogni 24 ore dall'avvio del beat"
+        # (giro delle 07:00 UTC mai partito, 28/11). Il giro è orario: la guardia per
+        # partita in sync_predicted_lineups (snapshot recente, aggiornamento del
+        # mattino) evita chiamate inutili al fornitore, e dopo un riavvio si recupera
+        # entro un'ora.
         schedule["sports-predicted-lineups"] = {
             "task": "sports_data.sync_predicted_lineups",
-            "schedule": (
-                crontab(hour=7, minute=0)
-                if predicted_lineups_interval_seconds == 86_400
-                else float(predicted_lineups_interval_seconds)
-            ),
+            "schedule": float(predicted_lineups_interval_seconds),
             "options": {"expires": float(predicted_lineups_interval_seconds)},
         }
     if market_values_enabled:

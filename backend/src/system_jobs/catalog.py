@@ -216,13 +216,14 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         task="sports_data.sync_predicted_lineups",
         title="Formazioni probabili",
         description=(
-            "Una volta al giorno scarica le formazioni previste e gli "
-            "indisponibili delle partite non ancora iniziate. Non sostituisce "
-            "le formazioni ufficiali."
+            "Ogni ora controlla le partite non ancora iniziate e scarica "
+            "formazioni previste e indisponibili solo di quelle senza dati dal "
+            "mattino (dalle 07:00 UTC): ogni partita si aggiorna circa una volta "
+            "al giorno. Non sostituisce le formazioni ufficiali."
         ),
         enabled_attr="predicted_lineups_enabled",
         interval_attr="predicted_lineups_interval_seconds",
-        default_interval_seconds=86_400,
+        default_interval_seconds=3600,
         min_interval_seconds=3600,
         max_interval_seconds=604_800,
     ),

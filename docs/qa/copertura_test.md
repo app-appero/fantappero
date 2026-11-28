@@ -57,6 +57,8 @@ Il 28/11 entrano 6.9, 6.10, 7.9 e 7.10 (correzioni della 1.5 segnalate da Rosari
 
 Il 28/11 entra anche 7.11 (gol o assist annullato dal VAR che lasciava il bonus, correzione del server): DA FARE su API, W390 e MobB appena pubblicata su dev.
 
+Il 28/11 entra anche 11.4 (area job/Operatore: giro delle formazioni probabili che non partiva alle 07:00 UTC, correzione del server): DA FARE su API e W1280 appena pubblicata su dev.
+
 **Problemi nuovi della notte 23→24/11:**
 - **KI-165**, corsa 23:33, voce 2.3 (W1280 e W390; stesso testo e stesso schema nell'app), bassa, in correzione il 24/11 con l'approvazione di Rosario:
   - «Servono ancora 1 iscritti» al plurale (atteso «Serve ancora 1 iscritto»);
@@ -253,6 +255,7 @@ Le correzioni del 23/11 sono pubblicate su dev e riprovate OK nella notte 23→2
 | 11.1 | `/live`, `/ready`, letture sotto 2 s, nessun 5xx | OK | – | – | – | – | 24/11 | 24/11 (corse 03:03 e 04:13): `/live` e `/ready` 200, letture al massimo circa 1 s, nessun 5xx. Scritture lente: conferma dell'import CSV 6-8,3 s per 105-140 righe, regolamento 5 s, sincronizza 9,5 s, riempimento 6 s |
 | 11.2 | Tempi su una lega attiva con rose piene [PREP] | OK | – | – | – | – | 22/11 | letture al massimo 0,77 s, nessun dato altrui esposto |
 | 11.3 | `/realtime/stream` | OK | – | – | – | – | 22/11 | si apre, riceve un evento in circa 1 s, 401 senza token |
+| 11.4 | **Nuova (28/11).** Job/Operatore: il giro delle formazioni probabili parte da solo e il Prossimo giro è corretto [OPER] | DA FARE | DA FARE | – | – | – | – | riga del 28/11 «Giro delle formazioni probabili che non parte (crontab 07:00 UTC)» di `known_issues.md`. Operatore › Job: «Formazioni probabili» acceso con frequenza 1 ora; «Ultima partenza» al massimo un'ora fa e «Prossimo giro» = ultima partenza + 1 ora (mai «Mai eseguito» né un orario passato di ore); il giorno dopo, entro le 08:00 UTC, le partite dei prossimi 4 giorni hanno una formazione probabile letta dopo le 07:00 (schermo «Partita» o diagnosi dell'operatore). Il 28/11 provato solo con test automatici |
 
 ## Area 12 – App Android: azioni sull'app (solo EMU)
 Le aree 1-8 sono state provate quasi sempre via API. Qui ci sono le stesse funzioni fatte **dall'app**, più le cose che esistono solo su un telefono. Quando serve l'altra parte (per esempio chi riceve uno scambio), quella si fa via API con un altro account QA.
