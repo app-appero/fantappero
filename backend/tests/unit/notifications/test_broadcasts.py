@@ -199,3 +199,13 @@ def test_sample_list_renders_every_sample() -> None:
     items = list_samples(_operator=SimpleNamespace()).items  # type: ignore[arg-type]
     assert items
     assert all(i.title and i.body and i.category for i in items)
+
+
+def test_audience_label_users_singular_and_plural() -> None:
+    """«1 utente scelto» con un solo destinatario, «N utenti scelti» altrimenti (QA 28/11)."""
+    audience = {"mode": "users", "userIds": [str(uuid4())]}
+    session = MagicMock()
+    assert svc.audience_label(session, audience, 1) == "1 utente scelto"
+    assert svc.audience_label(session, audience, 2) == "2 utenti scelti"
+    assert svc.audience_label(session, audience, 0) == "0 utenti scelti"
+    assert svc.audience_label(session, {"mode": "all"}, 1200) == "Tutti gli utenti"

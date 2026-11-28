@@ -10,6 +10,7 @@ import {
   type NotificationRecipient,
   type NotificationRecipientList,
   type TestSampleItem,
+  usersLabel,
 } from "@fantappero/contracts";
 import { Breadcrumb, Button, Input, Modal, PageContainer, Select, Switch, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -322,8 +323,8 @@ export function ComposeTab() {
       });
       setDone(
         result.status === "scheduled"
-          ? `Programmata per ${result.recipientCount} utenti.`
-          : `Inviata a ${result.recipientCount} utenti (${result.pushCount} con push).`,
+          ? `Programmata per ${usersLabel(result.recipientCount)}.`
+          : `Inviata a ${usersLabel(result.recipientCount)} (${result.pushCount} con push).`,
       );
     } catch (e) {
       setError(getApiErrorMessage(e, "Invio non riuscito."));
@@ -422,7 +423,7 @@ export function ComposeTab() {
           {done ? <p className="fa-nop-done" data-testid="admin-notifications-done">{done}</p> : null}
           <div className="fa-nop-row">
             <Button type="button" loading={busy} disabled={busy} onClick={requestSend} data-testid="admin-notifications-send">
-              {recipients === null ? "Invia" : `Invia a ${recipients} utenti`}
+              {recipients === null ? "Invia" : `Invia a ${usersLabel(recipients)}`}
             </Button>
             <Button type="button" variant="secondary" disabled={busy} onClick={() => void submit(true)} data-testid="admin-notifications-send-me">
               Invia a me come prova
@@ -475,7 +476,7 @@ export function ComposeTab() {
           <header className="fa-nop-card__head"><h3>Riepilogo</h3></header>
           <dl className="fa-nop-sum">
             <div><dt>Tipo</dt><dd>{BROADCAST_KIND_OPTIONS.find((o) => o.value === kind)?.label}</dd></div>
-            <div><dt>Destinatari</dt><dd>{recipients === null ? "—" : `${recipients} utenti`}</dd></div>
+            <div><dt>Destinatari</dt><dd>{recipients === null ? "—" : usersLabel(recipients)}</dd></div>
             <div><dt>Canali</dt><dd>{["App", push ? "push" : null, email ? "email" : null].filter(Boolean).join(" + ")}</dd></div>
             <div><dt>Invio</dt><dd>{scheduled ? "Programmato" : "Subito"}</dd></div>
           </dl>
@@ -575,7 +576,7 @@ function TestTab() {
           </div>
           {toOthers ? (
             <button type="button" className="fa-nop-selected" onClick={() => setPickerOpen(true)}>
-              <strong>{users.size} utenti selezionati</strong>
+              <strong>{users.size === 1 ? "1 utente selezionato" : `${users.size} utenti selezionati`}</strong>
               <span>Scegli utenti ›</span>
             </button>
           ) : null}

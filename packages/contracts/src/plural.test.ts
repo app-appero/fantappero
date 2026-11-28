@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { usersLabel } from "./confirmations.ts";
 import { evaluateLineup } from "./fantasyLineups.ts";
 import { countWithNoun, missingCount, missingStartersLabel, pendingInvitesA11yLabel } from "./plural.ts";
 
@@ -10,6 +11,14 @@ describe("singolare con 1 (QA 24-25/11)", () => {
     assert.equal(countWithNoun(4, "titolare", "titolari"), "4 titolari");
     assert.equal(missingCount(1), "manca 1");
     assert.equal(missingCount(2), "mancano 2");
+  });
+
+  it("destinatari di notifiche ed email: «1 utente», mai «1 utenti» (QA 28/11)", () => {
+    assert.equal(usersLabel(1), "1 utente");
+    assert.equal(usersLabel(0), "0 utenti");
+    assert.equal(usersLabel(2), "2 utenti");
+    assert.equal(usersLabel(1200), "1200 utenti");
+    assert.equal(usersLabel(null), "tutti gli utenti");
   });
 
   it("badge inviti ricevuti", () => {

@@ -1,4 +1,5 @@
 import type { OperatorEmailHistoryItem } from "@fantappero/contracts";
+import { usersLabel } from "@fantappero/contracts";
 import { Breadcrumb, Button, Input, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { fetchOperatorEmails, sendOperatorEmail } from "../api/notifications";
@@ -46,7 +47,7 @@ function ComposeTab() {
       setError("Utente non riconosciuto.");
       return;
     }
-    if (!toMeOnly && !window.confirm(`Inviare l'email a ${recipients ?? "tutti gli"} utenti?`)) {
+    if (!toMeOnly && !window.confirm(`Inviare l'email a ${usersLabel(recipients)}?`)) {
       return;
     }
     setBusy(true);
@@ -62,7 +63,7 @@ function ComposeTab() {
             ? { mode: "all" }
             : { mode: "users", userIds: [...selected.keys()] },
       });
-      setDone(`Email inviata a ${result.recipientCount} utenti.`);
+      setDone(`Email inviata a ${usersLabel(result.recipientCount)}.`);
     } catch (e) {
       setError(getApiErrorMessage(e, "Invio non riuscito."));
     } finally {
@@ -109,7 +110,7 @@ function ComposeTab() {
           {done ? <p className="fa-nop-done" data-testid="admin-email-done">{done}</p> : null}
           <div className="fa-nop-row">
             <Button type="button" loading={busy} disabled={busy} onClick={() => void submit(false)} data-testid="admin-email-send">
-              {recipients === null ? "Invia" : `Invia a ${recipients} utenti`}
+              {recipients === null ? "Invia" : `Invia a ${usersLabel(recipients)}`}
             </Button>
             <Button type="button" variant="secondary" disabled={busy} onClick={() => void submit(true)} data-testid="admin-email-send-me">
               Invia a me come prova
@@ -131,7 +132,7 @@ function ComposeTab() {
         <section className="fa-nop-card">
           <header className="fa-nop-card__head"><h3>Riepilogo</h3></header>
           <dl className="fa-nop-sum">
-            <div><dt>Destinatari</dt><dd>{recipients === null ? "—" : `${recipients} utenti`}</dd></div>
+            <div><dt>Destinatari</dt><dd>{recipients === null ? "—" : usersLabel(recipients)}</dd></div>
           </dl>
         </section>
       </aside>

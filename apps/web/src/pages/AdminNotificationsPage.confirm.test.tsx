@@ -130,4 +130,13 @@ describe("AdminNotificationsPage — conferma prima di inviare a tutti (1.5)", (
     const [, body] = createBroadcastMock.mock.calls[0] ?? [];
     expect(body).toMatchObject({ kind: "test", audience: { mode: "users", userIds: ["op-1"] } });
   });
+
+  it("con un solo destinatario l'esito dice «1 utente», non «1 utenti» (QA 28/11)", async () => {
+    createBroadcastMock.mockResolvedValue({ status: "sent", recipientCount: 1, pushCount: 0 });
+    await click("admin-notifications-send-me");
+
+    expect(byTestId("admin-notifications-done")?.textContent).toBe(
+      "Inviata a 1 utente (0 con push).",
+    );
+  });
 });
