@@ -96,10 +96,18 @@ def _on_task_postrun(
 ) -> None:
     if not task_id:
         return
-    job_key = job_key_for_task(_task_name(task, sender))
-    if job_key is not None:
-        # Anche un giro saltato (job spento) o non finito toglie il suo segno «in esecuzione».
-        release(job_key, task_id)
+    try:
+        _record_finished_run(task_id, retval, state)
+    finally:
+        # Il segno «in esecuzione» si toglie dopo aver scritto l'esito: quando il pannello vede il
+        # job fermo, l'ultimo esito è già quello nuovo. Vale anche per un giro saltato (job
+        # spento) o non finito.
+        job_key = job_key_for_task(_task_name(task, sender))
+        if job_key is not None:
+            release(job_key, task_id)
+
+
+def _record_finished_run(task_id: str, retval: Any, state: str | None) -> None:
     started = _running.pop(task_id, None)
     skipped = task_id in _skipped
     _skipped.discard(task_id)

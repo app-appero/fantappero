@@ -269,6 +269,9 @@ describe("esito per operazione dei Turni", () => {
     assert.deepEqual([skipped.tone, skipped.text], ["warning", "Saltata"]);
     const waiting = turniBatchOperationOutcome({ key: "a", label: "A", status: "pending", message: null });
     assert.equal(waiting.text, "In attesa");
+    assert.equal(waiting.tone, "neutral");
+    const running = turniBatchOperationOutcome({ key: "a", label: "A", status: "running", message: null });
+    assert.deepEqual([running.tone, running.text], ["neutral", "In corso"]);
   });
 
   it("riepilogo in corso e a fine blocco, con singolare e plurale", () => {

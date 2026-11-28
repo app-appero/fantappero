@@ -167,7 +167,8 @@ export function jobsRunAllConfirmation(
   };
 }
 
-export type RunTone = "success" | "warning" | "error";
+/** `neutral` = non ancora finita (in attesa o in corso). */
+export type RunTone = "success" | "warning" | "error" | "neutral";
 
 export interface RunOutcomeLine {
   key: string;
@@ -260,7 +261,9 @@ export function turniBatchOperationOutcome(operation: TurniBatchOperation): RunO
         ? "error"
         : operation.status === "skipped"
           ? "warning"
-          : "success";
+          : operation.status === "pending" || operation.status === "running"
+            ? "neutral"
+            : "success";
   const status = turniBatchOperationStatusLabel(operation.status);
   const text = operation.message ? `${status}: ${operation.message}` : status;
   return { key: operation.key, title: operation.label, tone, text };
