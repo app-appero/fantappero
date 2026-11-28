@@ -166,6 +166,37 @@ describe("StandingsPage real session", () => {
     }
   });
 
+  it("writes «1 gara» in the podium after a single match and «2 gare» after two", async () => {
+    // QA 28/11 (N2): con una sola partita giocata il podio diceva «1 gare».
+    fetchLeagueStandingsMock.mockResolvedValue([
+      { ...STANDINGS[0], played: 1, won: 1, lost: 0, points: 3 },
+      STANDINGS[1],
+    ]);
+    fetchMyFantasyTeamMock.mockResolvedValue({
+      id: "team-mine",
+      leagueId: "league-1",
+      membershipId: "m-1",
+      userId: "user-1",
+      userType: "human",
+      name: "La mia squadra",
+      rosterSize: 35,
+      filledSlots: 35,
+      compositionStatus: "validated",
+      composition: null,
+      slots: [],
+    });
+
+    const { html, unmount } = await renderAppAt("/classifica");
+    try {
+      expect(html).toContain('data-testid="standings-podium"');
+      expect(html).toContain("1 gara · GF:GS");
+      expect(html).not.toContain("1 gare");
+      expect(html).toContain("2 gare · GF:GS");
+    } finally {
+      unmount();
+    }
+  });
+
   it("shows empty state when standings have not been computed yet", async () => {
     fetchLeagueStandingsMock.mockResolvedValue([]);
     fetchMyFantasyTeamMock.mockResolvedValue({
