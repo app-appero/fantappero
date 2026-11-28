@@ -445,6 +445,63 @@ export interface SystemJob {
   maxIntervalSeconds: number;
   lastStartedAt: string | null;
   nextRunAt: string | null;
+  /** Il giro chiama il fornitore sportivo e ne consuma la quota (1.5). */
+  usesProviderQuota: boolean;
+  /** Il giro può mandare avvisi (app, push) ai fantallenatori (1.5). */
+  sendsNotifications: boolean;
+  /** Sta girando adesso, lanciato a mano o dal beat (1.5). */
+  running: boolean;
+  /** Esito dell'ultimo giro finito; `null` se non ce n'è ancora (1.5). */
+  lastRun: SystemJobLastRun | null;
+}
+
+/** Ultimo giro finito di un job: `ok` oppure `failed` con il motivo. */
+export interface SystemJobLastRun {
+  outcome: "ok" | "failed" | string;
+  finishedAt: string;
+  reason: string | null;
+}
+
+/** Esito del lancio a mano di un job («Esegui»): il giro è in coda, non ancora finito. */
+export interface SystemJobRunResult {
+  key: string;
+  title: string;
+  status: "started" | "already_running" | "failed" | string;
+  message: string;
+  /** Per un job spento: «lanciato a mano una volta sola, non riparte da solo». */
+  warning: string | null;
+  code: string | null;
+  taskId: string | null;
+}
+
+/** Esito di «Esegui tutti» nei Job: uno per ogni job acceso, più i conteggi. */
+export interface SystemJobRunAllResult {
+  results: SystemJobRunResult[];
+  started: number;
+  alreadyRunning: number;
+  failed: number;
+}
+
+export type TurniBatchOperationStatus = "pending" | "running" | "ok" | "failed" | "skipped";
+
+/** Una operazione di «Esegui tutti» nei Turni, con l'esito. */
+export interface TurniBatchOperation {
+  key: string;
+  label: string;
+  status: TurniBatchOperationStatus | string;
+  message: string | null;
+}
+
+/** Avanzamento di «Esegui tutti» nei Turni: le operazioni girano una dopo l'altra sul server. */
+export interface TurniBatch {
+  batchId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  operations: TurniBatchOperation[];
+  ok: number;
+  failed: number;
+  skipped: number;
+  startedAt: string | null;
+  finishedAt: string | null;
 }
 
 export interface SystemJobUpdate {

@@ -25,6 +25,10 @@ function job(key: string, enabled: boolean, nextInMinutes: number | null): Syste
     maxIntervalSeconds: 86400,
     lastStartedAt: null,
     nextRunAt: nextInMinutes === null ? null : new Date(NOW + nextInMinutes * 60000).toISOString(),
+    usesProviderQuota: false,
+    sendsNotifications: false,
+    running: false,
+    lastRun: null,
   };
 }
 

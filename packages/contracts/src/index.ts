@@ -229,6 +229,28 @@ export {
   nextJobToRun,
 } from "./jobsSummary.js";
 export type { JobsSummaryTile } from "./jobsSummary.js";
+export {
+  JOBS_POLL_MS,
+  PROVIDER_QUOTA_NOTE,
+  RUN_ALL_LABEL,
+  RUN_JOB_LABEL,
+  TURNI_BATCH_OPERATIONS,
+  TURNI_BATCH_POLL_MS,
+  isTurniBatchFinished,
+  jobLastRunLabel,
+  jobRunConfirmation,
+  jobRunOutcome,
+  jobsRunAllConfirmation,
+  jobsRunAllSummary,
+  jobsRunAllTone,
+  runnableJobs,
+  turniBatchConfirmation,
+  turniBatchOperationOutcome,
+  turniBatchOperationStatusLabel,
+  turniBatchSummary,
+  turniBatchTone,
+} from "./operatorRuns.js";
+export type { RunOutcomeLine, RunTone, TurniBatchOperationInfo } from "./operatorRuns.js";
 
 export {
   DEFAULT_RESTORE_BEFORE,
@@ -679,7 +701,13 @@ export type {
   AdminSeasonImportResult,
   AdminTurniSyncResult,
   SystemJob,
+  SystemJobLastRun,
+  SystemJobRunAllResult,
+  SystemJobRunResult,
   SystemJobUpdate,
+  TurniBatch,
+  TurniBatchOperation,
+  TurniBatchOperationStatus,
   AdminBlockedAccount,
   AdminBlocklist,
   AdminDeleteUserResult,
