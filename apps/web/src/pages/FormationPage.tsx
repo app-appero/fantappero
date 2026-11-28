@@ -45,6 +45,8 @@ import {
   moveBenchToIndex,
   orderBenchForActiveRoles,
   orderedBenchFromRoster,
+  PITCH_HALO_LEGEND,
+  pitchHaloOf,
   planModuleChange,
   preserveLockedStarters,
   TURN_DISPLAY_LABEL,
@@ -91,6 +93,7 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { FaqHelpButton } from "../components/FaqHelpButton";
+import { italianAbsenceText } from "@fantappero/contracts";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { useTradeReplacement } from "../market/TradeReplacementContext";
 import {
@@ -382,12 +385,20 @@ const BEST_LINEUP_EXPECTED_REFUSALS: ReadonlySet<string> = new Set([
   "turn_modification_closed",
 ]);
 
-/** Messaggio quando al cambio modulo la formazione migliore non arriva: solo per un errore vero. */
+/**
+ * Messaggio quando al cambio modulo la formazione migliore non arriva: per un errore vero il
+ * messaggio breve; per «mancano disponibili» (`ai_lineup_incomplete`) quello del server, che dice
+ * quanti disponibili mancano per ruolo (gli indisponibili non entrano titolari, 28/11); niente
+ * per gli altri rifiuti previsti. Stessa regola dell'app (`moduleChange.ts`).
+ */
 function moduleChangeFallbackNotice(error: unknown): string | null {
   const code =
     error && typeof error === "object" && "code" in error && typeof error.code === "string"
       ? error.code
       : null;
+  if (code === "ai_lineup_incomplete") {
+    return error instanceof Error && error.message ? error.message : null;
+  }
   return code && BEST_LINEUP_EXPECTED_REFUSALS.has(code) ? null : MODULE_CHANGE_FALLBACK_MESSAGE;
 }
 
@@ -1239,8 +1250,8 @@ export function FormationPage() {
    * Cambio modulo senza bloccati in campo (decisione del 19/11): i migliori per ruolo sul nuovo
    * modulo, con lo stesso criterio di «Applica formazione migliore». Il server salva solo la
    * bozza: niente mosse tattiche consumate, niente conferma. Se la richiesta fallisce restano i
-   * compatibili già mostrati; il messaggio compare solo per un errore vero, non per rosa
-   * insufficiente o turno chiuso.
+   * compatibili già mostrati; il messaggio compare per un errore vero e quando mancano
+   * disponibili (messaggio del server), non per turno chiuso.
    */
   async function applyBestForModule(next: FantasyModule) {
     const session = loadStoredSession();
@@ -1896,8 +1907,11 @@ export function FormationPage() {
         return playerVoteState(row).kind === "voted" ? ("final" as const) : null;
       })(),
       probableState: (() => {
-        const state = athleteId ? probableState(roster, athleteId) : null;
-        return state === "bench" || state === "expelled" || state === "unavailable" ? state : null;
+        const row = athleteId ? roster.find((entry) => entry.athleteId === athleteId) : undefined;
+        if (!row) return null;
+        // Senza dato della formazione probabile: alone neutro («Nessuna informazione», 27/11).
+        const halo = pitchHaloOf(row);
+        return halo === "starter" ? null : halo;
       })(),
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       locked: athleteId ? playerLocked(roster, athleteId, clock, lockMarginMinutes) : false,
@@ -2000,7 +2014,7 @@ export function FormationPage() {
             : null,
           row.probableHint === "starter" ? "titolare probabile" : null,
           row.probableHint === "bench" ? "panchina probabile" : null,
-          row.probableHint === "unavailable" ? row.probableNote ?? "indisponibile" : null,
+          row.probableHint === "unavailable" ? italianAbsenceText(row.probableNote) ?? "indisponibile" : null,
         ].filter(Boolean);
         return {
           value: row.athleteId,
@@ -2505,10 +2519,12 @@ export function FormationPage() {
           </div>
 
           <div className="fa-formation-legend" data-testid="formation-legend" aria-label="Legenda formazioni probabili">
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--starter" />Titolare probabile</span>
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--bench" />Possibile panchina</span>
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--expelled" />Espulso / squalificato (non selezionabile)</span>
-            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--unavailable" />Indisponibile</span>
+            {PITCH_HALO_LEGEND.map((item) => (
+              <span key={item.halo} className="fa-formation-legend__item" data-testid={`formation-legend-${item.halo}`}>
+                <span className={`fa-formation-legend__dot fa-formation-legend__dot--${item.halo}`} />
+                {item.label}
+              </span>
+            ))}
           </div>
 
           <div className="fa-formation-layout__pitch-row">

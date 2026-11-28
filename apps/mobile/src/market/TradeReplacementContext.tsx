@@ -11,7 +11,12 @@ import { Alert } from "react-native";
 import { fetchTradeReplacements } from "../api/market";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { TradeReplacementSheet } from "./TradeReplacementSheet";
-import { markReplacementPromptShown, replacementPromptShown } from "./tradeReplacementPrompt";
+import {
+  beginExplicitOpen,
+  claimAutoOpen,
+  claimExplicitOpen,
+  replacementPromptShown,
+} from "./tradeReplacementPrompt";
 
 export type TradeReplacementContextValue = {
   /** I sostituti da scegliere della mia squadra nella lega attiva (`null` finché non si sa). */
@@ -64,9 +69,16 @@ export function TradeReplacementProvider({ children }: { children: ReactNode }) 
     }
   }, [accessToken, enabled]);
 
+  // Il foglio e i sostituti si azzerano solo cambiando lega (o a provider spento): un nuovo
+  // `accessToken` o un `enabled` che torna vero rileggono i sostituti senza chiudere un foglio
+  // appena aperto (che poi si riaprirebbe da solo: anomalia del 24/11, vedi `tradeReplacementPrompt`).
+  const lastLeagueRef = useRef<string | null>(null);
   useEffect(() => {
-    setStatus(null);
-    setIsOpen(false);
+    if (lastLeagueRef.current !== activeLeagueId || !enabled) {
+      lastLeagueRef.current = activeLeagueId;
+      setStatus(null);
+      setIsOpen(false);
+    }
     if (!enabled || !activeLeagueId) {
       return;
     }
@@ -75,8 +87,11 @@ export function TradeReplacementProvider({ children }: { children: ReactNode }) 
       if (cancelled || !next) {
         return;
       }
-      if (shouldAutoOpenReplacement(next, replacementPromptShown(activeLeagueId))) {
-        markReplacementPromptShown(activeLeagueId);
+      // Una volta per lega e per sessione, e mai dopo un'apertura su richiesta (notifica).
+      if (
+        shouldAutoOpenReplacement(next, replacementPromptShown(activeLeagueId)) &&
+        claimAutoOpen(activeLeagueId)
+      ) {
         setIsOpen(true);
       }
     });
@@ -87,8 +102,18 @@ export function TradeReplacementProvider({ children }: { children: ReactNode }) 
 
   const refresh = useCallback(
     async (options?: { openIfPending?: boolean }) => {
+      // Il numero si prende prima di leggere: se intanto il foglio si apre per un'altra causa
+      // (apertura da sola al cambio lega) questa richiesta è già soddisfatta e non lo riapre.
+      const requestToken = options?.openIfPending ? beginExplicitOpen() : 0;
       const next = await load();
-      if (options?.openIfPending && next && next.pending.length > 0) {
+      const leagueId = leagueRef.current;
+      if (
+        options?.openIfPending &&
+        next &&
+        next.pending.length > 0 &&
+        leagueId &&
+        claimExplicitOpen(leagueId, requestToken)
+      ) {
         setIsOpen(true);
       }
       return next;

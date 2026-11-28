@@ -1,4 +1,5 @@
 import type { SystemJob } from "@fantappero/contracts";
+import { JOBS_INTRO, jobsSummaryTiles } from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
@@ -155,9 +156,19 @@ export function AdminJobsScreen() {
     <PageContainer title="Job automatici" refreshing={loading} onRefresh={() => void load()}>
       <View style={styles.section} testID="admin-jobs">
         <Text style={styles.sectionTitle}>Cosa parte da solo</Text>
-        <Text style={styles.meta}>
-          Puoi spegnerli o cambiare ogni quanto partono. Il beat legge la modifica da solo.
-        </Text>
+        <Text style={styles.meta}>{JOBS_INTRO}</Text>
+        {/* Riepilogo come sul sito (1.5): quanti job sono accesi e quando parte il prossimo. */}
+        {!loading && !error && jobs.length > 0 ? (
+          <View style={local.tiles} accessibilityLabel="Riepilogo job" testID="admin-jobs-summary">
+            {jobsSummaryTiles(jobs).map((tile) => (
+              <View key={tile.label} style={local.tile}>
+                <Text style={local.timeLabel}>{tile.label}</Text>
+                <Text style={local.tileValue}>{tile.value}</Text>
+                <Text style={styles.meta}>{tile.hint}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {loading ? (
           <UiStatePanel state="loading" title="Caricamento job" message="Lettura dello schedule…" testID="admin-jobs-loading" />
         ) : null}
@@ -256,6 +267,26 @@ export function AdminJobsScreen() {
 }
 
 const local = lazyStyles(() => StyleSheet.create({
+  tiles: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  tile: {
+    flexGrow: 1,
+    flexBasis: 130,
+    gap: 2,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  tileValue: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontWeight: "800",
+  },
   card: {
     gap: spacing.sm,
     padding: spacing.lg,

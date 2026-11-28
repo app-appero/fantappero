@@ -8,6 +8,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "rea
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { lazyStyles } from "../../theme/lazyStyles";
 import { AvatarImage } from "../../components/AvatarImage";
+import { HALO_COLOR, PITCH_HALO_LEGEND, type PitchHalo } from "./pitchHalo";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -47,6 +48,8 @@ export type PitchSlot = {
   final?: boolean;
   /** Altri stati dalle formazioni probabili: giallo = possibile panchina, rosso = espulso, grigio = indisponibile. */
   probableState?: ProbableTone | null;
+  /** Nessuna informazione dalla formazione probabile: alone neutro (27/11). */
+  noInfo?: boolean;
   photoUrl?: string | null;
   /** Countdown del prossimo blocco, sotto il nome. */
   lockCountdown?: string | null;
@@ -79,9 +82,10 @@ function hexToRgb(hex: string): string {
  * shadow/elevation si vedono uguali su iOS e Android, come l'alone del web.
  * `offset` = spessore del bordo del pallino, `width` = spessore di ogni anello.
  */
-export function ToneHalo({ tone, offset, width = 3 }: { tone: ProbableTone; offset: number; width?: number }) {
-  const rgb = hexToRgb(TONE_COLOR[tone]);
-  const alphas = tone === "unavailable" ? [0.5, 0.3, 0.15] : [0.95, 0.6, 0.3];
+export function ToneHalo({ tone, offset, width = 3 }: { tone: PitchHalo; offset: number; width?: number }) {
+  const rgb = hexToRgb(HALO_COLOR[tone]);
+  // Grigio e neutro più tenui: non devono sembrare uno stato «buono» come verde e giallo.
+  const alphas = tone === "unavailable" ? [0.5, 0.3, 0.15] : tone === "none" ? [0.75, 0.4, 0.18] : [0.95, 0.6, 0.3];
   return (
     <>
       {alphas.map((alpha, k) => {
@@ -122,17 +126,17 @@ export function probableTone(row: {
 }
 
 export function FormationLegend() {
-  const items: { tone: ProbableTone; label: string }[] = [
-    { tone: "starter", label: "Titolare probabile" },
-    { tone: "bench", label: "Possibile panchina" },
-    { tone: "expelled", label: "Espulso / squalificato (non selezionabile)" },
-    { tone: "unavailable", label: "Indisponibile" },
-  ];
   return (
     <View style={styles.legend} testID="formation-legend">
-      {items.map((item) => (
-        <View key={item.tone} style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: TONE_COLOR[item.tone] }]} />
+      {PITCH_HALO_LEGEND.map((item) => (
+        <View key={item.halo} style={styles.legendItem} testID={`formation-legend-${item.halo}`}>
+          <View
+            style={[
+              styles.legendDot,
+              { backgroundColor: HALO_COLOR[item.halo] },
+              item.halo === "none" ? styles.legendDotNone : null,
+            ]}
+          />
           <Text style={styles.legendText}>{item.label}</Text>
         </View>
       ))}
@@ -220,6 +224,8 @@ export function FormationPitch({
           >
             {slot.probableState ?? (slot.probable ? "starter" : null) ? (
               <ToneHalo tone={(slot.probableState ?? "starter") as ProbableTone} offset={4} />
+            ) : slot.noInfo ? (
+              <ToneHalo tone="none" offset={4} />
             ) : null}
             {slot.photoUrl ? (
               <AvatarImage uri={slot.photoUrl} style={styles.photo} size={38} />
@@ -741,6 +747,8 @@ const styles = lazyStyles(() =>
     },
     legendItem: { flexDirection: "row", alignItems: "center", gap: 6, marginRight: spacing.sm },
     legendDot: { width: 12, height: 12, borderRadius: 6 },
+    // Alone neutro: chiaro con un filo scuro, leggibile su fondo chiaro e scuro.
+    legendDotNone: { borderWidth: 1.5, borderColor: "rgba(100,116,139,0.7)" },
     legendText: { color: colors.foreground, fontSize: typography.fontSize.xs },
     clearText: { color: colors.danger, fontWeight: "600" },
   }),

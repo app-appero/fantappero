@@ -1,4 +1,5 @@
 import type { SystemJob } from "@fantappero/contracts";
+import { JOBS_INTRO, jobsSummaryTiles } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -69,23 +70,6 @@ function progressPercent(job: SystemJob): number {
     return 0;
   }
   return Math.min(100, Math.max(0, Math.round(((Date.now() - start) / (end - start)) * 100)));
-}
-
-function formatTimeUntil(value: string | null): string {
-  if (!value) {
-    return "—";
-  }
-  const minutes = Math.round((new Date(value).getTime() - Date.now()) / 60000);
-  if (minutes <= 0) {
-    return "ora";
-  }
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-  if (minutes < 1440) {
-    return `${Math.round(minutes / 60)} h`;
-  }
-  return `${Math.round(minutes / 1440)} g`;
 }
 
 export function AdminJobsPage() {
@@ -189,11 +173,7 @@ export function AdminJobsPage() {
       }
     >
       <div className="fa-jobs" data-testid="admin-jobs">
-        <p className="fa-jobs__intro">
-          Questi giri non aspettano un pulsante. Puoi spegnerli o cambiare ogni quanto partono: il
-          beat legge la modifica da solo, senza un nuovo deploy. La prossima partenza è calcolata
-          dall’ultima esecuzione più la frequenza.
-        </p>
+        <p className="fa-jobs__intro">{JOBS_INTRO}</p>
         {loading ? (
           <UiStatePanel state="loading" title="Caricamento job" message="Lettura dello schedule…" testId="admin-jobs-loading" />
         ) : null}
@@ -205,25 +185,13 @@ export function AdminJobsPage() {
         ) : null}
         {!loading && !loadError && jobs.length > 0 ? (
           <ul className="fa-jobs__tiles" aria-label="Riepilogo job">
-            <li>
-              <span>Attivi</span>
-              <strong>
-                {jobs.filter((job) => job.enabled).length} / {jobs.length}
-              </strong>
-              <small>{jobs.filter((job) => !job.enabled).length === 1 ? "1 spento" : `${jobs.filter((job) => !job.enabled).length} spenti`}</small>
-            </li>
-            {(() => {
-              const next = jobs
-                .filter((job) => job.enabled && job.nextRunAt)
-                .sort((x, y) => new Date(x.nextRunAt as string).getTime() - new Date(y.nextRunAt as string).getTime())[0];
-              return (
-                <li>
-                  <span>Prossimo giro</span>
-                  <strong>{next ? formatTimeUntil(next.nextRunAt) : "—"}</strong>
-                  <small>{next ? next.title : "Nessun job attivo"}</small>
-                </li>
-              );
-            })()}
+            {jobsSummaryTiles(jobs).map((tile) => (
+              <li key={tile.label}>
+                <span>{tile.label}</span>
+                <strong>{tile.value}</strong>
+                <small>{tile.hint}</small>
+              </li>
+            ))}
           </ul>
         ) : null}
         <div className="fa-jobs__grid">

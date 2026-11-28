@@ -28,7 +28,11 @@ export type ListoneRefreshContextValue = {
   refreshing: boolean;
   progress: ListoneRefreshProgress | null;
   seasonYear: number | null;
-  startRefresh: (accessToken: string, seasonYear: number) => Promise<AdminListoneRefreshResult>;
+  startRefresh: (
+    accessToken: string,
+    seasonYear: number,
+    options?: { updateRoles?: boolean },
+  ) => Promise<AdminListoneRefreshResult>;
 };
 
 const ListoneRefreshContext = createContext<ListoneRefreshContextValue | null>(null);
@@ -96,12 +100,16 @@ export function ListoneRefreshProvider({ children }: { children: ReactNode }) {
   );
 
   const startRefresh = useCallback(
-    (token: string, year: number): Promise<AdminListoneRefreshResult> => {
+    (
+      token: string,
+      year: number,
+      options: { updateRoles?: boolean } = {},
+    ): Promise<AdminListoneRefreshResult> => {
       if (inFlightRef.current) {
         return inFlightRef.current;
       }
       setProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
-      const promise = startAdminListoneRefresh(token, year).then((job) =>
+      const promise = startAdminListoneRefresh(token, year, options).then((job) =>
         watch(token, job.jobId, year),
       );
       inFlightRef.current = promise;

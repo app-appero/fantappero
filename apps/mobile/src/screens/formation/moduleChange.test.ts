@@ -33,9 +33,15 @@ describe("moduleChangeRoute", () => {
 describe("moduleChangeFallbackNotice", () => {
   const apiError = (code: string) => Object.assign(new Error("errore"), { code, status: 422 });
 
-  it("tace sui rifiuti previsti: rosa insufficiente e turno non modificabile", () => {
+  it("con pochi disponibili mostra il messaggio del server (cosa manca per ruolo)", () => {
+    const message =
+      "Formazione migliore non applicata: per il modulo 4-4-2 mancano calciatori disponibili (1 difensore).";
+    const error = Object.assign(new Error(message), { code: "ai_lineup_incomplete", status: 400 });
+    assert.equal(moduleChangeFallbackNotice(error), message);
+  });
+
+  it("tace sugli altri rifiuti previsti: rosa non validata e turno non modificabile", () => {
     for (const code of [
-      "ai_lineup_incomplete",
       "roster_not_validated",
       "turn_not_open",
       "turn_skipped",

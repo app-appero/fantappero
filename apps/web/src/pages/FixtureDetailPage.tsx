@@ -10,6 +10,7 @@ import type {
 import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete,
   playerAvatarUrl,
   clubCrestUrl,
+  absenceLine,
 } from "@fantappero/contracts";
 import type { TimelineEntry } from "@fantappero/ui";
 import {
@@ -252,7 +253,7 @@ function SquadTabs({
                   <span className="fa-mrow__name">
                     <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
                   </span>
-                  <span className="fa-mrow__team">{absenceLabel(player.kind, player.label)}</span>
+                  <span className="fa-mrow__team">{absenceLine(player.kind, player.label)}</span>
                 </span>
                 <span className={`fa-mrow__chip ${susp ? "fa-mrow__chip--out" : "fa-mrow__chip--gone"}`}>
                   {susp ? "Squalifica" : "Infortunio"}
@@ -264,19 +265,6 @@ function SquadTabs({
       )}
     </div>
   );
-}
-
-function absenceLabel(kind: string | null, label: string | null): string {
-  const normalized = (kind ?? "").toLowerCase();
-  const kindLabel =
-    normalized === "injury"
-      ? "Infortunio"
-      : normalized === "suspension" || normalized === "suspended"
-        ? "Squalifica"
-        : normalized === "red" || normalized === "red_card" || normalized === "redcard"
-          ? "Espulsione"
-          : "Indisponibile";
-  return label ? `${kindLabel} · ${label}` : kindLabel;
 }
 
 function LineupBlock({

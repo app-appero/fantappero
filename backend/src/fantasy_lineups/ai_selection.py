@@ -36,12 +36,15 @@ class ExclusionReason(StrEnum):
 
     INJURED = "injured"
     NO_FIXTURE = "no_fixture"
+    #: Indisponibile per la formazione probabile o senza voto sicuro (in grigio in campo).
+    UNAVAILABLE = "unavailable"
     NOT_SELECTED = "not_selected"
 
 
 EXCLUSION_LABELS: dict[ExclusionReason, str] = {
     ExclusionReason.INJURED: "Infortunato",
     ExclusionReason.NO_FIXTURE: "Nessuna partita nel turno",
+    ExclusionReason.UNAVAILABLE: "Indisponibile",
     ExclusionReason.NOT_SELECTED: "Non selezionato dalla formula",
 }
 
@@ -71,6 +74,10 @@ class CandidateInput:
     has_fixture: bool
     #: True quando la sua partita è già iniziata.
     kickoff_locked: bool
+    #: True quando la formazione lo mostra indisponibile (in grigio): assenza nella formazione
+    #: probabile, partita rinviata, nessuna partita. Lo imposta solo «Applica formazione
+    #: migliore» (``best_lineup_service``); le squadre IA restano come prima.
+    unavailable: bool = False
 
 
 @dataclass(frozen=True)
@@ -115,6 +122,8 @@ def is_eligible(candidate: CandidateInput) -> ExclusionReason | None:
         return ExclusionReason.INJURED
     if not candidate.has_fixture:
         return ExclusionReason.NO_FIXTURE
+    if candidate.unavailable:
+        return ExclusionReason.UNAVAILABLE
     return None
 
 

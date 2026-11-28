@@ -62,7 +62,7 @@ import type {
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
-import { CALENDAR_ROSTERS_INVALID_CODE } from "@fantappero/contracts";
+import { CALENDAR_ROSTERS_INVALID_CODE, calendarRosterIssuesFromPayload } from "@fantappero/contracts";
 import { apiRequest, apiUpload, ApiError } from "./client";
 import { getWebEnv, resolveApiBaseUrl } from "../config/env";
 
@@ -338,29 +338,7 @@ export function calendarRosterIssuesFromError(error: unknown): CalendarRosterTea
   if (!(error instanceof ApiError) || error.code !== CALENDAR_ROSTERS_INVALID_CODE) {
     return null;
   }
-  const raw = error.payload.teams;
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  return raw.flatMap((item): CalendarRosterTeamIssues[] => {
-    if (!item || typeof item !== "object") {
-      return [];
-    }
-    const team = item as Record<string, unknown>;
-    if (typeof team.teamName !== "string") {
-      return [];
-    }
-    return [
-      {
-        teamId: typeof team.teamId === "string" ? team.teamId : null,
-        teamName: team.teamName,
-        issues: Array.isArray(team.issues)
-          ? team.issues.filter((issue): issue is string => typeof issue === "string")
-          : [],
-        lineupBlocked: team.lineupBlocked === true,
-      },
-    ];
-  });
+  return calendarRosterIssuesFromPayload(error.payload);
 }
 
 export function fetchLeagueListone(

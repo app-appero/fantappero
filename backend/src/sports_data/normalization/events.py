@@ -7,6 +7,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from sports_data.normalization.disallowed import without_disallowed_goals
 from sports_data.normalization.keys import event_provider_key, stats_provider_key
 from sports_data.normalization.types import (
     AnomalyCode,
@@ -49,7 +50,8 @@ def normalize_scoring_events(
     Does not apply fantavoto points. Contradictions and insufficient data are
     surfaced via EventStatus and AnomalyCode — never silently merged away.
     """
-    raw_events = _response_list(events_payload)
+    # Un gol annullato dal VAR non dà gol, assist né rigore segnato (QA 28/11).
+    raw_events = without_disallowed_goals(_response_list(events_payload))
     player_rows = list(_iter_player_rows(players_payload))
 
     out: list[NormalizedScoringEvent] = []

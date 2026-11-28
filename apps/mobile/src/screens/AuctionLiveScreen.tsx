@@ -8,7 +8,15 @@ import type {
   PendingSwapDecision,
   RosterOccupancyEntry,
 } from "@fantappero/contracts";
-import { computeMinimumNextBid } from "@fantappero/contracts";
+import {
+  CUSTOM_RAISE_LABEL,
+  computeMinimumNextBid,
+  customRaiseAmount,
+  customRaisePlaceholder,
+  raiseButtonLabel,
+  raiseTargetAmount,
+} from "@fantappero/contracts";
+import { theme } from "@fantappero/ui/theme";
 import { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
@@ -305,6 +313,7 @@ export function AuctionLiveScreen() {
 
   const [raiseBusy, setRaiseBusy] = useState(false);
   const [raiseError, setRaiseError] = useState<string | null>(null);
+  const [customBid, setCustomBid] = useState("");
 
   const minimumNextBid = currentLot
     ? computeMinimumNextBid(
@@ -577,14 +586,37 @@ export function AuctionLiveScreen() {
                 </View>
               ) : null}
 
+              {/* «Offerta personalizzata» come sul sito (1.5): scrivi tu l'importo del rilancio. */}
+              <Text style={styles.fieldLabel}>{CUSTOM_RAISE_LABEL}</Text>
+              <TextInput
+                style={styles.input}
+                value={customBid}
+                onChangeText={setCustomBid}
+                keyboardType="number-pad"
+                placeholder={customRaisePlaceholder(minimumNextBid)}
+                placeholderTextColor={theme.colors.foregroundMuted}
+                editable={!raiseBusy && marketOpen}
+                accessibilityLabel={CUSTOM_RAISE_LABEL}
+                testID="auction-live-custom-bid"
+              />
+
               <View style={styles.lotActions} testID="auction-live-lot-actions">
                 <Pressable
                   style={[styles.button, (raiseBusy || minimumNextBid === null || !marketOpen) && styles.disabled]}
                   disabled={raiseBusy || minimumNextBid === null || !marketOpen}
-                  onPress={() => minimumNextBid !== null && handleRaise(minimumNextBid)}
+                  onPress={() => {
+                    const amount = raiseTargetAmount(customBid, minimumNextBid);
+                    if (amount === null) {
+                      return;
+                    }
+                    handleRaise(amount);
+                    if (customRaiseAmount(customBid) !== null) {
+                      setCustomBid("");
+                    }
+                  }}
                   testID="auction-live-raise-min"
                 >
-                  <Text style={styles.buttonLabel}>Rilancia a {minimumNextBid ?? "—"}</Text>
+                  <Text style={styles.buttonLabel}>{raiseButtonLabel(customBid, minimumNextBid)}</Text>
                 </Pressable>
                 {isOperator ? (
                   <>

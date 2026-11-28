@@ -56,6 +56,7 @@ import {
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
+import { pitchHalo } from "./formation/pitchHalo";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
 import { formationRoundToLoad } from "./formation/roundSelection";
@@ -91,6 +92,9 @@ import { formationTurnOptionLabel } from "../matchday/turnLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
+import { italianAbsenceText } from "@fantappero/contracts";
+import { STARTERS_COUNTER_COLOR_TOKEN, startersCounterTone } from "./formation/startersCounter";
+import { BenchRoleDot } from "./formation/BenchRoleDot";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -874,7 +878,8 @@ export function FormationScreen() {
    * Cambio modulo senza bloccati in campo (decisione del 19/11): i migliori per ruolo sul nuovo
    * modulo, con lo stesso criterio di «Formazione migliore». Il server salva solo la bozza: niente
    * mosse tattiche consumate, niente conferma. Se la richiesta fallisce restano i compatibili già
-   * mostrati; il messaggio compare solo per un errore vero, non per rosa insufficiente o turno chiuso.
+   * mostrati; il messaggio compare per un errore vero e quando mancano disponibili (messaggio del
+   * server), non per turno chiuso.
    */
   async function applyBestForModule(code: FantasyModule) {
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
@@ -1169,6 +1174,8 @@ export function FormationScreen() {
         const tone = probableTone(row);
         return tone === "starter" ? null : tone;
       })() : null,
+      // Nessun dato dalla formazione probabile: alone neutro, voce «Nessuna informazione» (27/11).
+      noInfo: row ? pitchHalo(probableTone(row)) === "none" : false,
       photoUrl: row ? playerAvatarUrl(row.athleteId, row.realTeamName) : null,
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
@@ -1313,7 +1320,7 @@ export function FormationScreen() {
               stateLabel = "Fuori rosa, in esubero";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
-              stateLabel = row.probableNote ?? "Indisponibile";
+              stateLabel = italianAbsenceText(row.probableNote) ?? "Indisponibile";
             } else if (playerLocked(row.athleteId)) {
               state = "bloccato";
               stateLabel = "Bloccato · partita iniziata";
@@ -1387,7 +1394,7 @@ export function FormationScreen() {
                 stateLabel = `Panchina ${benchPos + 1}°`;
               }
               if (row.selectionBlocked || row.probableAbsence === "suspended") {
-                stateLabel = `${stateLabel} · ${row.probableNote ?? "Indisponibile"}`;
+                stateLabel = `${stateLabel} · ${italianAbsenceText(row.probableNote) ?? "Indisponibile"}`;
               }
             }
             if (!isCurrent && benchQuotaSwaps.has(row.athleteId)) {
@@ -1546,7 +1553,15 @@ export function FormationScreen() {
         <View style={styles.progressHead}>
           <View style={styles.progressTitle}>
             <Text style={styles.progressLabel}>Titolari</Text>
-            <Text style={[styles.progressCount, missing === 0 ? styles.progressOk : null]}>
+            <Text
+              style={[
+                styles.progressCount,
+                startersCounterTone(filledCount, totalSlots) === "complete"
+                  ? styles.progressOk
+                  : styles.progressPending,
+              ]}
+              testID="formation-starters-count"
+            >
               {filledCount}/{totalSlots}
             </Text>
           </View>
@@ -1667,6 +1682,7 @@ export function FormationScreen() {
                   )}
                   <View style={styles.benchBody}>
                     <View style={styles.benchNameRow}>
+                      {row ? <BenchRoleDot role={role} testID={`formation-bench-role-${index}`} /> : null}
                       <AthleteName plain athleteId={id} style={styles.benchName}>
                         {name}
                       </AthleteName>
@@ -1738,6 +1754,7 @@ export function FormationScreen() {
                       )}
                       <View style={styles.benchBody}>
                         <View style={styles.benchNameRow}>
+                          {row ? <BenchRoleDot role={role} testID={`formation-bench-role-${index}`} /> : null}
                           <AthleteName plain athleteId={id} style={styles.benchName}>
                             {name}
                           </AthleteName>
@@ -2311,7 +2328,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
   },
-  progressOk: { color: colors.success },
+  progressOk: { color: colors[STARTERS_COUNTER_COLOR_TOKEN.complete] },
+  // Sotto gli 11 titolari: colore del testo del tema (prima nessun colore, nero sul fondo scuro).
+  progressPending: { color: colors[STARTERS_COUNTER_COLOR_TOKEN.incomplete] },
   progressTrack: {
     height: 6,
     borderRadius: 999,

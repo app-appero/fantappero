@@ -1,5 +1,10 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
-import { avatarInitials, missingMembersLabel, pendingInvitesLabel } from "@fantappero/contracts";
+import {
+  avatarInitials,
+  missingMembersLabel,
+  pendingInvitesLabel,
+  removeMemberConfirmation,
+} from "@fantappero/contracts";
 import { AvatarWithFallback, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -96,6 +101,8 @@ export function LeagueMembersPanel({
   );
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  // «Rimuovi» chiede prima «Sei sicuro?» (1.5): finestra aperta se c'è un partecipante da confermare.
+  const [removeTarget, setRemoveTarget] = useState<LeagueMember | null>(null);
   // Sostituzione fantallenatore: finestra a due passi (chi togliere, chi mettere).
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceFromId, setReplaceFromId] = useState("");
@@ -353,6 +360,10 @@ export function LeagueMembersPanel({
     }
   }
 
+  const removeConfirmation = removeTarget
+    ? removeMemberConfirmation(removeTarget.displayName)
+    : null;
+
   return (
     <section
       className="fa-members"
@@ -515,7 +526,8 @@ export function LeagueMembersPanel({
                     size="sm"
                     loading={workingId === `remove-${member.userId}`}
                     disabled={workingId !== null}
-                    onClick={() => void onRemove(member)}
+                    onClick={() => setRemoveTarget(member)}
+                    data-testid={`league-member-remove-${member.userId}`}
                   >
                     Rimuovi
                   </Button>
@@ -534,6 +546,39 @@ export function LeagueMembersPanel({
           testId="league-members-success"
         />
       ) : null}
+      <Modal
+        open={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        title={removeConfirmation?.title ?? "Sei sicuro?"}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setRemoveTarget(null)}
+              data-testid="league-members-remove-cancel"
+            >
+              {removeConfirmation?.cancelLabel ?? "Annulla"}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                const target = removeTarget;
+                setRemoveTarget(null);
+                if (target) {
+                  void onRemove(target);
+                }
+              }}
+              data-testid="league-members-remove-confirm"
+            >
+              {removeConfirmation?.confirmLabel ?? "Rimuovi"}
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="league-members-remove-dialog">{removeConfirmation?.message}</p>
+      </Modal>
       <Modal
         open={adminOpen}
         onClose={() => setAdminOpen(false)}

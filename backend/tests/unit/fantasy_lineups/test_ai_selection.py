@@ -77,6 +77,32 @@ def test_available_player_is_eligible() -> None:
     assert is_eligible(candidate(1)) is None
 
 
+def test_player_shown_unavailable_is_excluded() -> None:
+    """Grigio in campo (formazione probabile, Rosario 27/11): mai titolare."""
+    shown = CandidateInput(**{**candidate(1).__dict__, "unavailable": True})
+    assert is_eligible(shown) is ExclusionReason.UNAVAILABLE
+
+
+def test_unavailable_player_yields_to_an_available_one_of_the_same_role() -> None:
+    """Il preferito della formula (id minore) è indisponibile: entra l'altro dello stesso
+    ruolo; senza alternative il ruolo resta scoperto, non riempito con l'indisponibile."""
+    keeper = candidate(1, role=FantasyRole.P)
+    preferred = CandidateInput(
+        **{**candidate(2, role=FantasyRole.D, recent_form=9.0).__dict__, "unavailable": True}
+    )
+    others = [candidate(3, role=FantasyRole.D), candidate(4, role=FantasyRole.D)]
+    midfielder = CandidateInput(**{**candidate(5).__dict__, "unavailable": True})
+    plan = build_lineup_plan(
+        [keeper, preferred, *others, midfielder], SMALL_TARGETS, decided_at=DECIDED_AT
+    )
+    assert preferred.athlete_id not in plan.starters
+    assert {item.athlete_id for item in others} <= set(plan.starters)
+    assert midfielder.athlete_id not in plan.starters
+    assert plan.unfilled_roles == (FantasyRole.C,)
+    assert not plan.is_complete
+    assert {preferred.athlete_id, midfielder.athlete_id} <= set(plan.bench)
+
+
 # ---------------------------------------------------------------------------
 # Formula
 # ---------------------------------------------------------------------------

@@ -26,7 +26,7 @@ import {
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { buyTradeReplacement, fetchTradeReplacementCandidates } from "../api/market";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { getApiErrorMessage } from "../session/DemoSessionContext";
@@ -143,8 +143,21 @@ export function TradeReplacementSheet({
   const unaffordable = replacementUnaffordableNotice(status, activeRole);
   const closeOrBack = target ? () => setTarget(null) : onClose;
 
+  // Nel browser (app aperta con Expo web) `react-native-web` tiene il `<Modal>` montato finché
+  // non finisce l'animazione di chiusura: se non arriva `animationend` ne resta una copia
+  // invisibile, e una riapertura ravvicinata ne mostrava due. Sul web niente animazione e a
+  // finestra chiusa non si monta nulla; sul telefono resta lo scorrimento dal basso.
+  if (Platform.OS === "web" && !visible) {
+    return null;
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={closeOrBack}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={Platform.OS === "web" ? "none" : "slide"}
+      onRequestClose={closeOrBack}
+    >
       <Pressable style={shortfallStyles.backdrop} onPress={closeOrBack} accessibilityLabel={REPLACEMENT_LATER_LABEL}>
         <Pressable style={shortfallStyles.sheet} onPress={() => undefined} testID="replacement-sheet">
           <View style={shortfallStyles.grip} />

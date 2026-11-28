@@ -1217,6 +1217,15 @@ button.fa-app-header__league-action {
   padding: 0 4px;
 }
 
+/* Nessuna informazione dalla formazione probabile: alone neutro (27/11). Prima degli altri stati,
+   così live e voti, se ci sono, prevalgono. */
+.fa-pitch-player--no-info .fa-pitch-player__card {
+  border-color: #e2e8f0;
+  box-shadow:
+    0 0 0 3px rgba(226, 232, 240, 0.55),
+    0 0 12px 3px rgba(226, 232, 240, 0.45);
+}
+
 .fa-pitch-player--probable .fa-pitch-player__card {
   border-color: var(--fa-success-400);
   box-shadow:
@@ -1338,6 +1347,7 @@ button.fa-app-header__league-action {
 .fa-formation-legend__dot--bench { background: #facc15; box-shadow: 0 0 8px #facc15; }
 .fa-formation-legend__dot--expelled { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
 .fa-formation-legend__dot--unavailable { background: #9ca3af; }
+.fa-formation-legend__dot--none { background: #e2e8f0; box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.55), 0 0 6px rgba(226, 232, 240, 0.8); }
 
 .fa-pitch-player__lockdot {
   position: absolute;

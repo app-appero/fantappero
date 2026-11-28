@@ -1,4 +1,6 @@
 import {
+  broadcastConfirmation,
+  type ConfirmCopy,
   avatarInitial,
   BROADCAST_CATEGORY_OPTIONS,
   BROADCAST_DESTINATIONS,
@@ -22,6 +24,7 @@ import {
 } from "../../api/notifications";
 import { adminUiStyles as base } from "../../admin/adminUiStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DateTimeField, parseDateTimeValue } from "../../components/DateTimeField";
 import { HScroll } from "../../components/HScroll";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -266,29 +269,48 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  // «Invia a N utenti» chiede prima «Sei sicuro?» (1.5); «Invia a me come prova» no.
+  const [confirm, setConfirm] = useState<ConfirmCopy | null>(null);
   const recipients = mode === "all" ? allTotal : selected.size;
 
-  async function submit(toMeOnly: boolean) {
+  /** I controlli prima dell'invio; `null` e l'errore a schermo se qualcosa non va. */
+  function validate(toMeOnly: boolean): { when: Date | null } | null {
     if (!title.trim() || !body.trim()) {
       setError("Titolo e testo sono obbligatori.");
-      return;
+      return null;
     }
     if (toMeOnly && !myId) {
       setError("Utente non riconosciuto.");
-      return;
+      return null;
     }
     if (!toMeOnly && mode === "users" && selected.size === 0) {
       setError("Scegli almeno un destinatario.");
-      return;
+      return null;
     }
     let when: Date | null = null;
     if (scheduled && !toMeOnly) {
       when = parseDateTimeValue(scheduledAt);
       if (!when || when.getTime() <= Date.now()) {
         setError("Scegli una data e un'ora nel futuro.");
-        return;
+        return null;
       }
     }
+    return { when };
+  }
+
+  function requestSend() {
+    if (validate(false)) {
+      setError(null);
+      setConfirm(broadcastConfirmation({ title, recipients, scheduled, push, email }));
+    }
+  }
+
+  async function submit(toMeOnly: boolean) {
+    const checked = validate(toMeOnly);
+    if (!checked) {
+      return;
+    }
+    const { when } = checked;
     setBusy(true);
     setError(null);
     setDone(null);
@@ -389,7 +411,7 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
         {scheduled ? <DateTimeField label="Data e ora" value={scheduledAt} onChange={setScheduledAt} testID="admin-notifications-when" /> : null}
         {error ? <Text style={styles.error} testID="admin-notifications-error">{error}</Text> : null}
         {done ? <Text style={styles.done} testID="admin-notifications-done">{done}</Text> : null}
-        <Pressable style={[base.button, busy && base.disabled]} disabled={busy} onPress={() => void submit(false)} testID="admin-notifications-send">
+        <Pressable style={[base.button, busy && base.disabled]} disabled={busy} onPress={requestSend} testID="admin-notifications-send">
           <Text style={base.buttonLabel}>{recipients === null ? "Invia" : `Invia a ${recipients} utenti`}</Text>
         </Pressable>
         <Pressable style={[base.secondaryButton, busy && base.disabled]} disabled={busy} onPress={() => void submit(true)} testID="admin-notifications-send-me">
@@ -407,6 +429,16 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
           </View>
         </View>
       </View>
+      <ConfirmDialog
+        copy={confirm}
+        busy={busy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          setConfirm(null);
+          void submit(false);
+        }}
+        testID="admin-notifications-confirm"
+      />
     </View>
   );
 }

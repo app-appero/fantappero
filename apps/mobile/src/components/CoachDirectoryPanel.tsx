@@ -1,6 +1,13 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
-import { avatarInitials } from "@fantappero/contracts";
+import {
+  COACH_RESET_FILTERS_LABEL,
+  COACH_TYPE_FILTER_LABEL,
+  COACH_TYPE_OPTIONS,
+  type CoachTypeFilter,
+  avatarInitials,
+  hasCoachFilters,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -87,6 +94,8 @@ export function CoachDirectoryPanel({
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  // Filtro «Tipologia» (Tutte / Manuale / IA): lo applica il server, come sul sito (1.5).
+  const [userType, setUserType] = useState<CoachTypeFilter>("");
   const [page, setPage] = useState(0);
   const leagueFull = capacity > 0 && (capacityReached || memberCount >= capacity);
 
@@ -99,7 +108,7 @@ export function CoachDirectoryPanel({
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedQuery, onlyAvailable]);
+  }, [debouncedQuery, onlyAvailable, userType]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -132,6 +141,7 @@ export function CoachDirectoryPanel({
       try {
         const first = await fetchManagerDirectory(accessToken, leagueId, {
           query: debouncedQuery || undefined,
+          userType: userType || undefined,
           page: 1,
           pageSize: 50,
         });
@@ -140,6 +150,7 @@ export function CoachDirectoryPanel({
         for (let page = 2; page <= lastPage; page += 1) {
           const next = await fetchManagerDirectory(accessToken, leagueId, {
             query: debouncedQuery || undefined,
+            userType: userType || undefined,
             page,
             pageSize: 50,
           });
@@ -157,7 +168,7 @@ export function CoachDirectoryPanel({
         setLoading(false);
       }
     },
-    [accessToken, can, debouncedQuery, leagueId],
+    [accessToken, can, debouncedQuery, leagueId, userType],
   );
 
   useFocusEffect(
@@ -305,6 +316,26 @@ export function CoachDirectoryPanel({
           style={styles.search}
           testID={`${testIDPrefix}-search`}
         />
+        <Text style={styles.filterLabel}>{COACH_TYPE_FILTER_LABEL}</Text>
+        <View style={styles.typeRow} accessibilityRole="radiogroup" testID={`${testIDPrefix}-type`}>
+          {COACH_TYPE_OPTIONS.map((option) => {
+            const selected = userType === option.value;
+            return (
+              <Pressable
+                key={option.value || "all"}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, checked: selected }}
+                onPress={() => setUserType(option.value)}
+                style={[styles.typeChip, selected && styles.typeChipOn]}
+                testID={`${testIDPrefix}-type-${option.value || "all"}`}
+              >
+                <Text style={[styles.typeChipLabel, selected && styles.typeChipLabelOn]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
         <Pressable
           style={styles.checkRow}
           onPress={() => setOnlyAvailable((current) => !current)}
@@ -317,6 +348,22 @@ export function CoachDirectoryPanel({
           </View>
           <Text style={styles.checkLabel}>Solo disponibili</Text>
         </Pressable>
+        {hasCoachFilters({ query, userType, onlyAvailable }) ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setQuery("");
+              setDebouncedQuery("");
+              setUserType("");
+              setOnlyAvailable(false);
+              setPage(0);
+            }}
+            style={styles.retry}
+            testID={`${testIDPrefix}-reset-filters`}
+          >
+            <Text style={styles.retryLabel}>{COACH_RESET_FILTERS_LABEL}</Text>
+          </Pressable>
+        ) : null}
         <Text style={styles.hint}>
           Tutti i fantallenatori della piattaforma, non solo quelli di questa lega.
           {capacity > 0
@@ -543,6 +590,20 @@ const styles = lazyStyles(() => StyleSheet.create({
   checkBoxOn: { backgroundColor: colors.brand, borderColor: colors.brand },
   checkMark: { color: colors.onBrand, fontWeight: "800" },
   checkLabel: { color: colors.foreground, fontWeight: "600" },
+  filterLabel: { color: colors.foregroundMuted, fontSize: typography.fontSize.sm },
+  typeRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  typeChip: {
+    minHeight: 40,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  typeChipOn: { borderColor: colors.accent, backgroundColor: colors.backgroundElevated },
+  typeChipLabel: { color: colors.foregroundMuted, fontSize: typography.fontSize.sm },
+  typeChipLabelOn: { color: colors.foreground, fontWeight: typography.fontWeight.semibold },
   pager: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   pagerButton: {
     paddingHorizontal: spacing.md,

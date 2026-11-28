@@ -23,6 +23,23 @@ export const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = Object.fromEntries(
   Object.entries(ADMIN_SCREEN_BY_ID).map(([id, screen]) => [screen, id]),
 );
 
+/** Etichetta del tasto che sta in cima a ogni schermata del pannello operatore (1.5). */
+export const ADMIN_BACK_LABEL = "Indietro";
+
+/**
+ * Dove porta «Indietro» nel pannello operatore (1.5): indietro nella pila se c'è una schermata
+ * prima, altrimenti al Riepilogo; dal Riepilogo si esce dal pannello e si torna all'app.
+ */
+export function adminBackTarget(input: {
+  screen: keyof AdminStackParamList;
+  canGoBack: boolean;
+}): "back" | "home" | "app" {
+  if (input.screen === "AdminHome") {
+    return "app";
+  }
+  return input.canGoBack ? "back" : "home";
+}
+
 /** Schermata a cui porta una riga di «Da guardare». */
 export function adminScreenForWatchTarget(
   target: OperatorWatchTarget,

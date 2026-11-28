@@ -1,5 +1,7 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import type {
+  CalendarActionModalState,
+  CalendarRosterTeamIssues,
   CreatedLeagueInvite,
   LeagueCalendar,
   LeagueInvite,
@@ -9,7 +11,16 @@ import type {
   LeagueRules,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
-import { missingMembersLabel, orderLeagueSetupBlockers } from "@fantappero/contracts";
+import {
+  CALENDAR_CONFIRMED_MESSAGE,
+  CALENDAR_PANEL_INTRO,
+  avatarInitials,
+  calendarErrorNeedsParticipants,
+  calendarGeneratedMessage,
+  missingMembersLabel,
+  orderLeagueSetupBlockers,
+  removeMemberConfirmation,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -19,12 +30,16 @@ import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "re
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { ApiError } from "../api/client";
 import {
+  assignRandomAiRoster,
+  calendarRosterIssuesFromError,
   confirmLeagueCalendar,
   createLeagueInvite,
   deleteLeague,
+  ensureFantasyTeams,
   ensureFantasyTurns,
   fetchLeagueAdminPanel,
   fetchLeagueCalendarAdmin,
+  fetchLeagueCalendarRosterCheck,
   fetchLeagueInvites,
   fetchLeagueMembers,
   generateLeagueCalendar,
@@ -37,19 +52,40 @@ import {
 } from "../api/leagues";
 import { fetchManagerDirectory } from "../api/managerInvites";
 import { AppTextInput } from "../components/AppTextInput";
+import { AvatarWithFallback } from "../components/AvatarWithFallback";
+import { CalendarActionDialog } from "../components/CalendarActionDialog";
 import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import {
+  calendarButtonsDisabled,
+  calendarModalAfterCheck,
+  calendarModalAfterError,
+  calendarModalChecking,
+} from "../leagues/calendarModalFlow";
 import { isLeagueDeletable, stackAfterLeagueDeleted } from "../leagues/leagueDeleteHelpers";
 import { leagueStateLabel } from "../leagues/leagueLabels";
+import {
+  RANDOM_ROSTER_FALLBACK_ERROR,
+  RANDOM_ROSTER_ONLY_AI_MESSAGE,
+  RANDOM_ROSTER_TEAM_MISSING_MESSAGE,
+  canAssignRandomRoster,
+  canManageMember,
+  canOpenMemberProfile,
+  memberRemovedMessage,
+  memberRoleLabel,
+  randomRosterAssignedMessage,
+} from "../leagues/memberRow";
 import { rulesSavedMessage } from "../leagues/rulesSaved";
 import { MarketGateBarView } from "../market/MarketGateBar";
 import { pendingInvitesLabel } from "../market/marketGateNotice";
 import { useMarketGate } from "../market/useMarketGate";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { resolveAvatarUrl } from "../utils/avatar";
 import { copyToClipboard } from "../utils/clipboard";
 
 const { colors, spacing, typography, radius } = theme;
@@ -124,6 +160,13 @@ export function LeagueAdminScreen() {
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
   const [createdInvite, setCreatedInvite] = useState<CreatedLeagueInvite | null>(null);
   const [calendar, setCalendar] = useState<LeagueCalendar | null>(null);
+  // «Genera/Conferma calendario» apre la finestra con il controllo delle rose (1.5).
+  const [calendarModal, setCalendarModal] = useState<CalendarActionModalState | null>(null);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [calendarSuccess, setCalendarSuccess] = useState<string | null>(null);
+  // «Rimuovi» chiede prima «Sei sicuro?» con il nome (1.5).
+  const [removeTarget, setRemoveTarget] = useState<LeagueMember | null>(null);
+  const [membersSuccess, setMembersSuccess] = useState<string | null>(null);
   const [expiresInDays, setExpiresInDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -408,6 +451,7 @@ export function LeagueAdminScreen() {
 
   async function onRemove(userId: string, displayName: string) {
     setActionError(null);
+    setMembersSuccess(null);
     if (!leagueId || !accessToken) {
       return;
     }
@@ -416,6 +460,7 @@ export function LeagueAdminScreen() {
       await removeLeagueMember(accessToken, leagueId, userId);
       // Il backend abbassa participantCount agli iscritti rimasti: ricarica tutto.
       await loadAll();
+      setMembersSuccess(memberRemovedMessage(displayName));
     } catch (error) {
       setActionError(getApiErrorMessage(error, `Impossibile rimuovere ${displayName}.`));
     } finally {
@@ -423,49 +468,117 @@ export function LeagueAdminScreen() {
     }
   }
 
-  async function onGenerateCalendar() {
+  /** «Assegna rosa random» per un fantallenatore IA (come sul sito). */
+  async function onAssignRandomRoster(target: LeagueMember) {
     setActionError(null);
-    if (!leagueId || !accessToken) {
+    setMembersSuccess(null);
+    if (target.userType !== "ai") {
+      setActionError(RANDOM_ROSTER_ONLY_AI_MESSAGE);
       return;
     }
-    setWorkingId("calendar-generate");
+    if (!leagueId || !accessToken) {
+      setActionError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setWorkingId(`random-${target.userId}`);
     try {
-      try {
-        setCalendar(await generateLeagueCalendar(accessToken, leagueId));
-      } catch (error) {
-        // I Turni Europei di questa lega non esistono ancora (lega nuova, mai
-        // entrata nella finestra del cron automatico che copre solo le leghe
-        // già attive): li sincronizziamo al volo e riproviamo, così "Genera
-        // calendario" resta un solo bottone per l'intera catena.
-        if (!(error instanceof ApiError) || error.code !== "european_turns_missing") {
-          throw error;
-        }
-        await ensureFantasyTurns(accessToken, leagueId);
-        setCalendar(await generateLeagueCalendar(accessToken, leagueId));
+      const ensured = await ensureFantasyTeams(accessToken, leagueId);
+      const team = ensured.teams.find((row) => row.userId === target.userId);
+      if (!team) {
+        setActionError(RANDOM_ROSTER_TEAM_MISSING_MESSAGE);
+        return;
       }
+      const updated = await assignRandomAiRoster(accessToken, leagueId, team.id);
+      setMembersSuccess(randomRosterAssignedMessage(target.displayName, updated));
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Impossibile generare il calendario."));
+      setActionError(getApiErrorMessage(error, RANDOM_ROSTER_FALLBACK_ERROR));
     } finally {
       setWorkingId(null);
     }
   }
 
-  async function onConfirmCalendar() {
-    setActionError(null);
+  /**
+   * «Genera/Conferma calendario» apre la finestra: prima si verificano le rose, poi la conferma
+   * «Vuoi generare il calendario?» o l'avviso con «Genera/Conferma comunque» (come sul sito).
+   */
+  async function openCalendarModal(action: "generate" | "confirm") {
+    setCalendarError(null);
+    setCalendarSuccess(null);
+    setCalendarModal(calendarModalChecking(action));
     if (!leagueId || !accessToken) {
+      setCalendarModal(calendarModalAfterCheck(calendarModalChecking(action), action, []));
       return;
     }
-    setWorkingId("calendar-confirm");
+    let teams: CalendarRosterTeamIssues[] = [];
     try {
-      setCalendar(await confirmLeagueCalendar(accessToken, leagueId));
-      try {
-        const panel = await fetchLeagueAdminPanel(accessToken, leagueId);
-        setLifecycle(panel.lifecycle);
-      } catch {
-        // Calendario già confermato; il lifecycle si aggiorna al prossimo refresh.
+      teams = (await fetchLeagueCalendarRosterCheck(accessToken, leagueId)).teams;
+    } catch {
+      // Verifica non riuscita: conferma normale; se le rose non sono in regola lo dice l'azione
+      // stessa (`league_rosters_invalid`) e la finestra passa all'avviso.
+    }
+    setCalendarModal((current) => calendarModalAfterCheck(current, action, teams));
+  }
+
+  function closeCalendarModal() {
+    if (workingId === null) {
+      setCalendarModal(null);
+    }
+  }
+
+  async function runCalendarAction(action: "generate" | "confirm", force: boolean) {
+    setCalendarError(null);
+    setCalendarSuccess(null);
+    if (!leagueId || !accessToken) {
+      setCalendarModal(null);
+      setCalendarError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setWorkingId(action === "generate" ? "calendar-generate" : "calendar-confirm");
+    try {
+      if (action === "generate") {
+        let next: LeagueCalendar;
+        try {
+          next = await generateLeagueCalendar(accessToken, leagueId, { force });
+        } catch (error) {
+          // I Turni Europei di questa lega non esistono ancora (lega nuova, mai
+          // entrata nella finestra del cron automatico che copre solo le leghe
+          // già attive): li sincronizziamo al volo e riproviamo, così "Genera
+          // calendario" resta un solo bottone per l'intera catena.
+          if (!(error instanceof ApiError) || error.code !== "european_turns_missing") {
+            throw error;
+          }
+          await ensureFantasyTurns(accessToken, leagueId);
+          next = await generateLeagueCalendar(accessToken, leagueId, { force });
+        }
+        setCalendarModal(null);
+        setCalendar(next);
+        setCalendarSuccess(calendarGeneratedMessage(next));
+      } else {
+        const next = await confirmLeagueCalendar(accessToken, leagueId, { force });
+        setCalendarModal(null);
+        setCalendar(next);
+        setCalendarSuccess(CALENDAR_CONFIRMED_MESSAGE);
+        try {
+          const panel = await fetchLeagueAdminPanel(accessToken, leagueId);
+          setLifecycle(panel.lifecycle);
+        } catch {
+          // Calendario già confermato; il lifecycle si aggiorna al prossimo refresh.
+        }
       }
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Impossibile confermare il calendario."));
+      // Rose non in regola: la finestra passa all'avviso; ogni altro errore resta nel pannello.
+      const next = calendarModalAfterError(action, calendarRosterIssuesFromError(error));
+      setCalendarModal(next);
+      if (!next) {
+        setCalendarError(
+          getApiErrorMessage(
+            error,
+            action === "generate"
+              ? "Impossibile generare il calendario."
+              : "Impossibile confermare il calendario.",
+          ),
+        );
+      }
     } finally {
       setWorkingId(null);
     }
@@ -501,6 +614,10 @@ export function LeagueAdminScreen() {
     }
   }
 
+  const calendarLocked = calendarButtonsDisabled({
+    working: workingId === "calendar-generate" || workingId === "calendar-confirm",
+    modalOpen: calendarModal !== null,
+  });
   const canConfigure =
     lifecycle?.state === "draft" || lifecycle?.state === "configuring";
   const leagueName = activeLeague?.name ?? "Lega";
@@ -577,8 +694,8 @@ export function LeagueAdminScreen() {
                     : ""}
                 </Text>
                 <Text style={styles.body}>
-                  Genera e conferma il calendario quando tutte le rose in Partecipanti sono
-                  complete. Gli scontri si consultano nel tab Turni, giornata per giornata.
+                  {CALENDAR_PANEL_INTRO} Gli scontri si consultano nel tab Turni, giornata per
+                  giornata.
                 </Text>
 
                 {!calendar ? (
@@ -587,22 +704,55 @@ export function LeagueAdminScreen() {
                   </Text>
                 ) : null}
 
+                {calendarError ? (
+                  <UiStatePanel
+                    state="error"
+                    title="Operazione non completata"
+                    message={calendarError}
+                    testID="league-calendar-action-error"
+                  />
+                ) : null}
+                {calendarErrorNeedsParticipants(calendarError) ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setSetupTab("invitati")}
+                    style={styles.secondaryButton}
+                    testID="league-calendar-goto-participants"
+                  >
+                    <Text style={styles.secondaryLabel}>Vai a Partecipanti</Text>
+                  </Pressable>
+                ) : null}
+                {calendarSuccess ? (
+                  <UiStatePanel
+                    state="success"
+                    title="Calendario aggiornato"
+                    message={calendarSuccess}
+                    testID="league-calendar-success"
+                  />
+                ) : null}
+
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => void onGenerateCalendar()}
-                  style={styles.primaryButton}
+                  disabled={calendarLocked}
+                  onPress={() => void openCalendarModal("generate")}
+                  style={[styles.primaryButton, calendarLocked && styles.disabled]}
                   testID="league-calendar-generate"
                 >
-                  <Text style={styles.primaryLabel}>Genera calendario</Text>
+                  <Text style={styles.primaryLabel}>
+                    {workingId === "calendar-generate" ? "Generazione…" : "Genera calendario"}
+                  </Text>
                 </Pressable>
                 {calendar ? (
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => void onConfirmCalendar()}
-                    style={styles.secondaryButton}
+                    disabled={calendarLocked}
+                    onPress={() => void openCalendarModal("confirm")}
+                    style={[styles.secondaryButton, calendarLocked && styles.disabled]}
                     testID="league-calendar-confirm"
                   >
-                    <Text style={styles.secondaryLabel}>Conferma calendario</Text>
+                    <Text style={styles.secondaryLabel}>
+                      {workingId === "calendar-confirm" ? "Conferma…" : "Conferma calendario"}
+                    </Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -867,29 +1017,91 @@ export function LeagueAdminScreen() {
             />
           ) : null}
           <View style={styles.memberList} testID="league-members-list">
-            {members.map((member) => (
-              <View key={member.userId} style={styles.inviteRow}>
-                <View style={styles.flex}>
-                  <Text style={styles.inviteTitle}>{member.displayName}</Text>
-                  <Text style={styles.body}>
-                    {member.role === "league_admin" ? "Amministratore" : "Partecipante"}
-                  </Text>
-                </View>
-                {member.role === "member" && canConfigure ? (
-                  <View style={styles.row}>
+            {members.map((member) => {
+              const identity = (
+                <>
+                  <AvatarWithFallback
+                    src={resolveAvatarUrl(member.avatarUrl ?? null)}
+                    style={styles.memberAvatar}
+                    fallback={
+                      <View style={styles.memberAvatarFallback}>
+                        <Text style={styles.memberAvatarInitial}>
+                          {avatarInitials(member.displayName)}
+                        </Text>
+                      </View>
+                    }
+                  />
+                  <View style={styles.flex}>
+                    <Text style={styles.inviteTitle}>{member.displayName}</Text>
+                    {member.email ? (
+                      <Text style={styles.body} testID={`league-member-email-${member.userId}`}>
+                        {member.email}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.body}>{memberRoleLabel(member)}</Text>
+                  </View>
+                </>
+              );
+              return (
+                <View key={member.userId} style={styles.memberRow}>
+                  {canOpenMemberProfile(member, user?.id) ? (
+                    // Il nome apre il profilo del fantallenatore, come sul sito (1.5).
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => void onRemove(member.userId, member.displayName)}
-                      style={styles.dangerButton}
-                      testID={`league-member-remove-${member.userId}`}
+                      accessibilityLabel={`Apri il profilo di ${member.displayName}`}
+                      onPress={() =>
+                        leagueId
+                          ? navigation.navigate("CoachProfile", { userId: member.userId, leagueId })
+                          : undefined
+                      }
+                      style={styles.memberIdentity}
+                      testID={`league-member-open-${member.userId}`}
                     >
-                      <Text style={styles.dangerLabel}>Rimuovi</Text>
+                      {identity}
                     </Pressable>
-                  </View>
-                ) : null}
-              </View>
-            ))}
+                  ) : (
+                    <View style={styles.memberIdentity}>{identity}</View>
+                  )}
+                  {canManageMember(member, canConfigure) ? (
+                    <View style={styles.row}>
+                      {canAssignRandomRoster(member, canConfigure) ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={workingId !== null}
+                          onPress={() => void onAssignRandomRoster(member)}
+                          style={[styles.secondaryButton, workingId !== null && styles.disabled]}
+                          testID={`league-members-random-ai-${member.userId}`}
+                        >
+                          <Text style={styles.secondaryLabel}>
+                            {workingId === `random-${member.userId}`
+                              ? "Assegnazione…"
+                              : "Assegna rosa random"}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={workingId !== null}
+                        onPress={() => setRemoveTarget(member)}
+                        style={[styles.dangerButton, workingId !== null && styles.disabled]}
+                        testID={`league-member-remove-${member.userId}`}
+                      >
+                        <Text style={styles.dangerLabel}>Rimuovi</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
+          {membersSuccess ? (
+            <UiStatePanel
+              state="success"
+              title="Partecipanti aggiornati"
+              message={membersSuccess}
+              testID="league-members-success"
+            />
+          ) : null}
 
           <Text style={styles.heading}>Directory fantallenatori</Text>
           {leagueId ? (
@@ -1316,6 +1528,30 @@ export function LeagueAdminScreen() {
           ) : null}
         </DialogFrame>
       </Modal>
+      <ConfirmDialog
+        copy={removeTarget ? removeMemberConfirmation(removeTarget.displayName) : null}
+        destructive
+        busy={workingId !== null}
+        onCancel={() => setRemoveTarget(null)}
+        onConfirm={() => {
+          const target = removeTarget;
+          setRemoveTarget(null);
+          if (target) {
+            void onRemove(target.userId, target.displayName);
+          }
+        }}
+        testID="league-member-remove-confirm-dialog"
+      />
+      <CalendarActionDialog
+        state={calendarModal}
+        working={workingId === "calendar-generate" || workingId === "calendar-confirm"}
+        onCancel={closeCalendarModal}
+        onProceed={(force) => {
+          if (calendarModal) {
+            void runCalendarAction(calendarModal.action, force);
+          }
+        }}
+      />
     </PageContainer>
   );
 }
@@ -1683,6 +1919,36 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.sm,
   },
   inviteTitle: {
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  memberRow: {
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    gap: spacing.sm,
+  },
+  memberIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.border,
+  },
+  memberAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.border,
+  },
+  memberAvatarInitial: {
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },

@@ -49,14 +49,19 @@ const EXPECTED_REFUSAL_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Messaggio da mostrare quando la formazione migliore per il nuovo modulo non arriva: `null`
- * per i rifiuti previsti, il messaggio breve per ogni errore vero (rete, server, permessi).
+ * Messaggio da mostrare quando la formazione migliore per il nuovo modulo non arriva: per
+ * «mancano disponibili» (`ai_lineup_incomplete`) quello del server, che dice quanti disponibili
+ * mancano per ruolo (gli indisponibili non entrano titolari, 28/11); `null` per gli altri rifiuti
+ * previsti; il messaggio breve per ogni errore vero (rete, server, permessi).
  */
 export function moduleChangeFallbackNotice(error: unknown): string | null {
   const code =
     error && typeof error === "object" && "code" in error && typeof error.code === "string"
       ? error.code
       : null;
+  if (code === "ai_lineup_incomplete") {
+    return error instanceof Error && error.message ? error.message : null;
+  }
   if (code && EXPECTED_REFUSAL_CODES.has(code)) {
     return null;
   }

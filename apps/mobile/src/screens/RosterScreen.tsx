@@ -324,13 +324,16 @@ export function RosterScreen() {
   const underQuotaNotice = teamUnderQuotaNotice(team);
   const route = useRoute<RouteProp<AppTabParamList, "Roster">>();
   const openFromNotification = wantsReplacementSheet(route.params);
+  // Dipende da `refresh` (stabile), non dal contesto intero: ogni lettura dei sostituti cambia il
+  // contesto e rifaceva partire la richiesta (anomalia del 24/11, foglio aperto due volte).
+  const refreshReplacement = replacement.refresh;
   useEffect(() => {
     if (!openFromNotification) {
       return;
     }
     navigation.setParams({ sostituto: undefined } as never);
-    void replacement.refresh({ openIfPending: true });
-  }, [navigation, openFromNotification, replacement]);
+    void refreshReplacement({ openIfPending: true });
+  }, [navigation, openFromNotification, refreshReplacement]);
   const lastPurchaseCount = useRef(replacement.purchaseCount);
   useEffect(() => {
     if (lastPurchaseCount.current !== replacement.purchaseCount) {

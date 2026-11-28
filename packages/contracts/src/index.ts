@@ -177,6 +177,101 @@ export {
   rosterImportAmbiguousRows,
 } from "./leagues.js";
 
+// Release 1.5, allineamento app ↔ sito: conferme, calendario, listone operatore, job, directory.
+export {
+  CALENDAR_ACTION_COPY,
+  CALENDAR_CANCEL_LABEL,
+  CALENDAR_CHECKING_TEXT,
+  CALENDAR_CONFIRMED_MESSAGE,
+  CALENDAR_ISSUES_HEADING,
+  CALENDAR_PANEL_INTRO,
+  calendarBlockedNote,
+  calendarErrorNeedsParticipants,
+  calendarForceNote,
+  calendarGeneratedMessage,
+  calendarIssueText,
+  calendarProceedLabel,
+  calendarRosterIssuesFromPayload,
+  joinTeamNames,
+} from "./calendarAction.js";
+export type {
+  CalendarAction,
+  CalendarActionCopy,
+  CalendarActionModalState,
+} from "./calendarAction.js";
+
+export {
+  CONFIRM_CANCEL_LABEL,
+  CONFIRM_TITLE,
+  broadcastConfirmation,
+  operatorEmailConfirmation,
+  removeMemberConfirmation,
+} from "./confirmations.js";
+export type { BroadcastConfirmInput, ConfirmCopy } from "./confirmations.js";
+
+export {
+  COACH_RESET_FILTERS_LABEL,
+  COACH_TYPE_FILTER_LABEL,
+  COACH_TYPE_OPTIONS,
+  NO_COACH_FILTERS,
+  hasCoachFilters,
+} from "./coachDirectoryFilters.js";
+export type { CoachDirectoryFilters, CoachTypeFilter } from "./coachDirectoryFilters.js";
+
+export {
+  JOBS_INTRO,
+  formatTimeUntil,
+  jobsSummaryTiles,
+  nextJobToRun,
+} from "./jobsSummary.js";
+export type { JobsSummaryTile } from "./jobsSummary.js";
+
+export {
+  DEFAULT_RESTORE_BEFORE,
+  LISTONE_REFRESH_BUTTON_LABEL,
+  LISTONE_REFRESH_CANCEL_LABEL,
+  LISTONE_REFRESH_OPTIONS,
+  LISTONE_REFRESH_QUESTION,
+  LISTONE_REFRESH_ROLES_WARNING,
+  LISTONE_REFRESH_TITLE,
+  LISTONE_RESTORE_APPLY_LABEL,
+  LISTONE_RESTORE_BEFORE_LABEL,
+  LISTONE_RESTORE_CONFIRM_NO_LABEL,
+  LISTONE_RESTORE_CONFIRM_YES_LABEL,
+  LISTONE_RESTORE_INTRO,
+  LISTONE_RESTORE_INVALID_INPUT,
+  LISTONE_RESTORE_PREVIEW_LABEL,
+  LISTONE_RESTORE_TITLE,
+  LISTONE_ROLES_KEPT_MESSAGE,
+  LISTONE_ROLE_PREVIEW_CANCEL_LABEL,
+  LISTONE_ROLE_PREVIEW_CONFIRM_LABEL,
+  LISTONE_ROLE_PREVIEW_ERROR_FALLBACK,
+  LISTONE_ROLE_PREVIEW_ERROR_TITLE,
+  LISTONE_ROLE_PREVIEW_INTRO,
+  LISTONE_ROLE_PREVIEW_TITLE,
+  formatRomeLocal,
+  listoneRefreshStartLabel,
+  listoneRefreshSummary,
+  listoneRestoreConfirmText,
+  listoneRestoreDoneMessage,
+  listoneRestoreEmptyMessage,
+  listoneRestoreSummary,
+  listoneRoleChangesLabel,
+  listoneRoleChangesParts,
+  listoneRoleChangesSummary,
+  listoneRolesAppliedMessage,
+  romeLocalToIso,
+} from "./listoneRoles.js";
+export type { ListoneRefreshMode } from "./listoneRoles.js";
+
+export {
+  CUSTOM_RAISE_LABEL,
+  customRaiseAmount,
+  customRaisePlaceholder,
+  raiseButtonLabel,
+  raiseTargetAmount,
+} from "./liveRaise.js";
+
 export {
   LISTONE_FILTER_ALL_LABEL,
   LISTONE_FILTER_LABEL,
@@ -753,8 +848,8 @@ export {
 } from "./faq.js";
 export type { FaqGroup, FaqHelpId, FaqItem } from "./faq.js";
 
-export { probableToneOf } from "./probableTone.js";
-export type { ProbableTone } from "./probableTone.js";
+export { NO_INFO_LABEL, PITCH_HALO_LEGEND, pitchHaloOf, probableToneOf } from "./probableTone.js";
+export type { PitchHalo, ProbableTone } from "./probableTone.js";
 
 export {
   KNOWN_CLUB_KEYS,
@@ -910,3 +1005,5 @@ export {
   underQuotaAfterReplacements,
   underQuotaLabel,
 } from "./tradeReplacement.js";
+
+export { absenceKindLabel, absenceLine, italianAbsenceText } from "./providerAbsence.js";

@@ -2,10 +2,11 @@ import { lazyStyles } from "../theme/lazyStyles";
 import { useFocusEffect, useNavigation, useNavigationState } from "@react-navigation/core";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
+import { AdminBackBar } from "../components/AdminBackBar";
 import { AppDrawer } from "../components/AppDrawer";
 import { ImpersonationBanner } from "../components/ImpersonationBanner";
 import { AppHeader } from "../layout/AppHeader";
@@ -22,13 +23,27 @@ import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { AdminAppVersionScreen } from "../screens/admin/AdminAppVersionScreen";
 import { consumePendingAdminScreen, openAdminScreen, registerLeaveAdmin } from "./adminEntry";
-import { ADMIN_NAV_ID_BY_ROUTE, ADMIN_SCREEN_BY_ID } from "./adminScreens";
+import { ADMIN_NAV_ID_BY_ROUTE, ADMIN_SCREEN_BY_ID, adminBackTarget } from "./adminScreens";
 import { filterMobileNavItems, MOBILE_ADMIN_NAV_ITEMS } from "./navConfig";
 import type { AdminStackParamList, RootStackParamList } from "./types";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
 const { colors } = theme;
+
+/** Le schermate del pannello, nell'ordine dello stack; «AdminHome» (Riepilogo) è la prima. */
+const ADMIN_STACK_SCREENS: ReadonlyArray<[keyof AdminStackParamList, ComponentType]> = [
+  ["AdminHome", AdminDashboardScreen],
+  ["AdminLeagues", AdminLeaguesScreen],
+  ["AdminUsers", AdminUsersScreen],
+  ["AdminListone", AdminListoneScreen],
+  ["AdminTurni", AdminTurniScreen],
+  ["AdminJobs", AdminJobsScreen],
+  ["AdminEmail", AdminEmailScreen],
+  ["AdminFeedback", AdminFeedbackScreen],
+  ["AdminNotifications", AdminNotificationsScreen],
+  ["AdminAppVersion", AdminAppVersionScreen],
+];
 
 /**
  * Pannello operatore: le sezioni si aprono dal menu in alto a sinistra,
@@ -110,66 +125,36 @@ export function AdminNavigator() {
       <LockCountdownBar />
       <View style={styles.content}>
         <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: buildSceneBackgroundStyle() }}>
-          <Stack.Screen name="AdminHome">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminDashboardScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminLeagues">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminLeaguesScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminUsers">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminUsersScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminListone">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminListoneScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminTurni">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminTurniScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminJobs">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminJobsScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminEmail">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminEmailScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminFeedback">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminFeedbackScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminNotifications">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminNotificationsScreen />;
-            }}
-          </Stack.Screen>
-          <Stack.Screen name="AdminAppVersion">
-            {({ navigation }) => {
-              rememberStack(navigation);
-              return <AdminAppVersionScreen />;
-            }}
-          </Stack.Screen>
+          {ADMIN_STACK_SCREENS.map(([name, Screen]) => (
+            <Stack.Screen key={name} name={name}>
+              {({ navigation }) => {
+                rememberStack(navigation);
+                return (
+                  <View style={styles.content}>
+                    {/* 1.5: «Indietro» ben visibile in ogni schermata del pannello. */}
+                    <AdminBackBar
+                      onPress={() => {
+                        const target = adminBackTarget({
+                          screen: name,
+                          canGoBack: navigation.canGoBack(),
+                        });
+                        if (target === "back") {
+                          navigation.goBack();
+                        } else if (target === "home") {
+                          navigation.navigate("AdminHome");
+                        } else {
+                          goToApp();
+                        }
+                      }}
+                    />
+                    <View style={styles.content}>
+                      <Screen />
+                    </View>
+                  </View>
+                );
+              }}
+            </Stack.Screen>
+          ))}
         </Stack.Navigator>
       </View>
       <AppDrawer
