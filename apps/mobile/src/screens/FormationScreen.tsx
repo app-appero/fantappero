@@ -93,7 +93,8 @@ import { showsPageLockNote } from "../matchday/pageLockNote";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
-import { italianAbsenceText } from "@fantappero/contracts";
+import { doubtNoteText, italianAbsenceText } from "@fantappero/contracts";
+import { isProbableDoubt } from "./formation/pitchHalo";
 import { STARTERS_COUNTER_COLOR_TOKEN, startersCounterTone } from "./formation/startersCounter";
 import { BenchRoleDot } from "./formation/BenchRoleDot";
 
@@ -1336,6 +1337,11 @@ export function FormationScreen() {
             } else if (row.probableHint === "bench") {
               stateLabel = "Panchina probabile";
             }
+            // «In dubbio» (1.5): resta selezionabile, la nota dice «Dubbio» con lo stato tradotto.
+            if (!isCurrent && state !== "bloccato" && isProbableDoubt(row)) {
+              const doubt = doubtNoteText(row.probableNote);
+              stateLabel = state === "libero" ? doubt : `${stateLabel} · ${doubt}`;
+            }
             return {
               athleteId: row.athleteId,
               name: row.athleteName,
@@ -1396,6 +1402,8 @@ export function FormationScreen() {
               }
               if (row.selectionBlocked || row.probableAbsence === "suspended") {
                 stateLabel = `${stateLabel} · ${italianAbsenceText(row.probableNote) ?? "Indisponibile"}`;
+              } else if (isProbableDoubt(row)) {
+                stateLabel = `${stateLabel} · ${doubtNoteText(row.probableNote)}`;
               }
             }
             if (!isCurrent && benchQuotaSwaps.has(row.athleteId)) {
@@ -1433,7 +1441,9 @@ export function FormationScreen() {
           ? "rgba(250, 204, 21, 0.16)"
           : tone === "expelled"
             ? "rgba(239, 68, 68, 0.16)"
-            : "rgba(156, 163, 175, 0.16)",
+            : tone === "doubt"
+              ? "rgba(234, 88, 12, 0.16)"
+              : "rgba(156, 163, 175, 0.16)",
     } as const;
   };
 

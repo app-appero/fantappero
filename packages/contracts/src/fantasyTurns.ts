@@ -116,6 +116,8 @@ export interface FixtureUnavailablePlayer {
   kind: string | null;
   label: string | null;
   blocksSelection: boolean;
+  /** 1.5: assente solo «in dubbio» (può giocare). Assente da un backend più vecchio. */
+  probableDoubt?: boolean;
 }
 
 /** Dettaglio partita live: risultato, formazioni ufficiali e cronologia. */

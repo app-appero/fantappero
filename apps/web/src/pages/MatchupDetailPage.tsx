@@ -140,7 +140,8 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number):
       const tone = probableToneOf(player);
       return {
         probableStarter: tone === "starter",
-        probableState: tone === "bench" || tone === "expelled" || tone === "unavailable" ? tone : null,
+        probableState:
+          tone === "bench" || tone === "expelled" || tone === "unavailable" || tone === "doubt" ? tone : null,
       };
     })(),
     live: playerVoteState(player).live,

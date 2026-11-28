@@ -93,7 +93,7 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { FaqHelpButton } from "../components/FaqHelpButton";
-import { italianAbsenceText } from "@fantappero/contracts";
+import { doubtNoteText, isProbableDoubt, italianAbsenceText } from "@fantappero/contracts";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { useTradeReplacement } from "../market/TradeReplacementContext";
 import {
@@ -307,6 +307,9 @@ function probableMark(roster: LineupRosterPlayer[], athleteId: string): string {
   if (!player) {
     return "";
   }
+  if (isProbableDoubt(player)) {
+    return " · in dubbio";
+  }
   if (player.selectionBlocked || player.probableHint === "unavailable") {
     return " · indisponibile";
   }
@@ -319,12 +322,16 @@ function probableMark(roster: LineupRosterPlayer[], athleteId: string): string {
   return "";
 }
 
-type ProbableState = "starter" | "bench" | "expelled" | "unavailable" | null;
+type ProbableState = "starter" | "bench" | "expelled" | "unavailable" | "doubt" | null;
 
 function probableState(roster: LineupRosterPlayer[], athleteId: string): ProbableState {
   const player = roster.find((row) => row.athleteId === athleteId);
   if (!player) {
     return null;
+  }
+  // «In dubbio» (1.5): arancione e selezionabile, prima del grigio che vede l'app 1.4.
+  if (isProbableDoubt(player)) {
+    return "doubt";
   }
   if (player.probableHint === "unavailable" || player.selectionBlocked) {
     return player.probableAbsence === "suspended" ? "expelled" : "unavailable";
@@ -583,7 +590,9 @@ function BenchOrderRow({
         "fa-bench-order__row",
         canEnter ? "" : "fa-bench-order__row--overflow",
         probable ? "fa-bench-order__row--probable" : "",
-        state === "bench" || state === "expelled" || state === "unavailable" ? `fa-bench-order__row--${state}` : "",
+        state === "bench" || state === "expelled" || state === "unavailable" || state === "doubt"
+          ? `fa-bench-order__row--${state}`
+          : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -2014,7 +2023,11 @@ export function FormationPage() {
             : null,
           row.probableHint === "starter" ? "titolare probabile" : null,
           row.probableHint === "bench" ? "panchina probabile" : null,
-          row.probableHint === "unavailable" ? italianAbsenceText(row.probableNote) ?? "indisponibile" : null,
+          isProbableDoubt(row)
+            ? doubtNoteText(row.probableNote)
+            : row.probableHint === "unavailable"
+              ? italianAbsenceText(row.probableNote) ?? "indisponibile"
+              : null,
         ].filter(Boolean);
         return {
           value: row.athleteId,

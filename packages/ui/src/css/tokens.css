@@ -151,6 +151,12 @@
   --fa-color-input-placeholder: #ffffff;
   --fa-color-disabled-bg: var(--fa-pitch-700);
   --fa-color-disabled-fg: var(--fa-slate-500);
+
+  /* Formazione: alone «In dubbio» (1.5). Arancione, ben distinto dal giallo «Possibile
+     panchina» (#facc15). Uguale nei due temi: almeno 3:1 sugli sfondi chiari e scuri (legenda),
+     e il nome bianco su --fa-halo-doubt-strong almeno 4,5:1. */
+  --fa-halo-doubt: #ea580c;
+  --fa-halo-doubt-strong: #c2410c;
 }
 
 :root {

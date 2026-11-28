@@ -199,3 +199,42 @@ describe("ambra «attenzione» nell'app", () => {
     }
   });
 });
+
+describe("campo della Formazione: alone «In dubbio» (1.5)", () => {
+  const layout = readCss("layout.css");
+
+  it("il token arancione è lo stesso nei due temi", () => {
+    expect(tokenResolver("dark")("var(--fa-halo-doubt)")).toBe("#ea580c");
+    expect(tokenResolver("light")("var(--fa-halo-doubt)")).toBe("#ea580c");
+    expect(tokenResolver("light")("var(--fa-halo-doubt-strong)")).toBe("#c2410c");
+  });
+
+  it("il pallino della legenda si vede sugli sfondi chiari e scuri (almeno 3:1)", () => {
+    for (const scheme of ["light", "dark"] as const) {
+      const resolve = tokenResolver(scheme);
+      const doubt = resolve("var(--fa-halo-doubt)");
+      for (const background of CSS_BACKGROUNDS) {
+        const ratio = contrastRatio(doubt, resolve(`var(${background})`));
+        expect(ratio, `${doubt} su ${background} (${scheme})`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("il nome bianco sull'arancione si legge (almeno 4,5:1)", () => {
+    const rule = /\.fa-pitch-player--doubt \.fa-pitch-player__name\s*\{([^}]*)\}/.exec(layout)?.[1] ?? "";
+    expect(rule).toContain("var(--fa-halo-doubt-strong");
+    expect(rule).toContain("color: #fff;");
+    const strong = tokenResolver("dark")("var(--fa-halo-doubt-strong)");
+    expect(contrastRatio("#ffffff", strong)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("è ben distinto dal giallo «Possibile panchina» e dal rosso «Espulso»", () => {
+    const doubt = tokenResolver("dark")("var(--fa-halo-doubt)");
+    // Giallo della panchina: con l'arancione serve una differenza netta di luminosità.
+    expect(contrastRatio(doubt, "#facc15")).toBeGreaterThanOrEqual(2);
+    expect(doubt).not.toBe("#ef4444");
+    expect(layout).toMatch(/\.fa-formation-legend__dot--doubt\s*\{[^}]*--fa-halo-doubt/);
+    expect(layout).toMatch(/\.fa-pitch-player--doubt \.fa-pitch-player__card\s*\{[^}]*--fa-halo-doubt/);
+  });
+});
+

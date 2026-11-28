@@ -8,7 +8,14 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "rea
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { lazyStyles } from "../../theme/lazyStyles";
 import { AvatarImage } from "../../components/AvatarImage";
-import { HALO_COLOR, PITCH_HALO_LEGEND, type PitchHalo } from "./pitchHalo";
+import {
+  DOUBT_LABEL_BG,
+  HALO_COLOR,
+  PITCH_HALO_LEGEND,
+  haloToneOf,
+  type PitchHalo,
+  type ProbableRow,
+} from "./pitchHalo";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -46,7 +53,7 @@ export type PitchSlot = {
   sv?: boolean;
   /** Voto definitivo a partita finita: bianco semplice. */
   final?: boolean;
-  /** Altri stati dalle formazioni probabili: giallo = possibile panchina, rosso = espulso, grigio = indisponibile. */
+  /** Altri stati dalle formazioni probabili: giallo = possibile panchina, rosso = espulso, grigio = indisponibile, arancione = in dubbio. */
   probableState?: ProbableTone | null;
   /** Nessuna informazione dalla formazione probabile: alone neutro (27/11). */
   noInfo?: boolean;
@@ -55,13 +62,14 @@ export type PitchSlot = {
   lockCountdown?: string | null;
 };
 
-export type ProbableTone = "starter" | "bench" | "expelled" | "unavailable";
+export type ProbableTone = "starter" | "bench" | "expelled" | "unavailable" | "doubt";
 
 export const TONE_COLOR: Record<ProbableTone, string> = {
   starter: "#22c55e",
   bench: "#facc15",
   expelled: "#ef4444",
   unavailable: "#9ca3af",
+  doubt: HALO_COLOR.doubt,
 };
 
 export const TONE_LABEL_BG: Record<ProbableTone, string> = {
@@ -69,6 +77,7 @@ export const TONE_LABEL_BG: Record<ProbableTone, string> = {
   bench: "#ca8a04",
   expelled: "#dc2626",
   unavailable: "#6b7280",
+  doubt: DOUBT_LABEL_BG,
 };
 
 function hexToRgb(hex: string): string {
@@ -112,17 +121,8 @@ export function ToneHalo({ tone, offset, width = 3 }: { tone: PitchHalo; offset:
 }
 
 /** Stato di un calciatore dalle formazioni probabili, per colorare campo, panchina e scelta. */
-export function probableTone(row: {
-  probableHint?: "starter" | "bench" | "unavailable" | null;
-  probableAbsence?: "suspended" | "injured" | "other" | null;
-  selectionBlocked?: boolean;
-}): ProbableTone | null {
-  if (row.probableHint === "unavailable" || row.selectionBlocked) {
-    return row.probableAbsence === "suspended" ? "expelled" : "unavailable";
-  }
-  if (row.probableHint === "starter") return "starter";
-  if (row.probableHint === "bench") return "bench";
-  return null;
+export function probableTone(row: ProbableRow): ProbableTone | null {
+  return haloToneOf(row);
 }
 
 export function FormationLegend() {

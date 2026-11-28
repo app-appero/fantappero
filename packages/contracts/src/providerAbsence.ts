@@ -289,3 +289,15 @@ export function absenceLine(
   }
   return `${kindLabel} · ${text}`;
 }
+
+/**
+ * Nota di un «in dubbio» nella lista «Cambia» e nelle note: sempre «Dubbio», più lo stato o il
+ * rientro del fornitore tradotti quando dicono qualcosa in più («Dubbio · giorno per giorno»).
+ */
+export function doubtNoteText(note: string | null | undefined): string {
+  const text = italianAbsenceText(note);
+  if (text === null || text.toLowerCase() === "dubbio") {
+    return "Dubbio";
+  }
+  return `Dubbio · ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}

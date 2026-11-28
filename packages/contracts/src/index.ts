@@ -852,8 +852,15 @@ export {
 } from "./faq.js";
 export type { FaqGroup, FaqHelpId, FaqItem } from "./faq.js";
 
-export { NO_INFO_LABEL, PITCH_HALO_LEGEND, pitchHaloOf, probableToneOf } from "./probableTone.js";
-export type { PitchHalo, ProbableTone } from "./probableTone.js";
+export {
+  DOUBT_LABEL,
+  NO_INFO_LABEL,
+  PITCH_HALO_LEGEND,
+  isProbableDoubt,
+  pitchHaloOf,
+  probableToneOf,
+} from "./probableTone.js";
+export type { PitchHalo, ProbableRow, ProbableTone } from "./probableTone.js";
 
 export {
   KNOWN_CLUB_KEYS,
@@ -1010,5 +1017,5 @@ export {
   underQuotaLabel,
 } from "./tradeReplacement.js";
 
-export { absenceKindLabel, absenceLine, italianAbsenceText } from "./providerAbsence.js";
+export { absenceKindLabel, absenceLine, doubtNoteText, italianAbsenceText } from "./providerAbsence.js";
 export { italianVarEventText } from "./providerEventText.js";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { absenceKindLabel, absenceLine, italianAbsenceText } from "./providerAbsence.ts";
+import { absenceKindLabel, absenceLine, doubtNoteText, italianAbsenceText } from "./providerAbsence.ts";
 
 describe("rientro in italiano (Rosario 27/11)", () => {
   it("i casi dello schermo «Partita»", () => {
@@ -180,5 +180,15 @@ describe("riga «Infortunati e squalificati»", () => {
         `${sample} → ${line}`,
       );
     }
+  });
+});
+
+describe("nota dell'«in dubbio» (28/11)", () => {
+  it("dice sempre «Dubbio», con lo stato del fornitore tradotto se aggiunge qualcosa", () => {
+    assert.equal(doubtNoteText("Doubtful"), "Dubbio");
+    assert.equal(doubtNoteText("Questionable"), "Dubbio");
+    assert.equal(doubtNoteText(null), "Dubbio");
+    assert.equal(doubtNoteText("Day-to-day"), "Dubbio · giorno per giorno");
+    assert.equal(doubtNoteText("Mid December 2026"), "Dubbio · metà dicembre 2026");
   });
 });

@@ -32,6 +32,7 @@ const TONE_ROW_BG: Record<ProbableTone, string> = {
   bench: "rgba(250,204,21,0.14)",
   expelled: "rgba(239,68,68,0.14)",
   unavailable: "rgba(156,163,175,0.14)",
+  doubt: "rgba(234,88,12,0.14)",
 };
 
 function probableRowStyle(tone: ProbableTone) {

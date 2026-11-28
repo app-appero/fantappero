@@ -26,9 +26,10 @@ export type PitchPlayer = {
   voteKind?: "sv" | "provisional" | "final" | null;
   /**
    * Altri stati dalle formazioni probabili: possibile panchina (giallo), espulso (rosso),
-   * indisponibile (grigio), `none` = nessuna informazione (alone neutro, legenda «Nessuna informazione»).
+   * indisponibile (grigio), in dubbio (arancione, 1.5), `none` = nessuna informazione (alone
+   * neutro, legenda «Nessuna informazione»).
    */
-  probableState?: "bench" | "expelled" | "unavailable" | "none" | null;
+  probableState?: "bench" | "expelled" | "unavailable" | "doubt" | "none" | null;
   /** Calciatore bloccato (partita iniziata): lucchetto sul pallino. */
   locked?: boolean;
   /** Countdown del prossimo blocco, sotto il nome. */
@@ -142,6 +143,7 @@ function PlayerPill({
     player.probableState === "bench" && "fa-pitch-player--bench",
     player.probableState === "expelled" && "fa-pitch-player--expelled",
     player.probableState === "unavailable" && "fa-pitch-player--unavailable",
+    player.probableState === "doubt" && "fa-pitch-player--doubt",
     player.probableState === "none" && "fa-pitch-player--no-info",
   );
   if (player.athleteId && onAthletePress) {

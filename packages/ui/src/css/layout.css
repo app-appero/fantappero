@@ -1309,6 +1309,19 @@ button.fa-app-header__league-action {
   color: #fff;
 }
 
+/* «In dubbio» (1.5): arancione, selezionabile. Token in tokens.css (contrasto in tokens.test.ts). */
+.fa-pitch-player--doubt .fa-pitch-player__card {
+  border-color: var(--fa-halo-doubt, #ea580c);
+  box-shadow:
+    0 0 0 3px rgba(234, 88, 12, 0.8),
+    0 0 18px 5px rgba(234, 88, 12, 0.85);
+}
+
+.fa-pitch-player--doubt .fa-pitch-player__name {
+  background: var(--fa-halo-doubt-strong, #c2410c);
+  color: #fff;
+}
+
 .fa-pitch-player--unavailable .fa-pitch-player__card {
   border-color: #9ca3af;
   filter: grayscale(1);
@@ -1347,6 +1360,7 @@ button.fa-app-header__league-action {
 .fa-formation-legend__dot--bench { background: #facc15; box-shadow: 0 0 8px #facc15; }
 .fa-formation-legend__dot--expelled { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
 .fa-formation-legend__dot--unavailable { background: #9ca3af; }
+.fa-formation-legend__dot--doubt { background: var(--fa-halo-doubt, #ea580c); box-shadow: 0 0 8px var(--fa-halo-doubt, #ea580c); }
 .fa-formation-legend__dot--none { background: #e2e8f0; box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.55), 0 0 6px rgba(226, 232, 240, 0.8); }
 
 .fa-pitch-player__lockdot {

@@ -1,11 +1,31 @@
-/** Stato di un calciatore dalle formazioni probabili: stessa regola su web e app. */
-export type ProbableTone = "starter" | "bench" | "expelled" | "unavailable";
+/**
+ * Stato di un calciatore dalle formazioni probabili: stessa regola su web e app.
+ *
+ * `doubt` (1.5, Rosario 28/11) = assente «in dubbio» per il fornitore (Doubtful, Questionable,
+ * Day to day…): può giocare e resta selezionabile. Il server lo segnala con il campo nuovo
+ * `probableDoubt`, lasciando `probableHint = "unavailable"` per l'app 1.4 (che lo vede grigio).
+ */
+export type ProbableTone = "starter" | "bench" | "expelled" | "unavailable" | "doubt";
 
-export function probableToneOf(row: {
+export type ProbableRow = {
   probableHint?: "starter" | "bench" | "unavailable" | null;
   probableAbsence?: "suspended" | "injured" | "other" | null;
+  probableDoubt?: boolean | null;
   selectionBlocked?: boolean;
-}): ProbableTone | null {
+};
+
+/** «In dubbio»: assenza non certa, nient'altro gli toglie il voto, non è una squalifica. */
+export function isProbableDoubt(row: ProbableRow): boolean {
+  return (
+    row.probableDoubt === true &&
+    row.probableHint === "unavailable" &&
+    row.selectionBlocked !== true &&
+    row.probableAbsence !== "suspended"
+  );
+}
+
+export function probableToneOf(row: ProbableRow): ProbableTone | null {
+  if (isProbableDoubt(row)) return "doubt";
   if (row.probableHint === "unavailable" || row.selectionBlocked) {
     return row.probableAbsence === "suspended" ? "expelled" : "unavailable";
   }
@@ -24,7 +44,10 @@ export type PitchHalo = ProbableTone | "none";
 
 export const NO_INFO_LABEL = "Nessuna informazione";
 
-export function pitchHaloOf(row: Parameters<typeof probableToneOf>[0]): PitchHalo {
+/** Voce della legenda per l'alone arancione (1.5). */
+export const DOUBT_LABEL = "In dubbio";
+
+export function pitchHaloOf(row: ProbableRow): PitchHalo {
   return probableToneOf(row) ?? "none";
 }
 
@@ -34,5 +57,6 @@ export const PITCH_HALO_LEGEND: readonly { halo: PitchHalo; label: string }[] = 
   { halo: "bench", label: "Possibile panchina" },
   { halo: "expelled", label: "Espulso / squalificato (non selezionabile)" },
   { halo: "unavailable", label: "Indisponibile" },
+  { halo: "doubt", label: DOUBT_LABEL },
   { halo: "none", label: NO_INFO_LABEL },
 ];

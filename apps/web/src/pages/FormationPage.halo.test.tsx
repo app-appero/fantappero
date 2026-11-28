@@ -73,6 +73,9 @@ const HINTS: Record<string, Partial<LineupRosterPlayer>> = {
   P1: { probableHint: "starter", probableNote: "Titolare probabile" },
   D1: { probableHint: "bench", probableNote: "Possibile panchina" },
   D2: { probableHint: "unavailable", probableNote: "Infortunato", probableAbsence: "injured" },
+  // 1.5 (28/11): «in dubbio» per il fornitore. Per l'app 1.4 resta "unavailable" (grigio).
+  D4: { probableHint: "unavailable", probableNote: "Doubtful", probableAbsence: "injured", probableDoubt: true },
+  D8: { probableHint: "unavailable", probableNote: "Day-to-day", probableAbsence: "other", probableDoubt: true },
 };
 
 const ROSTER: LineupRosterPlayer[] = ROSTER_IDS.map((athleteId, slotIndex) => ({
@@ -168,5 +171,49 @@ describe("FormationPage — alone in campo anche senza dato (Rosario, 27/11)", (
     const none = container.querySelector('[data-testid="formation-legend-none"]');
     expect(none?.textContent).toBe("Nessuna informazione");
     expect(none?.querySelector(".fa-formation-legend__dot--none")).not.toBeNull();
+  });
+
+  it("l'«in dubbio» ha l'alone arancione, non il grigio", async () => {
+    await render();
+
+    expect(pitchPlayer(4)?.className).toContain("fa-pitch-player--doubt");
+    expect(pitchPlayer(4)?.className).not.toContain("fa-pitch-player--unavailable");
+    // L'assente certo resta grigio.
+    expect(pitchPlayer(2)?.className).toContain("fa-pitch-player--unavailable");
+    expect(pitchPlayer(2)?.className).not.toContain("fa-pitch-player--doubt");
+  });
+
+  it("la legenda ha la voce «In dubbio» dopo «Indisponibile»", async () => {
+    await render();
+
+    const doubt = container.querySelector('[data-testid="formation-legend-doubt"]');
+    expect(doubt?.textContent).toBe("In dubbio");
+    expect(doubt?.querySelector(".fa-formation-legend__dot--doubt")).not.toBeNull();
+    const order = [...container.querySelectorAll('[data-testid^="formation-legend-"]')].map((item) =>
+      item.getAttribute("data-testid"),
+    );
+    expect(order).toEqual([
+      "formation-legend-starter",
+      "formation-legend-bench",
+      "formation-legend-expelled",
+      "formation-legend-unavailable",
+      "formation-legend-doubt",
+      "formation-legend-none",
+    ]);
+  });
+
+  it("nella lista «Cambia» l'«in dubbio» è selezionabile e dice «Dubbio»", async () => {
+    await render();
+
+    const slot = container.querySelector<HTMLButtonElement>('[data-testid="formation-starter-1"]');
+    await act(async () => slot?.click());
+    const option = container.querySelector<HTMLButtonElement>('[data-testid="formation-starter-1-option-D8"]');
+    expect(option).not.toBeNull();
+    expect(option?.disabled).toBe(false);
+    expect(option?.className).toContain("fa-starter-row--doubt");
+    expect(option?.textContent).toContain("Dubbio · giorno per giorno");
+    // L'assente certo, invece, resta grigio con la sua nota.
+    const certain = container.querySelector<HTMLButtonElement>('[data-testid="formation-starter-1-option-D2"]');
+    expect(certain?.textContent ?? "").not.toContain("Dubbio");
   });
 });

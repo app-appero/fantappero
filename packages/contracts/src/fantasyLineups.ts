@@ -77,6 +77,12 @@ export interface LineupRosterPlayer {
   probableNote?: string | null;
   /** Solo se indisponibile: espulso/squalificato, infortunato o altro motivo. */
   probableAbsence?: "suspended" | "injured" | "other" | null;
+  /**
+   * 1.5: assente «in dubbio» per il fornitore (Doubtful, Questionable, Day to day…). Resta
+   * selezionabile; alone arancione «In dubbio». `probableHint` resta "unavailable" per l'app 1.4.
+   * Assente da un backend più vecchio.
+   */
+  probableDoubt?: boolean;
   /** Non può essere aggiunto tra i titolari. Chi è già schierato resta finché non lo si toglie. */
   selectionBlocked?: boolean;
   /** In rosa ma oltre la quota di ruolo dopo uno scambio: non schierabile finché non si libera uno slot. */

@@ -736,6 +736,8 @@ export interface H2HPlayerScore {
   probableHint?: "starter" | "bench" | "unavailable" | null;
   probableNote?: string | null;
   probableAbsence?: "suspended" | "injured" | "other" | null;
+  /** 1.5: assente «in dubbio» (può giocare), come in Formazione. */
+  probableDoubt?: boolean;
   selectionBlocked?: boolean;
 }
 
