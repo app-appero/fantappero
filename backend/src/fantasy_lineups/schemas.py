@@ -67,6 +67,9 @@ class LineupRosterPlayerResponse(ApiModel):
         default=None,
         alias="probableAbsence",
     )
+    # 1.5: assenza «in dubbio» (Doubtful, Questionable, Day to day…): può giocare ed è
+    # selezionabile. Campo nuovo e opzionale: ``probableHint`` resta "unavailable" per l'app 1.4.
+    probable_doubt: bool = Field(default=False, alias="probableDoubt")
     selection_blocked: bool = Field(default=False, alias="selectionBlocked")
     # EP08-10: scambio accettato col ruolo già al completo — resta in rosa ma
     # non è schierabile finché l'allenatore non libera uno slot per quel ruolo.

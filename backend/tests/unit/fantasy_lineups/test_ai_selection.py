@@ -103,6 +103,87 @@ def test_unavailable_player_yields_to_an_available_one_of_the_same_role() -> Non
     assert {preferred.athlete_id, midfielder.athlete_id} <= set(plan.bench)
 
 
+def _doubtful(item: CandidateInput) -> CandidateInput:
+    return CandidateInput(**{**item.__dict__, "doubtful": True})
+
+
+def _unavailable(item: CandidateInput) -> CandidateInput:
+    return CandidateInput(**{**item.__dict__, "unavailable": True})
+
+
+def test_doubtful_player_yields_to_any_available_one_of_the_same_role() -> None:
+    """1.5 (Rosario, 28/11): l'«in dubbio» è schierabile ma viene dopo ogni disponibile dello
+    stesso ruolo, anche se ha un punteggio molto più alto."""
+    keeper = candidate(1, role=FantasyRole.P)
+    star = _doubtful(candidate(2, role=FantasyRole.D, recent_form=9.0))
+    others = [
+        candidate(3, role=FantasyRole.D, recent_form=1.0),
+        candidate(4, role=FantasyRole.D, recent_form=1.0),
+    ]
+    midfielder = candidate(5)
+    plan = build_lineup_plan(
+        [keeper, star, *others, midfielder], SMALL_TARGETS, decided_at=DECIDED_AT
+    )
+    assert plan.unfilled_roles == ()
+    assert star.athlete_id not in plan.starters
+    assert {item.athlete_id for item in others} <= set(plan.starters)
+    assert plan.doubtful_starter_count == 0
+    # Non sparisce: è il primo in panchina del suo ruolo.
+    assert star.athlete_id in plan.bench
+
+
+def test_doubtful_player_fills_a_role_only_when_no_available_alternative() -> None:
+    """Senza un disponibile dello stesso ruolo l'«in dubbio» completa il modulo; un assente
+    certo invece mai, e se mancano anche gli «in dubbio» il ruolo resta scoperto."""
+    keeper = candidate(1, role=FantasyRole.P)
+    available = candidate(2, role=FantasyRole.D)
+    doubtful = _doubtful(candidate(3, role=FantasyRole.D))
+    certain = _unavailable(candidate(4, role=FantasyRole.D, recent_form=9.0))
+    certain_midfielder = _unavailable(candidate(5))
+    plan = build_lineup_plan(
+        [keeper, available, doubtful, certain, certain_midfielder],
+        SMALL_TARGETS,
+        decided_at=DECIDED_AT,
+    )
+    assert available.athlete_id in plan.starters
+    assert doubtful.athlete_id in plan.starters
+    assert certain.athlete_id not in plan.starters
+    assert certain_midfielder.athlete_id not in plan.starters
+    assert plan.doubtful_starter_count == 1
+    assert plan.unfilled_roles == (FantasyRole.C,)
+    assert not plan.is_complete
+
+
+def test_bench_puts_doubtful_before_certain_absences() -> None:
+    """In panchina l'«in dubbio» sta davanti a chi di sicuro non gioca."""
+    keeper = candidate(1, role=FantasyRole.P)
+    defenders = [candidate(2, role=FantasyRole.D), candidate(3, role=FantasyRole.D)]
+    certain = _unavailable(candidate(4, role=FantasyRole.D, recent_form=9.0))
+    doubtful = _doubtful(candidate(5, role=FantasyRole.D))
+    midfielder = candidate(6)
+    plan = build_lineup_plan(
+        [keeper, *defenders, certain, doubtful, midfielder],
+        SMALL_TARGETS,
+        decided_at=DECIDED_AT,
+    )
+    assert plan.unfilled_roles == ()
+    assert plan.bench.index(doubtful.athlete_id) < plan.bench.index(certain.athlete_id)
+
+
+def test_without_doubtful_players_the_order_is_unchanged() -> None:
+    """Le squadre IA non hanno «in dubbio»: stesso piano di prima (ADR-0005)."""
+    pool = [
+        candidate(1, role=FantasyRole.P),
+        candidate(2, role=FantasyRole.D, recent_form=3.0),
+        candidate(3, role=FantasyRole.D, recent_form=7.0),
+        candidate(4, role=FantasyRole.D, recent_form=5.0),
+        candidate(5, recent_form=6.0),
+    ]
+    plan = build_lineup_plan(pool, SMALL_TARGETS, decided_at=DECIDED_AT)
+    assert plan.starters == (UUID(int=1), UUID(int=3), UUID(int=4), UUID(int=5))
+    assert plan.doubtful_starter_count == 0
+
+
 # ---------------------------------------------------------------------------
 # Formula
 # ---------------------------------------------------------------------------

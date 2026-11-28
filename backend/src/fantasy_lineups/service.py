@@ -28,7 +28,11 @@ from database.enums import (
 )
 from fantasy_lineups.ai_selection import LineupPlan
 from fantasy_lineups.ai_service import DEFAULT_MODULE
-from fantasy_lineups.availability import no_vote_reasons, probable_hints, shown_unavailable_ids
+from fantasy_lineups.availability import (
+    best_lineup_availability,
+    no_vote_reasons,
+    probable_hints,
+)
 from fantasy_lineups.best_lineup_service import (
     best_lineup_incomplete_message,
     compute_best_lineup_for_team,
@@ -909,9 +913,10 @@ class FantasyLineupService:
         )
 
         # Chi in campo è grigio (indisponibile) non entra tra i titolari: stessa regola del
-        # contesto mandato a sito e app (Rosario, 27/11).
+        # contesto mandato a sito e app (Rosario, 27/11). Chi è «in dubbio» (arancione, 1.5)
+        # entra solo come ultima risorsa, se nel suo ruolo manca un disponibile (28/11).
         roster_athlete_ids = [row.athlete_id for row in roster]
-        unavailable_ids = shown_unavailable_ids(
+        unavailable_ids, doubtful_ids = best_lineup_availability(
             roster_athlete_ids,
             kickoffs,
             self._probable_hints(fantasy_round.id, roster_athlete_ids),
@@ -927,6 +932,7 @@ class FantasyLineupService:
                 submission=submission,
                 fallback_module=current_module,
                 unavailable_ids=unavailable_ids,
+                doubtful_ids=doubtful_ids,
             )
         else:
             module = current_module
@@ -939,6 +945,7 @@ class FantasyLineupService:
                 locked_ids=locked_ids,
                 submission=submission,
                 unavailable_ids=unavailable_ids,
+                doubtful_ids=doubtful_ids,
             )
         if not plan.is_complete:
             get_metrics().incr(
@@ -997,6 +1004,7 @@ class FantasyLineupService:
         locked_ids: set[UUID],
         submission: LineupSubmission | None,
         unavailable_ids: set[UUID] | None = None,
+        doubtful_ids: set[UUID] | None = None,
     ) -> LineupPlan:
         """Un piano per un modulo specifico — stessa scelta tra le due euristiche
         (libera o a blocchi rispettati) già usata da ``apply_best_lineup``,
@@ -1011,6 +1019,7 @@ class FantasyLineupService:
                 module=module,
                 decided_at=now,
                 unavailable_athlete_ids=unavailable_ids or (),
+                doubtful_athlete_ids=doubtful_ids or (),
             )
         confirmed_slots = self._slots_from_submission(submission)
         confirmed_starter_ids = {
@@ -1033,6 +1042,7 @@ class FantasyLineupService:
             confirmed_starter_ids=confirmed_starter_ids,
             confirmed_bench_order=confirmed_bench_order,
             unavailable_athlete_ids=unavailable_ids or (),
+            doubtful_athlete_ids=doubtful_ids or (),
         )
 
     def _best_module_plan(
@@ -1046,6 +1056,7 @@ class FantasyLineupService:
         submission: LineupSubmission | None,
         fallback_module: FantasyModule,
         unavailable_ids: set[UUID] | None = None,
+        doubtful_ids: set[UUID] | None = None,
     ) -> tuple[FantasyModule, LineupPlan]:
         """Il modulo approvato (tra tutti quelli del catalogo) che massimizza il
         punteggio totale degli undici titolari scelti, vincoli di blocco
@@ -1070,6 +1081,7 @@ class FantasyLineupService:
                     locked_ids=locked_ids,
                     submission=submission,
                     unavailable_ids=unavailable_ids,
+                    doubtful_ids=doubtful_ids,
                 ),
             )
             for module in APPROVED_MODULES
@@ -1086,6 +1098,7 @@ class FantasyLineupService:
             locked_ids=locked_ids,
             submission=submission,
             unavailable_ids=unavailable_ids,
+            doubtful_ids=doubtful_ids,
         )
 
     def save_my_draft(
@@ -2328,6 +2341,8 @@ class FantasyLineupService:
                 if probable is None
                 else probable.absence
             ),
+            # In dubbio (1.5): solo se nient'altro gli toglie il voto. Resta selezionabile.
+            probableDoubt=(no_vote_reason is None and probable is not None and probable.doubtful),
             # Chi di sicuro non prende il voto non è selezionabile come titolare.
             selectionBlocked=no_vote_reason is not None,
             exceedsRoleQuota=row.exceeds_role_quota,

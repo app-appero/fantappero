@@ -78,6 +78,10 @@ class CandidateInput:
     #: probabile, partita rinviata, nessuna partita. Lo imposta solo «Applica formazione
     #: migliore» (``best_lineup_service``); le squadre IA restano come prima.
     unavailable: bool = False
+    #: True quando la formazione lo mostra «in dubbio» (arancione, 1.5): resta schierabile ma
+    #: è l'ultima risorsa, dopo tutti i disponibili dello stesso ruolo (``_sort_key``). Lo
+    #: imposta solo «Applica formazione migliore»; le squadre IA restano come prima.
+    doubtful: bool = False
 
 
 @dataclass(frozen=True)
@@ -87,6 +91,8 @@ class ScoredCandidate:
     score: float
     sources: tuple[SignalSource, ...]
     excluded_reason: ExclusionReason | None
+    #: Copia di ``CandidateInput.doubtful`` (per ``select_best_module``).
+    doubtful: bool = False
 
 
 @dataclass
@@ -104,6 +110,12 @@ class LineupPlan:
     @property
     def is_complete(self) -> bool:
         return len(self.starters) == 11 and not self.unfilled_roles
+
+    @property
+    def doubtful_starter_count(self) -> int:
+        """Quanti titolari scelti sono «in dubbio» (ultima risorsa)."""
+        starters = set(self.starters)
+        return sum(1 for item in self.candidates if item.doubtful and item.athlete_id in starters)
 
 
 def is_eligible(candidate: CandidateInput) -> ExclusionReason | None:
@@ -148,9 +160,27 @@ def score_candidate(candidate: CandidateInput) -> tuple[float, tuple[SignalSourc
     return score, tuple(sources)
 
 
-def _sort_key(scored: ScoredCandidate, candidate: CandidateInput) -> tuple[float, int, str]:
-    """Score desc, presenze desc, athlete_id asc: stabile e riproducibile."""
-    return (-scored.score, -candidate.recent_appearances, str(scored.athlete_id))
+def _sort_key(scored: ScoredCandidate, candidate: CandidateInput) -> tuple[int, float, int, str]:
+    """Prima i disponibili, poi gli «in dubbio», poi gli indisponibili mostrati in grigio;
+    dentro ogni gruppo score desc, presenze desc, athlete_id asc.
+
+    Un «in dubbio» viene dopo ogni disponibile, qualunque punteggio abbia: entra tra i
+    titolari solo se nel suo ruolo non c'è un'alternativa disponibile (1.5, Rosario 28/11), e
+    in panchina sta davanti a chi di sicuro non gioca. Le squadre IA non hanno né «in dubbio»
+    né indisponibili segnati (``unavailable``): per loro l'ordine è quello di sempre.
+    """
+    if scored.excluded_reason is ExclusionReason.UNAVAILABLE:
+        group = 2
+    elif candidate.doubtful:
+        group = 1
+    else:
+        group = 0
+    return (
+        group,
+        -scored.score,
+        -candidate.recent_appearances,
+        str(scored.athlete_id),
+    )
 
 
 def active_bench_order(
@@ -183,7 +213,7 @@ def active_bench_order(
     if not pool:
         return []
 
-    def key(item: ScoredCandidate) -> tuple[float, int, str]:
+    def key(item: ScoredCandidate) -> tuple[int, float, int, str]:
         return _sort_key(item, by_id[item.athlete_id])
 
     by_role: dict[FantasyRole, list[ScoredCandidate]] = defaultdict(list)
@@ -262,6 +292,7 @@ def build_lineup_plan(
                 score=value,
                 sources=sources,
                 excluded_reason=None,
+                doubtful=candidate.doubtful,
             )
         )
 
@@ -316,6 +347,7 @@ def build_lineup_plan(
             score=item.score,
             sources=item.sources,
             excluded_reason=ExclusionReason.NOT_SELECTED,
+            doubtful=item.doubtful,
         )
         for item in scored
     )

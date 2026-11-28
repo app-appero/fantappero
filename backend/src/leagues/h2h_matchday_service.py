@@ -754,5 +754,6 @@ def _player_score_response(
         probableHint=None if probable is None else probable.hint,
         probableNote=None if probable is None else probable.note,
         probableAbsence=None if probable is None else probable.absence,
+        probableDoubt=False if probable is None else probable.doubtful,
         selectionBlocked=False if probable is None else probable.blocked,
     )

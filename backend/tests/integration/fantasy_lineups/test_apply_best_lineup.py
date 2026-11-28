@@ -809,6 +809,11 @@ def test_apply_best_lineup_never_fields_a_player_shown_unavailable(
     assert hints[str(defender.id)] == "unavailable"
     assert hints[str(midfielder.id)] == "unavailable"
     assert all(hints[athlete_id] != "unavailable" for athlete_id in starters)
+    # 1.5: il campo nuovo distingue il «in dubbio» (arancione) dall'assente certo (grigio).
+    doubts = {row["athleteId"]: row.get("probableDoubt") for row in body["roster"]}
+    assert doubts[str(midfielder.id)] is True
+    assert doubts[str(defender.id)] is False
+    assert all(doubts[athlete_id] is False for athlete_id in starters)
 
 
 def test_apply_best_lineup_says_which_roles_lack_available_players(
@@ -817,7 +822,10 @@ def test_apply_best_lineup_says_which_roles_lack_available_players(
     competition_ids: list[str],
 ) -> None:
     """Se senza gli indisponibili il modulo non si completa, la formula non riempie il buco
-    con un grigio: rifiuta e dice quanti disponibili mancano per ruolo, senza toccare la bozza."""
+    con un grigio: rifiuta e dice quanti disponibili mancano per ruolo, senza toccare la bozza.
+
+    Dalla 1.5 gli «in dubbio» possono coprire un buco (ultima risorsa): qui gli assenti sono
+    tutti certi, quindi il messaggio resta quello di prima."""
     token, _ = _register_and_login(client, "apply.best.unavailable-short@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Corta")
     fantasy_round, home_club_id = _create_round(
@@ -829,14 +837,11 @@ def test_apply_best_lineup_says_which_roles_lack_available_players(
     )
     grouped = _seed_roster_athletes(db_session, id_offset=2_570_000, club_id=home_club_id)
     _fill_validated_roster(db_session, league_id, grouped)
-    # 11 difensori, 8 assenti (certi o in dubbio): ne restano 3 per un 4-3-3.
+    # 11 difensori, 8 assenti certi: ne restano 3 per un 4-3-3.
     _seed_predicted_absences(
         db_session,
         round_id=fantasy_round.id,
-        absences=[
-            (athlete, index % 2 == 0, "Infortunato")
-            for index, athlete in enumerate(grouped["D"][:8])
-        ],
+        absences=[(athlete, True, "Infortunato") for athlete in grouped["D"][:8]],
     )
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -857,3 +862,72 @@ def test_apply_best_lineup_says_which_roles_lack_available_players(
     )
     assert context.status_code == 200
     assert context.json()["draft"] is None
+
+
+def test_apply_best_lineup_uses_a_doubtful_player_only_as_last_resort(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Rosario, 28/11 (1.5): un «in dubbio» può giocare. La formula lo usa solo se nel suo
+    ruolo non c'è più un disponibile e solo per completare il modulo; gli assenti certi
+    restano fuori. Qui degli 11 difensori 6 sono assenti certi, 2 in dubbio e 3 disponibili: per il
+    4-3-3 entrano i 3 disponibili e un solo «in dubbio», mai un assente certo."""
+    token, _ = _register_and_login(client, "apply.best.doubtful@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Dubbi")
+    fantasy_round, home_club_id = _create_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_595_000,
+        competition_ids=competition_ids,
+    )
+    grouped = _seed_roster_athletes(db_session, id_offset=2_590_000, club_id=home_club_id)
+    _fill_validated_roster(db_session, league_id, grouped)
+    defenders = sorted(grouped["D"], key=lambda athlete: str(athlete.id))
+    # I primi per la formula (a parità di segnali vince l'id) sono gli «in dubbio» e i certi:
+    # senza la regola nuova entrerebbero prima dei disponibili.
+    doubtful = defenders[:2]
+    certain = defenders[2:8]
+    available = defenders[8:]
+    _seed_predicted_absences(
+        db_session,
+        round_id=fantasy_round.id,
+        absences=[
+            *((athlete, False, "Doubtful") for athlete in doubtful),
+            *((athlete, True, "Infortunato") for athlete in certain),
+        ],
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.post(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione/migliore",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    starters = set(body["draft"]["starterAthleteIds"])
+    assert len(starters) == 11
+    fielded = starters & {str(athlete.id) for athlete in grouped["D"]}
+    assert len(fielded) == 4
+    assert {str(athlete.id) for athlete in available} <= fielded
+    assert len(fielded & {str(athlete.id) for athlete in doubtful}) == 1
+    assert not fielded & {str(athlete.id) for athlete in certain}
+    # L'«in dubbio» rimasto fuori sta in panchina, davanti agli assenti certi dello stesso ruolo.
+    bench = body["draft"]["benchAthleteIds"]
+    left_out = next(str(a.id) for a in doubtful if str(a.id) not in starters)
+    assert bench.index(left_out) < min(bench.index(str(athlete.id)) for athlete in certain)
+
+    # Compatibilità: per l'app 1.4 l'«in dubbio» resta "unavailable" (grigio) e selezionabile.
+    rows = {row["athleteId"]: row for row in body["roster"]}
+    for athlete in doubtful:
+        row = rows[str(athlete.id)]
+        assert row["probableHint"] == "unavailable"
+        assert row["probableAbsence"] == "other"
+        assert row["selectionBlocked"] is False
+        assert row["probableDoubt"] is True
+    for athlete in certain:
+        row = rows[str(athlete.id)]
+        assert row["probableHint"] == "unavailable"
+        assert row["probableAbsence"] == "injured"
+        assert row["probableDoubt"] is False

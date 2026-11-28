@@ -20,7 +20,13 @@ from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
 
 logger = get_logger(__name__)
 
-__all__ = ["no_vote_reasons", "probable_hints", "shown_unavailable_ids"]
+__all__ = [
+    "best_lineup_availability",
+    "no_vote_reasons",
+    "probable_hints",
+    "shown_doubtful_ids",
+    "shown_unavailable_ids",
+]
 
 
 def probable_hints(
@@ -96,3 +102,40 @@ def shown_unavailable_ids(
         if (hint := probable.get(athlete_id)) is not None and hint.hint == "unavailable"
     )
     return unavailable
+
+
+def shown_doubtful_ids(
+    athlete_ids: list[UUID],
+    kickoffs: dict[UUID, KickoffRef],
+    probable: dict[UUID, AthleteProbable],
+) -> set[UUID]:
+    """Chi la formazione mostra «in dubbio» (alone arancione, 1.5) ai client nuovi.
+
+    Stessa regola di ``probableDoubt`` nel contesto della formazione: l'assenza della
+    formazione probabile è «in dubbio» e nient'altro gli toglie il voto (``no_vote_reasons``).
+    Per l'app 1.4 resta tra gli indisponibili di ``shown_unavailable_ids`` (grigio).
+    """
+    no_vote = no_vote_reasons(athlete_ids, kickoffs, probable)
+    return {
+        athlete_id
+        for athlete_id in athlete_ids
+        if athlete_id not in no_vote
+        and (hint := probable.get(athlete_id)) is not None
+        and hint.hint == "unavailable"
+        and hint.doubtful
+    }
+
+
+def best_lineup_availability(
+    athlete_ids: list[UUID],
+    kickoffs: dict[UUID, KickoffRef],
+    probable: dict[UUID, AthleteProbable],
+) -> tuple[set[UUID], set[UUID]]:
+    """Per «Applica formazione migliore»: (indisponibili da escludere, «in dubbio»).
+
+    Gli «in dubbio» non sono più esclusi come gli altri grigi: la formula li usa solo come
+    ultima risorsa (Rosario, 28/11). Gli assenti certi restano esclusi come prima.
+    """
+    doubtful = shown_doubtful_ids(athlete_ids, kickoffs, probable)
+    unavailable = shown_unavailable_ids(athlete_ids, kickoffs, probable) - doubtful
+    return unavailable, doubtful

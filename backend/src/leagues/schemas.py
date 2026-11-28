@@ -492,6 +492,8 @@ class H2HPlayerScoreResponse(ApiModel):
         default=None,
         alias="probableAbsence",
     )
+    # 1.5: assenza «in dubbio», stesso significato del campo di Formazione.
+    probable_doubt: bool = Field(default=False, alias="probableDoubt")
     selection_blocked: bool = Field(default=False, alias="selectionBlocked")
 
 

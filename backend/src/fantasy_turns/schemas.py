@@ -92,6 +92,8 @@ class FixtureUnavailablePlayerResponse(ApiModel):
     kind: str | None = None
     label: str | None = None
     blocks_selection: bool = Field(default=False, alias="blocksSelection")
+    # 1.5: assenza «in dubbio» (può giocare). Campo nuovo e opzionale.
+    probable_doubt: bool = Field(default=False, alias="probableDoubt")
 
 
 class FixtureLiveDetailResponse(ApiModel):

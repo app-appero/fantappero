@@ -13,7 +13,11 @@ from uuid import UUID, uuid4
 
 from database.enums import FantasyModule, FantasyRole
 from fantasy_lineups.ai_selection import LineupPlan, ScoredCandidate
-from fantasy_lineups.availability import shown_unavailable_ids
+from fantasy_lineups.availability import (
+    best_lineup_availability,
+    shown_doubtful_ids,
+    shown_unavailable_ids,
+)
 from fantasy_lineups.best_lineup_service import best_lineup_incomplete_message, select_best_module
 from fantasy_lineups.kickoffs import KickoffRef
 from sports_data.predicted.read import AthleteProbable
@@ -207,3 +211,89 @@ def test_shown_unavailable_matches_the_grey_rule_of_web_and_app() -> None:
         [certain, doubtful, no_match, postponed, starter, nothing], kickoffs, probable
     )
     assert result == {certain, doubtful, no_match, postponed}
+
+
+def _plan_with_doubtful(score: float, doubtful_count: int) -> LineupPlan:
+    plan = _complete_plan({athlete_id: score for athlete_id in _eleven_ids()})
+    candidates = tuple(
+        ScoredCandidate(
+            athlete_id=item.athlete_id,
+            role=item.role,
+            score=item.score,
+            sources=item.sources,
+            excluded_reason=None,
+            doubtful=index < doubtful_count,
+        )
+        for index, item in enumerate(plan.candidates)
+    )
+    return LineupPlan(
+        algorithm_version=plan.algorithm_version,
+        decided_at=plan.decided_at,
+        starters=plan.starters,
+        bench=(),
+        candidates=candidates,
+        used_fallback=False,
+        unfilled_roles=(),
+    )
+
+
+def test_best_module_prefers_fewer_doubtful_starters_over_a_higher_score() -> None:
+    """1.5: mai un «in dubbio» prima di un disponibile, nemmeno cambiando modulo. Un modulo
+    completabile senza «in dubbio» vince su uno che ne richiede, anche se rende di più."""
+    with_doubt = _plan_with_doubtful(9.0, 1)
+    clean = _plan_with_doubtful(5.0, 0)
+    two_doubts = _plan_with_doubtful(10.0, 2)
+    result = select_best_module(
+        [
+            (FantasyModule.M343, two_doubts),
+            (FantasyModule.M433, with_doubt),
+            (FantasyModule.M442, clean),
+        ]
+    )
+    assert result is not None
+    assert result[0] is FantasyModule.M442
+
+    # Se tutti richiedono un «in dubbio», vince quello che ne usa meno, poi il punteggio.
+    result = select_best_module(
+        [(FantasyModule.M343, two_doubts), (FantasyModule.M433, with_doubt)]
+    )
+    assert result is not None
+    assert result[0] is FantasyModule.M433
+
+
+def test_best_lineup_splits_doubtful_from_certain_absences() -> None:
+    """«In dubbio» = assenza della formazione probabile marcata ``doubtful`` e nessun altro
+    motivo senza voto. Per l'app 1.4 resta comunque tra i grigi di ``shown_unavailable_ids``."""
+    kickoff = KickoffRef(kickoff_at=DECIDED_AT, status_short="NS")
+    certain, doubtful, doubtful_postponed, other, suspended = (uuid4() for _ in range(5))
+    probable = {
+        certain: AthleteProbable(
+            hint="unavailable", note="Infortunato", blocked=True, absence="injured"
+        ),
+        doubtful: AthleteProbable(
+            hint="unavailable", note="Doubtful", blocked=False, absence="injured", doubtful=True
+        ),
+        doubtful_postponed: AthleteProbable(
+            hint="unavailable", note="Doubtful", blocked=False, absence="other", doubtful=True
+        ),
+        other: AthleteProbable(
+            hint="unavailable", note="Mid December", blocked=False, absence="other"
+        ),
+        suspended: AthleteProbable(
+            hint="unavailable", note="Squalificato", blocked=True, absence="suspended"
+        ),
+    }
+    kickoffs = {
+        certain: kickoff,
+        doubtful: kickoff,
+        doubtful_postponed: KickoffRef(kickoff_at=DECIDED_AT, status_short="PST"),
+        other: kickoff,
+        suspended: kickoff,
+    }
+    ids = [certain, doubtful, doubtful_postponed, other, suspended]
+    assert shown_doubtful_ids(ids, kickoffs, probable) == {doubtful}
+    unavailable, doubts = best_lineup_availability(ids, kickoffs, probable)
+    assert doubts == {doubtful}
+    assert unavailable == {certain, doubtful_postponed, other, suspended}
+    # Compatibilità: il grigio dei client vecchi non cambia.
+    assert shown_unavailable_ids(ids, kickoffs, probable) == set(ids)

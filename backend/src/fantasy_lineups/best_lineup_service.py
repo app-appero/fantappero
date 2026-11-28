@@ -107,6 +107,7 @@ def compute_best_lineup_for_team(
     module: FantasyModule,
     decided_at: datetime,
     unavailable_athlete_ids: Collection[UUID] = (),
+    doubtful_athlete_ids: Collection[UUID] = (),
 ) -> LineupPlan:
     """Stessa euristica ``ai_lineup_v1``, applicata on-demand a una squadra qualunque.
 
@@ -119,6 +120,10 @@ def compute_best_lineup_for_team(
     ``unavailable_athlete_ids``: chi la formazione mostra in grigio (indisponibile). Non entra
     tra i titolari; se senza di loro il modulo non si completa il piano resta incompleto e il
     servizio lo dice, invece di riempire il buco con un indisponibile.
+
+    ``doubtful_athlete_ids``: chi la formazione mostra «in dubbio» (arancione). Resta
+    schierabile, ma solo come ultima risorsa: entra tra i titolari solo se nel suo ruolo non
+    c'è un disponibile, e solo per completare il modulo (``ai_selection._sort_key``).
     """
     candidates = _mark_unavailable(
         collect_candidates_for_team(
@@ -130,6 +135,7 @@ def compute_best_lineup_for_team(
             decided_at=decided_at,
         ),
         unavailable_athlete_ids,
+        doubtful_athlete_ids,
     )
     return build_lineup_plan(candidates, _role_targets(module), decided_at=decided_at)
 
@@ -147,6 +153,7 @@ def compute_best_lineup_respecting_locks(
     confirmed_starter_ids: set[UUID],
     confirmed_bench_order: Sequence[UUID],
     unavailable_athlete_ids: Collection[UUID] = (),
+    doubtful_athlete_ids: Collection[UUID] = (),
 ) -> LineupPlan:
     """Come `compute_best_lineup_for_team`, ma vincola i calciatori già
     bloccati (partita iniziata) al ruolo già confermato — mai promuove un
@@ -165,6 +172,7 @@ def compute_best_lineup_respecting_locks(
 
     Gli indisponibili (``unavailable_athlete_ids``) non entrano tra i titolari liberi; un
     titolare bloccato resta dov'è anche se indisponibile (la sua partita è già iniziata).
+    Gli «in dubbio» (``doubtful_athlete_ids``) sono l'ultima risorsa, come nel caso libero.
     """
     candidates = _mark_unavailable(
         collect_candidates_for_team(
@@ -176,6 +184,7 @@ def compute_best_lineup_respecting_locks(
             decided_at=decided_at,
         ),
         unavailable_athlete_ids,
+        doubtful_athlete_ids,
     )
     # Davanti a un bloccato in panchina (o in tribuna) non si entra e non si esce
     # (`assert_bench_order_lock`): chi è in panchina fino all'ultimo bloccato resta al suo
@@ -275,15 +284,26 @@ def compute_best_lineup_respecting_locks(
 def _mark_unavailable(
     candidates: list[CandidateInput],
     unavailable_athlete_ids: Collection[UUID],
+    doubtful_athlete_ids: Collection[UUID] = (),
 ) -> list[CandidateInput]:
-    """Segna chi la formazione mostra indisponibile: ``is_eligible`` lo esclude dai titolari."""
+    """Segna chi la formazione mostra indisponibile (``is_eligible`` lo esclude dai titolari) e
+    chi mostra «in dubbio» (schierabile, ma dopo tutti i disponibili dello stesso ruolo).
+
+    Chi è in entrambi gli insiemi conta come indisponibile: un'assenza certa vince sul dubbio.
+    """
     unavailable = set(unavailable_athlete_ids)
-    if not unavailable:
+    doubtful = set(doubtful_athlete_ids) - unavailable
+    if not unavailable and not doubtful:
         return candidates
-    return [
-        replace(candidate, unavailable=True) if candidate.athlete_id in unavailable else candidate
-        for candidate in candidates
-    ]
+    marked: list[CandidateInput] = []
+    for candidate in candidates:
+        if candidate.athlete_id in unavailable:
+            marked.append(replace(candidate, unavailable=True))
+        elif candidate.athlete_id in doubtful:
+            marked.append(replace(candidate, doubtful=True))
+        else:
+            marked.append(candidate)
+    return marked
 
 
 def _role_aware_new_arrivals(
@@ -351,6 +371,7 @@ def _role_aware_new_arrivals(
                 score=value,
                 sources=sources,
                 excluded_reason=None,
+                doubtful=candidate.doubtful,
             )
         )
 
@@ -368,6 +389,10 @@ def select_best_module(
     """Tra più piani (uno per modulo), quello con il punteggio totale più alto
     tra gli undici titolari scelti — ``None`` se nessuno è completabile.
 
+    Prima di tutto conta quanti titolari «in dubbio» servono (1.5): un modulo completabile con
+    meno «in dubbio» vince comunque, anche con un punteggio più basso. Senza «in dubbio» la
+    scelta è quella di sempre.
+
     Funzione pura (EP-self-service, modalità ``best_module``): prende piani
     già calcolati (con o senza blocchi rispettati, indifferentemente) invece
     di calcolarli lei stessa, così la scelta del modulo migliore è
@@ -377,6 +402,7 @@ def select_best_module(
     """
     best: tuple[FantasyModule, LineupPlan] | None = None
     best_score: float = float("-inf")
+    best_doubtful = 0
     for module, plan in plans:
         if not plan.is_complete:
             continue
@@ -384,10 +410,18 @@ def select_best_module(
         score = sum(
             candidate.score for candidate in plan.candidates if candidate.athlete_id in starters
         )
+        doubtful = plan.doubtful_starter_count
+        if best is not None and doubtful != best_doubtful:
+            if doubtful < best_doubtful:
+                best = (module, plan)
+                best_score = score
+                best_doubtful = doubtful
+            continue
         tie_break_wins = score == best_score and best is not None and module.value < best[0].value
         if best is None or score > best_score or tie_break_wins:
             best = (module, plan)
             best_score = score
+            best_doubtful = doubtful
     return best
 
 

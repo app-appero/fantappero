@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
@@ -56,6 +57,8 @@ class PredictedUnavailable:
     kind: str | None
     label: str | None
     blocks_selection: bool
+    #: Assenza «in dubbio» (può giocare): vedi ``is_doubtful_absence``. Campo nuovo (1.5).
+    doubtful: bool = False
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,44 @@ class AthleteProbable:
     blocked: bool
     #: Solo per ``unavailable``: ``suspended`` = espulso/squalificato, ``injured``, ``other``.
     absence: Literal["suspended", "injured", "other"] | None = None
+    #: Solo per ``unavailable``: assenza «in dubbio» secondo lo stato del fornitore (Doubtful,
+    #: Questionable, Day to day…). ``hint``/``absence`` restano quelli di prima per l'app 1.4,
+    #: che continua a mostrarlo grigio; i client nuovi lo mostrano arancione e selezionabile.
+    doubtful: bool = False
+
+
+#: Stati del fornitore che dicono «può giocare, ma non è sicuro». Confronto su tipo e testo
+#: dell'assenza in minuscolo, con trattini e trattini bassi ridotti a spazi.
+DOUBTFUL_MARKERS: tuple[str, ...] = (
+    "doubtful",
+    "doubt",
+    "questionable",
+    "uncertain",
+    "day to day",
+    "game time decision",
+    "50 50",
+    "dubbio",
+    "in dubbio",
+    "da valutare",
+    "da confermare",
+)
+
+
+def is_doubtful_absence(kind: str | None, label: str | None, *, blocked: bool) -> bool:
+    """Assenza «in dubbio»: lo stato del fornitore dice che può giocare.
+
+    Mai per chi blocca la scelta (assenza certa già collegata alla rosa) né per una squalifica
+    o un'espulsione: quelle sono certe anche se il testo dice altro.
+    """
+    if blocked:
+        return False
+    blob = " ".join(re.sub(r"[-_/]+", " ", f"{kind or ''} {label or ''}".lower()).split())
+    if not blob:
+        return False
+    if _absence_category(kind, label) == "suspended":
+        return False
+    padded = f" {blob} "
+    return any(f" {marker} " in padded for marker in DOUBTFUL_MARKERS)
 
 
 def latest_predicted_view(session: Session, fixture_id: UUID) -> PredictedView | None:
@@ -123,6 +164,11 @@ def latest_predicted_view(session: Session, fixture_id: UUID) -> PredictedView |
                 kind=player.unavailability_type,
                 label=player.unavailability_label,
                 blocks_selection=player.blocks_selection,
+                doubtful=is_doubtful_absence(
+                    player.unavailability_type,
+                    player.unavailability_label,
+                    blocked=player.blocks_selection,
+                ),
             )
             for player in sorted(snapshot.players, key=lambda row: (row.side, row.sort_order))
             if player.is_unavailable
@@ -400,6 +446,11 @@ def _hint_for(player: PredictedLineupPlayer) -> AthleteProbable | None:
             note=label,
             blocked=player.blocks_selection,
             absence=_absence_category(player.unavailability_type, label),
+            doubtful=is_doubtful_absence(
+                player.unavailability_type,
+                player.unavailability_label,
+                blocked=player.blocks_selection,
+            ),
         )
     if player.is_starter:
         return AthleteProbable(hint="starter", note="Titolare probabile", blocked=False)

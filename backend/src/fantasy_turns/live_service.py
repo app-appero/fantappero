@@ -267,6 +267,7 @@ def _unavailable_payload(
                 kind=player.kind,
                 label=player.label,
                 blocksSelection=player.blocks_selection,
+                probableDoubt=player.doubtful,
             )
         )
     return rows
