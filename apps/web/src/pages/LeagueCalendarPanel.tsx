@@ -1,8 +1,15 @@
 import type {
+  CalendarAction,
+  CalendarActionModalState,
   CalendarRosterTeamIssues,
   CalendarWindow,
   LeagueCalendar,
   LeagueCalendarPlan,
+} from "@fantappero/contracts";
+import {
+  CALENDAR_ACTION_COPY,
+  calendarBlockedNote,
+  calendarForceNote,
 } from "@fantappero/contracts";
 import { Badge, Button, Modal, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -123,44 +130,8 @@ export function CalendarWindowsPanel({ plan }: { plan: LeagueCalendarPlan }) {
   );
 }
 
-export type CalendarAction = "generate" | "confirm";
-
-/** Stato del modale di «Genera/Conferma calendario»: verifica rose, poi conferma o avviso. */
-export type CalendarActionModalState = {
-  action: CalendarAction;
-  phase: "checking" | "ready";
-  teams: CalendarRosterTeamIssues[];
-};
-
-const ACTION_COPY: Record<
-  CalendarAction,
-  { title: string; verb: string; button: string; forceButton: string; working: string; prompt: string }
-> = {
-  generate: {
-    title: "Genera calendario",
-    verb: "generare",
-    button: "Genera calendario",
-    forceButton: "Genera comunque",
-    working: "Generazione…",
-    prompt:
-      "Vuoi generare il calendario? Le giornate seguono i Turni Europei della lega: dopo controlli l'anteprima e la confermi.",
-  },
-  confirm: {
-    title: "Conferma calendario",
-    verb: "confermare",
-    button: "Conferma calendario",
-    forceButton: "Conferma comunque",
-    working: "Conferma…",
-    prompt: "Vuoi confermare il calendario? Gli scontri diventano visibili a tutti i partecipanti.",
-  },
-};
-
-function joinTeamNames(names: string[]): string {
-  if (names.length <= 1) {
-    return names[0] ?? "";
-  }
-  return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
-}
+// Stato, testi e funzioni della finestra stanno in `@fantappero/contracts`: gli stessi dell'app (1.5).
+export type { CalendarAction, CalendarActionModalState };
 
 /**
  * Modale di «Genera/Conferma calendario» (Rosario 22/11): conferma normale con le rose in
@@ -182,11 +153,11 @@ export function CalendarActionModal({
   onCancel: () => void;
   onProceed: (force: boolean) => void;
 }) {
-  const copy = ACTION_COPY[state?.action ?? "generate"];
+  const copy = CALENDAR_ACTION_COPY[state?.action ?? "generate"];
   const teams = state?.teams ?? [];
   const checking = state?.phase === "checking";
   const hasIssues = !checking && teams.length > 0;
-  const blocked = teams.filter((team) => team.lineupBlocked).map((team) => team.teamName);
+  const blockedNote = calendarBlockedNote(teams);
   return (
     <Modal
       open={state !== null}
@@ -230,19 +201,8 @@ export function CalendarActionModal({
               </li>
             ))}
           </ul>
-          <p>
-            Puoi {copy.verb} comunque il calendario: le rose andranno sistemate, meglio prima del
-            primo turno. Finché una rosa non torna in regola, i calciatori in esubero restano in
-            rosa ma non potranno essere schierati, né titolari né tra i primi 10 della panchina; il
-            resto della squadra può schierare la formazione senza di loro.
-          </p>
-          {blocked.length > 0 ? (
-            <p data-testid="league-calendar-modal-blocked">
-              {joinTeamNames(blocked)} invece non{" "}
-              {blocked.length === 1 ? "potrà" : "potranno"} schierare la formazione finché la rosa
-              non sarà completa e con almeno 3 campionati.
-            </p>
-          ) : null}
+          <p>{calendarForceNote(state?.action ?? "generate")}</p>
+          {blockedNote ? <p data-testid="league-calendar-modal-blocked">{blockedNote}</p> : null}
         </div>
       ) : (
         <p data-testid="league-calendar-modal-confirm">{copy.prompt}</p>

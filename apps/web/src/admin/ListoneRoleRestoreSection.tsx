@@ -1,5 +1,14 @@
 import type { AdminListoneRoleRestoreResult, FantasyRole } from "@fantappero/contracts";
 import {
+  DEFAULT_RESTORE_BEFORE,
+  LISTONE_RESTORE_INTRO,
+  LISTONE_RESTORE_TITLE,
+  listoneRestoreConfirmText,
+  listoneRestoreDoneMessage,
+  listoneRestoreEmptyMessage,
+  romeLocalToIso,
+} from "@fantappero/contracts";
+import {
   Badge,
   Button,
   Card,
@@ -19,62 +28,8 @@ import { restoreAdminListoneRoles } from "../api/admin";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 
-/** L'ora prima dell'aggiornamento del 21/11 su pilota (ora di Roma). */
-export const DEFAULT_RESTORE_BEFORE = "2026-11-21T12:00";
-
-const ROME = "Europe/Rome";
-
-function romeOffsetMs(utcMs: number): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: ROME,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(utcMs));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((item) => item.type === type)?.value ?? "0");
-  const wall = Date.UTC(
-    part("year"),
-    part("month") - 1,
-    part("day"),
-    part("hour"),
-    part("minute"),
-    part("second"),
-  );
-  return wall - utcMs;
-}
-
-/** "2026-11-21T12:00" (ora di Roma, qualunque sia il fuso del browser) → ISO in UTC. */
-export function romeLocalToIso(value: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value.trim());
-  if (!match) {
-    return null;
-  }
-  const [year, month, day, hour, minute] = match.slice(1, 6).map(Number) as [
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  const wall = Date.UTC(year, month - 1, day, hour, minute);
-  let utc = wall - romeOffsetMs(wall);
-  utc = wall - romeOffsetMs(utc);
-  return new Date(utc).toISOString();
-}
-
-function formatRome(value: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value.trim());
-  if (!match) {
-    return value;
-  }
-  const [, year, month, day, hour, minute] = match;
-  return `${day}/${month}/${year} alle ${hour}:${minute}`;
-}
+// L'ora di Roma e i testi stanno in `@fantappero/contracts`, gli stessi dell'app (1.5).
+export { DEFAULT_RESTORE_BEFORE, romeLocalToIso };
 
 function RoleBadge({ role }: { role: FantasyRole | null }) {
   if (role === null) {
@@ -147,16 +102,10 @@ export function ListoneRoleRestoreSection({ seasonYear, onRestored }: Props) {
   return (
     <Card className="fa-admin-listone-restore" data-testid="admin-listone-restore">
       <CardHeader>
-        <h2 className="fa-admin-listone-restore__title">
-          Ripristina i ruoli cambiati da un aggiornamento
-        </h2>
+        <h2 className="fa-admin-listone-restore__title">{LISTONE_RESTORE_TITLE}</h2>
       </CardHeader>
       <CardBody>
-        <p className="fa-admin-listone-restore__intro">
-          Se un aggiornamento del listone ha cambiato il ruolo di calciatori già nelle rose, qui
-          li riporti al ruolo che avevano prima dell'ora scelta. Il ruolo si ricostruisce dalle
-          rose del fornitore salvate prima di quell'ora. Prima guardi cosa cambia, poi confermi.
-        </p>
+        <p className="fa-admin-listone-restore__intro">{LISTONE_RESTORE_INTRO}</p>
         <div className="fa-admin-listone-restore__form">
           <Input
             label="Ruoli com'erano prima del (ora di Roma)"
@@ -195,7 +144,7 @@ export function ListoneRoleRestoreSection({ seasonYear, onRestored }: Props) {
           <UiStatePanel
             state="success"
             title="Ruoli ripristinati"
-            message={`Ruoli ripristinati: ${done.counts.restored}. Rose ricalcolate: ${done.counts.rostersResynced}. Controlla le rose e la generazione del calendario.`}
+            message={listoneRestoreDoneMessage(done.counts)}
             testId="admin-listone-restore-done"
           />
         ) : null}
@@ -212,7 +161,7 @@ export function ListoneRoleRestoreSection({ seasonYear, onRestored }: Props) {
               <UiStatePanel
                 state="empty"
                 title="Niente da ripristinare"
-                message={`Nessun ruolo cambiato dopo il ${formatRome(before)}.`}
+                message={listoneRestoreEmptyMessage(before)}
                 testId="admin-listone-restore-empty"
               />
             ) : (
@@ -272,9 +221,7 @@ export function ListoneRoleRestoreSection({ seasonYear, onRestored }: Props) {
                 data-testid="admin-listone-restore-confirm"
               >
                 <p id="admin-listone-restore-confirm-text">
-                  Riporti {toRestore === 1 ? "1 calciatore" : `${toRestore} calciatori`} al ruolo
-                  che avevano prima del {formatRome(before)}. Le rose che li hanno vengono
-                  ricalcolate. I non ricostruibili restano come sono. Confermi?
+                  {listoneRestoreConfirmText(toRestore, before)}
                 </p>
                 <div className="fa-admin-listone-restore__actions">
                   <Button

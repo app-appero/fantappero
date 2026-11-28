@@ -1,5 +1,12 @@
 import type { AdminListoneProviderRolesResult } from "@fantappero/contracts";
 import {
+  LISTONE_ROLE_PREVIEW_CANCEL_LABEL,
+  LISTONE_ROLE_PREVIEW_CONFIRM_LABEL,
+  LISTONE_ROLE_PREVIEW_INTRO,
+  LISTONE_ROLE_PREVIEW_TITLE,
+  listoneRoleChangesLabel,
+} from "@fantappero/contracts";
+import {
   Badge,
   Button,
   Card,
@@ -58,21 +65,15 @@ export function ListoneProviderRolesPreview({ preview, onDone }: Props) {
   return (
     <Card className="fa-admin-listone-restore" data-testid="admin-listone-role-preview">
       <CardHeader>
-        <h2 className="fa-admin-listone-restore__title">Ruoli che cambierebbero dal fornitore</h2>
+        <h2 className="fa-admin-listone-restore__title">{LISTONE_ROLE_PREVIEW_TITLE}</h2>
       </CardHeader>
       <CardBody>
         <p data-testid="admin-listone-role-preview-summary">
-          {changes === 1
-            ? "1 calciatore cambierebbe ruolo"
-            : `${changes} calciatori cambierebbero ruolo`}{" "}
-          · Rose fuori quota con questi calciatori: ora{" "}
+          {listoneRoleChangesLabel(changes)} · Rose fuori quota con questi calciatori: ora{" "}
           <strong>{preview.counts.rostersOverQuotaNow}</strong>, con i nuovi ruoli{" "}
           <strong>{preview.counts.rostersOverQuotaAfter}</strong>
         </p>
-        <p className="fa-admin-listone-restore__intro">
-          Il listone è già aggiornato (nuovi calciatori e squadre); i ruoli non sono ancora
-          cambiati. Con la conferma cambiano e le rose che li hanno vengono ricalcolate.
-        </p>
+        <p className="fa-admin-listone-restore__intro">{LISTONE_ROLE_PREVIEW_INTRO}</p>
         <Table compact data-testid="admin-listone-role-preview-table">
           <TableHead>
             <TableRow>
@@ -120,7 +121,7 @@ export function ListoneProviderRolesPreview({ preview, onDone }: Props) {
             onClick={() => void confirm()}
             data-testid="admin-listone-role-preview-confirm"
           >
-            Conferma i nuovi ruoli
+            {LISTONE_ROLE_PREVIEW_CONFIRM_LABEL}
           </Button>
           <Button
             type="button"
@@ -129,7 +130,7 @@ export function ListoneProviderRolesPreview({ preview, onDone }: Props) {
             onClick={() => onDone(null)}
             data-testid="admin-listone-role-preview-cancel"
           >
-            Annulla: i ruoli restano come sono
+            {LISTONE_ROLE_PREVIEW_CANCEL_LABEL}
           </Button>
         </div>
       </CardBody>

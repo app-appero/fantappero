@@ -1,5 +1,6 @@
 import {
   avatarInitial,
+  broadcastConfirmation,
   BROADCAST_CATEGORY_OPTIONS,
   BROADCAST_DESTINATIONS,
   BROADCAST_KIND_OPTIONS,
@@ -10,7 +11,7 @@ import {
   type NotificationRecipientList,
   type TestSampleItem,
 } from "@fantappero/contracts";
-import { Breadcrumb, Button, Input, PageContainer, Select, Switch, UiStatePanel } from "@fantappero/ui";
+import { Breadcrumb, Button, Input, Modal, PageContainer, Select, Switch, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
   createBroadcast,
@@ -248,7 +249,7 @@ export function RecipientPicker(props: {
   );
 }
 
-function ComposeTab() {
+export function ComposeTab() {
   const [kind, setKind] = useState<BroadcastKind>("avviso");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -265,27 +266,42 @@ function ComposeTab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // «Invia a N utenti» chiede prima «Sei sicuro?» (1.5); «Invia a me come prova» no.
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const recipients = mode === "all" ? allTotal : selected.size;
 
-  async function submit(toMeOnly: boolean) {
-    const accessToken = token();
-    if (!accessToken) return;
+  /** I controlli prima dell'invio; `false` e l'errore a schermo se qualcosa non va. */
+  function validate(toMeOnly: boolean): boolean {
+    if (!token()) return false;
     if (!title.trim() || !body.trim()) {
       setError("Titolo e testo sono obbligatori.");
-      return;
+      return false;
     }
     if (!toMeOnly && mode === "users" && selected.size === 0) {
       setError("Scegli almeno un destinatario.");
-      return;
+      return false;
     }
     if (scheduled && !toMeOnly) {
       const when = new Date(scheduledAt);
       if (!scheduledAt || Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
         setError("Scegli una data e un’ora nel futuro.");
-        return;
+        return false;
       }
     }
+    return true;
+  }
+
+  function requestSend() {
+    if (validate(false)) {
+      setError(null);
+      setConfirmOpen(true);
+    }
+  }
+
+  async function submit(toMeOnly: boolean) {
+    const accessToken = token();
+    if (!accessToken || !validate(toMeOnly)) return;
     setBusy(true);
     setError(null);
     setDone(null);
@@ -317,6 +333,7 @@ function ComposeTab() {
   }
 
   const glyph = KIND_GLYPH[kind];
+  const confirmation = broadcastConfirmation({ title, recipients, scheduled, push, email });
   return (
     <div className="fa-nop-cols">
       <div className="fa-nop-stack">
@@ -404,7 +421,7 @@ function ComposeTab() {
           {error ? <UiStatePanel state="error" title="Invio non riuscito" message={error} testId="admin-notifications-error" /> : null}
           {done ? <p className="fa-nop-done" data-testid="admin-notifications-done">{done}</p> : null}
           <div className="fa-nop-row">
-            <Button type="button" loading={busy} disabled={busy} onClick={() => void submit(false)} data-testid="admin-notifications-send">
+            <Button type="button" loading={busy} disabled={busy} onClick={requestSend} data-testid="admin-notifications-send">
               {recipients === null ? "Invia" : `Invia a ${recipients} utenti`}
             </Button>
             <Button type="button" variant="secondary" disabled={busy} onClick={() => void submit(true)} data-testid="admin-notifications-send-me">
@@ -412,6 +429,35 @@ function ComposeTab() {
             </Button>
           </div>
         </section>
+        <Modal
+          open={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          title={confirmation.title}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setConfirmOpen(false)}
+                data-testid="admin-notifications-confirm-cancel"
+              >
+                {confirmation.cancelLabel}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  void submit(false);
+                }}
+                data-testid="admin-notifications-confirm-send"
+              >
+                {confirmation.confirmLabel}
+              </Button>
+            </>
+          }
+        >
+          <p data-testid="admin-notifications-confirm-text">{confirmation.message}</p>
+        </Modal>
       </div>
       <aside className="fa-nop-stack fa-nop-aside">
         <section className="fa-nop-card">
