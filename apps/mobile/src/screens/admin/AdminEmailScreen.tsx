@@ -1,9 +1,11 @@
-import type { OperatorEmailHistoryItem } from "@fantappero/contracts";
+import type { ConfirmCopy, OperatorEmailHistoryItem } from "@fantappero/contracts";
+import { operatorEmailConfirmation } from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { fetchOperatorEmails, sendOperatorEmail } from "../../api/notifications";
 import { adminUiStyles as base } from "../../admin/adminUiStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { HScroll } from "../../components/HScroll";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
@@ -33,19 +35,36 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // «Invia a N utenti» chiede prima «Sei sicuro?» (1.5); «Invia a me come prova» no.
+  const [confirm, setConfirm] = useState<ConfirmCopy | null>(null);
   const recipients = mode === "all" ? allTotal : selected.size;
 
-  async function submit(toMeOnly: boolean) {
+  /** I controlli prima dell'invio; `false` e l'errore a schermo se qualcosa non va. */
+  function validate(toMeOnly: boolean): boolean {
     if (!subject.trim() || !body.trim()) {
       setError("Oggetto e testo sono obbligatori.");
-      return;
+      return false;
     }
     if (toMeOnly && !myId) {
       setError("Utente non riconosciuto.");
-      return;
+      return false;
     }
     if (!toMeOnly && mode === "users" && selected.size === 0) {
       setError("Scegli almeno un destinatario.");
+      return false;
+    }
+    return true;
+  }
+
+  function requestSend() {
+    if (validate(false)) {
+      setError(null);
+      setConfirm(operatorEmailConfirmation({ recipients }));
+    }
+  }
+
+  async function submit(toMeOnly: boolean) {
+    if (!validate(toMeOnly)) {
       return;
     }
     setBusy(true);
@@ -105,7 +124,7 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
         <Text style={styles.cardTitle}>3 · Invio</Text>
         {error ? <Text style={styles.error} testID="admin-email-error">{error}</Text> : null}
         {done ? <Text style={styles.done} testID="admin-email-done">{done}</Text> : null}
-        <Pressable style={[base.button, busy && base.disabled]} disabled={busy} onPress={() => void submit(false)} testID="admin-email-send">
+        <Pressable style={[base.button, busy && base.disabled]} disabled={busy} onPress={requestSend} testID="admin-email-send">
           <Text style={base.buttonLabel}>{recipients === null ? "Invia" : `Invia a ${recipients} utenti`}</Text>
         </Pressable>
         <Pressable style={[base.secondaryButton, busy && base.disabled]} disabled={busy} onPress={() => void submit(true)} testID="admin-email-send-me">
@@ -113,6 +132,16 @@ function ComposeTab({ accessToken, myId }: { accessToken: string; myId: string |
         </Pressable>
         <Text style={styles.hint}>Le email automatiche (registrazione, verifica, reset password) partono da sole e non passano di qui.</Text>
       </View>
+      <ConfirmDialog
+        copy={confirm}
+        busy={busy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          setConfirm(null);
+          void submit(false);
+        }}
+        testID="admin-email-confirm"
+      />
     </View>
   );
 }

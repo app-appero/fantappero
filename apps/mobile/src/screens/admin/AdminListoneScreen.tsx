@@ -1,6 +1,17 @@
 import { lazyStyles } from "../../theme/lazyStyles";
 import { HScroll } from "../../components/HScroll";
-import type { AdminListoneEntry, FantasyRole } from "@fantappero/contracts";
+import type {
+  AdminListoneEntry,
+  AdminListoneProviderRolesResult,
+  FantasyRole,
+  ListoneRefreshMode,
+} from "@fantappero/contracts";
+import {
+  LISTONE_REFRESH_BUTTON_LABEL,
+  LISTONE_ROLES_KEPT_MESSAGE,
+  listoneRefreshSummary,
+  listoneRolesAppliedMessage,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -16,6 +27,11 @@ import { PageContainer } from "../../layout/PageContainer";
 import { foldSearchText } from "../roster/listoneFilter";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 import { AdminMarketValueDetailCard } from "./AdminMarketValueDetailCard";
+import {
+  ListoneRefreshChoiceModal,
+  ListoneRolePreviewCard,
+  ListoneRoleRestoreCard,
+} from "./AdminListoneRoles";
 import { AdminSeasonHistoryCard } from "./AdminSeasonHistoryCard";
 
 const { colors } = theme;
@@ -95,6 +111,10 @@ export function AdminListoneScreen() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshSuccess, setRefreshSuccess] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // «Aggiorna listone dal provider» apre prima la scelta (1.5): niente parte da solo.
+  const [refreshModalOpen, setRefreshModalOpen] = useState(false);
+  const [refreshMode, setRefreshMode] = useState<ListoneRefreshMode>("keep_roles");
+  const [rolePreview, setRolePreview] = useState<AdminListoneProviderRolesResult | null>(null);
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -142,7 +162,13 @@ export function AdminListoneScreen() {
     }
   }, [load]);
 
-  async function onRefreshListone() {
+  function openRefreshModal() {
+    setRefreshMode("keep_roles");
+    setRefreshModalOpen(true);
+  }
+
+  async function onRefreshListone(mode: ListoneRefreshMode) {
+    setRefreshModalOpen(false);
     const year = Number(seasonYear);
     if (!Number.isInteger(year) || year < 2000) {
       setRefreshError("Inserisci un anno stagione valido.");
@@ -152,17 +178,38 @@ export function AdminListoneScreen() {
       setRefreshError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    const updateRoles = mode === "update_roles";
     setRefreshError(null);
     setRefreshSuccess(null);
+    setRolePreview(null);
     try {
-      const result = await startRefresh(accessToken, year);
+      const result = await startRefresh(accessToken, year, { updateRoles });
+      const { counters } = result;
       setRefreshSuccess(
-        `${result.message} Creati: ${result.counters.listoneCreated}, aggiornati: ${result.counters.listoneUpdated}.`,
+        listoneRefreshSummary(
+          result.message,
+          counters.listoneCreated,
+          counters.listoneUpdated,
+          updateRoles ? 0 : (counters.roleChangesSkipped ?? 0),
+        ),
       );
+      if (updateRoles && result.roleChanges && result.roleChanges.counts.changes > 0) {
+        setRolePreview(result.roleChanges);
+      }
       await load();
     } catch (refreshErr) {
       setRefreshError(getApiErrorMessage(refreshErr, "Aggiornamento listone non riuscito."));
     }
+  }
+
+  function onRolePreviewDone(applied: AdminListoneProviderRolesResult | null) {
+    setRolePreview(null);
+    if (applied === null) {
+      setRefreshSuccess(LISTONE_ROLES_KEPT_MESSAGE);
+      return;
+    }
+    setRefreshSuccess(listoneRolesAppliedMessage(applied.counts));
+    void load({ silent: true });
   }
 
   const visibleEntries = useMemo(
@@ -186,14 +233,7 @@ export function AdminListoneScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
-      <AdminSeasonHistoryCard />
-      {/* 1.4: come si arriva al Valore di un calciatore (cerca nel listone caricato qui sotto). */}
-      <AdminMarketValueDetailCard
-        entries={entries}
-        seasonYear={
-          Number.isInteger(Number(seasonYear)) && Number(seasonYear) >= 2000 ? Number(seasonYear) : null
-        }
-      />
+      {/* Stesso ordine del sito (1.5): prima il listone, poi storico, Valore e ripristino ruoli. */}
       <View style={styles.section} testID="admin-listone-card">
         <View style={seasonStyles.row}>
           <View style={seasonStyles.field}>
@@ -209,10 +249,10 @@ export function AdminListoneScreen() {
           <Pressable
             style={[styles.button, seasonStyles.button, refreshingListone && styles.disabled]}
             disabled={refreshingListone}
-            onPress={() => void onRefreshListone()}
+            onPress={openRefreshModal}
             testID="admin-listone-refresh"
           >
-            <Text style={styles.buttonLabel}>Aggiorna listone dal provider</Text>
+            <Text style={styles.buttonLabel}>{LISTONE_REFRESH_BUTTON_LABEL}</Text>
           </Pressable>
         </View>
 
@@ -363,6 +403,33 @@ export function AdminListoneScreen() {
           </View>
         ) : null}
       </View>
+      {rolePreview ? (
+        <ListoneRolePreviewCard
+          preview={rolePreview}
+          accessToken={accessToken}
+          onDone={onRolePreviewDone}
+        />
+      ) : null}
+      <ListoneRefreshChoiceModal
+        visible={refreshModalOpen}
+        mode={refreshMode}
+        onModeChange={setRefreshMode}
+        onCancel={() => setRefreshModalOpen(false)}
+        onStart={(mode) => void onRefreshListone(mode)}
+      />
+      <AdminSeasonHistoryCard />
+      {/* 1.4: come si arriva al Valore di un calciatore (cerca nel listone caricato qui sopra). */}
+      <AdminMarketValueDetailCard
+        entries={entries}
+        seasonYear={
+          Number.isInteger(Number(seasonYear)) && Number(seasonYear) >= 2000 ? Number(seasonYear) : null
+        }
+      />
+      <ListoneRoleRestoreCard
+        seasonYear={Number.isInteger(Number(seasonYear)) ? Number(seasonYear) : null}
+        accessToken={accessToken}
+        onRestored={() => void load({ silent: true })}
+      />
     </PageContainer>
   );
 }
