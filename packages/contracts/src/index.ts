@@ -910,3 +910,5 @@ export {
   underQuotaAfterReplacements,
   underQuotaLabel,
 } from "./tradeReplacement.js";
+
+export { absenceKindLabel, absenceLine, italianAbsenceText } from "./providerAbsence.js";

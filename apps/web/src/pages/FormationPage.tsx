@@ -93,6 +93,7 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { FaqHelpButton } from "../components/FaqHelpButton";
+import { italianAbsenceText } from "@fantappero/contracts";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { useTradeReplacement } from "../market/TradeReplacementContext";
 import {
@@ -2013,7 +2014,7 @@ export function FormationPage() {
             : null,
           row.probableHint === "starter" ? "titolare probabile" : null,
           row.probableHint === "bench" ? "panchina probabile" : null,
-          row.probableHint === "unavailable" ? row.probableNote ?? "indisponibile" : null,
+          row.probableHint === "unavailable" ? italianAbsenceText(row.probableNote) ?? "indisponibile" : null,
         ].filter(Boolean);
         return {
           value: row.athleteId,

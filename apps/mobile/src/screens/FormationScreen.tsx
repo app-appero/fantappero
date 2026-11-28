@@ -92,6 +92,7 @@ import { formationTurnOptionLabel } from "../matchday/turnLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
+import { italianAbsenceText } from "@fantappero/contracts";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -1317,7 +1318,7 @@ export function FormationScreen() {
               stateLabel = "Fuori rosa, in esubero";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
-              stateLabel = row.probableNote ?? "Indisponibile";
+              stateLabel = italianAbsenceText(row.probableNote) ?? "Indisponibile";
             } else if (playerLocked(row.athleteId)) {
               state = "bloccato";
               stateLabel = "Bloccato · partita iniziata";
@@ -1391,7 +1392,7 @@ export function FormationScreen() {
                 stateLabel = `Panchina ${benchPos + 1}°`;
               }
               if (row.selectionBlocked || row.probableAbsence === "suspended") {
-                stateLabel = `${stateLabel} · ${row.probableNote ?? "Indisponibile"}`;
+                stateLabel = `${stateLabel} · ${italianAbsenceText(row.probableNote) ?? "Indisponibile"}`;
               }
             }
             if (!isCurrent && benchQuotaSwaps.has(row.athleteId)) {

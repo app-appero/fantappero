@@ -186,6 +186,26 @@ describe("FixtureDetailBody (EP13-P04-quater)", () => {
     expect(html).toContain("2 – 1");
   });
 
+  it("«Infortunati e squalificati» con stati e rientri del fornitore in italiano (Rosario 27/11)", () => {
+    const html = render(
+      detail({
+        unavailablePlayers: [
+          { athleteId: null, name: "Sergio Ramos", clubName: "Milan FC", side: "away", kind: "injury", label: "Mid December 2026", blocksSelection: true },
+          { athleteId: null, name: "Luis Diaz", clubName: "Milan FC", side: "away", kind: "injury", label: "Early January 2027", blocksSelection: true },
+          { athleteId: null, name: "Pablo Marì", clubName: "Milan FC", side: "away", kind: "injury", label: "Late February 2027", blocksSelection: true },
+          { athleteId: null, name: "Antonio Rüdiger", clubName: "Milan FC", side: "away", kind: "injury", label: "Doubtful", blocksSelection: false },
+          { athleteId: null, name: "Mario Gila", clubName: "Milan FC", side: "away", kind: "suspension", label: "Day to day", blocksSelection: true },
+        ],
+      }),
+    );
+    expect(html).toContain("Infortunio · metà dicembre 2026");
+    expect(html).toContain("Infortunio · inizio gennaio 2027");
+    expect(html).toContain("Infortunio · fine febbraio 2027");
+    expect(html).toContain("Infortunio · Dubbio");
+    expect(html).toContain("Squalifica · Giorno per giorno");
+    expect(html).not.toMatch(/Mid December|Early January|Late February|Doubtful|Day to day/);
+  });
+
   it("non trasforma un punteggio assente in zero", () => {
     const html = render(detail({ homeGoals: null, awayGoals: null, statusShort: "NS" }));
     expect(html).toContain("— – —");
