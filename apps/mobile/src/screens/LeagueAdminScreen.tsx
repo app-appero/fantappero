@@ -26,9 +26,18 @@ import {
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { ApiError } from "../api/client";
 import {
@@ -67,6 +76,7 @@ import {
   calendarModalAfterCheck,
   calendarModalAfterError,
   calendarModalChecking,
+  participantsShortcutTab,
 } from "../leagues/calendarModalFlow";
 import { isLeagueDeletable, stackAfterLeagueDeleted } from "../leagues/leagueDeleteHelpers";
 import { leagueStateLabel } from "../leagues/leagueLabels";
@@ -183,6 +193,14 @@ export function LeagueAdminScreen() {
   const [lockMarginText, setLockMarginText] = useState("15");
   const [configurationSaved, setConfigurationSaved] = useState(false);
   const [setupTab, setSetupTab] = useState<SetupTab>("configurazione");
+  // «Vai a Partecipanti» (errore del calendario) porta la pagina fino a «Prossime fasi». Le
+  // misure `onLayout` sono relative al blocco che le contiene: si sommano il blocco nel corpo
+  // della pagina e il titolo nel blocco. Il titolo della pagina e le schede «Home lega» sopra al
+  // corpo non rientrano nella somma: la pagina si ferma un po' più su del titolo «Prossime fasi»,
+  // che resta ben visibile sotto il bordo alto.
+  const pageScrollRef = useRef<ScrollViewInstance>(null);
+  const setupBlockYRef = useRef(0);
+  const setupHeadingYRef = useRef(0);
   const [creditsText, setCreditsText] = useState("1000");
   const [turnCoverageText, setTurnCoverageText] = useState("75");
   const [voluntaryRefundText, setVoluntaryRefundText] = useState("50");
@@ -642,6 +660,7 @@ export function LeagueAdminScreen() {
     <PageContainer
       title="Amministrazione lega"
       testID="screen-league-admin"
+      scrollRef={pageScrollRef}
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
@@ -695,7 +714,12 @@ export function LeagueAdminScreen() {
       ) : null}
 
       {!loading && rules && lifecycle ? (
-        <View style={styles.content}>
+        <View
+          style={styles.content}
+          onLayout={(event) => {
+            setupBlockYRef.current = event.nativeEvent.layout.y;
+          }}
+        >
           {calendar?.status === "confirmed" ? null : (
             <>
               <Text style={styles.heading}>Calendario fantallenatori</Text>
@@ -730,7 +754,14 @@ export function LeagueAdminScreen() {
                 {calendarErrorNeedsParticipants(calendarError) ? (
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setSetupTab("invitati")}
+                    onPress={() => {
+                      // «Invitati» è disattivata a configurazione non salvata: si va dove c'è «Salva».
+                      setSetupTab(participantsShortcutTab(configurationSaved));
+                      pageScrollRef.current?.scrollTo({
+                        y: Math.max(0, setupBlockYRef.current + setupHeadingYRef.current),
+                        animated: true,
+                      });
+                    }}
                     style={styles.secondaryButton}
                     testID="league-calendar-goto-participants"
                   >
@@ -803,7 +834,14 @@ export function LeagueAdminScreen() {
             <MarketGateBarView gate={marketGate} />
           </View>
 
-          <Text style={styles.heading}>Prossime fasi</Text>
+          <Text
+            style={styles.heading}
+            onLayout={(event) => {
+              setupHeadingYRef.current = event.nativeEvent.layout.y;
+            }}
+          >
+            Prossime fasi
+          </Text>
           {/* Solo finché la configurazione non è salvata: una lega avviata conta come
               configurata anche senza un salvataggio del regolamento (Rosario 22/11). */}
           {!configurationSaved ? (

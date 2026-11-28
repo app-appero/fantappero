@@ -56,6 +56,15 @@ export function calendarProceedForce(state: CalendarActionModalState | null): bo
   return Boolean(state && state.phase === "ready" && state.teams.length > 0);
 }
 
+/**
+ * «Vai a Partecipanti» dopo un errore del calendario: la scheda «Invitati» è attiva solo a
+ * configurazione salvata (come `resolveSetupNavigation` del sito); prima si va a «Configurazione»,
+ * dove c'è il «Salva», senza aggirare la scheda disattivata.
+ */
+export function participantsShortcutTab(configurationSaved: boolean): "configurazione" | "invitati" {
+  return configurationSaved ? "invitati" : "configurazione";
+}
+
 /** Pulsanti del pannello (Genera, Conferma) disattivati mentre una azione o la finestra è aperta. */
 export function calendarButtonsDisabled(input: {
   working: boolean;
