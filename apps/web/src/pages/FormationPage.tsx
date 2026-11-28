@@ -2185,15 +2185,8 @@ export function FormationPage() {
                 {/* Il «?» apre «Quando si blocca la formazione?» (FAQ 1.4). */}
                 <FaqHelpButton faqId={FAQ_HELP.lineupLock} data-testid="formation-lock-help" />
               </p>
-              {countdown && countdown.roundId === context.roundId ? (
-                <LockCountdown
-                  state={countdown.state}
-                  nextLockAt={countdown.nextLockAt}
-                  roundStatus={countdown.roundStatus}
-                  onExpire={refetchCountdown}
-                  data-testid="formation-lock-countdown"
-                />
-              ) : null}
+              {/* «Prossimo blocco»: una sola riga, la fascia dell'intestazione (AppLayout); qui non si
+                  ripete (Rosario, 28/11). Solo scorrendo la barra delle mosse ne prende il posto. */}
               <p data-testid="formation-lock-hint">
                 {context.modificationAllowed
                   ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."
