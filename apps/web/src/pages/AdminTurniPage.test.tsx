@@ -1,4 +1,4 @@
-import type { AdminLeagueTurnStatus } from "@fantappero/contracts";
+import type { AdminLeagueTurnStatus, TurniBatch } from "@fantappero/contracts";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,9 @@ const fetchAdminLeagueTurnStatusMock = vi.fn();
 const calculateCurrentRoundsAllLeaguesMock = vi.fn();
 const repairHistoricalRoundsMock = vi.fn();
 const refreshPredictedLineupsMock = vi.fn();
+const runTurniBatchMock = vi.fn();
 vi.mock("../api/admin", () => ({
+  runTurniBatch: (...args: unknown[]) => runTurniBatchMock(...args),
   fetchAdminLeagueTurnStatus: (...args: unknown[]) => fetchAdminLeagueTurnStatusMock(...args),
   generateAllAiLineups: vi.fn(),
   syncAllLeagueTurns: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock("../api/leagues", () => ({
   calculateCurrentRound: (...args: unknown[]) => calculateCurrentRoundMock(...args),
 }));
 
+import { ApiError } from "../api/client";
 import { saveStoredSession, clearStoredSession } from "../auth/sessionStorage";
 import { AdminTurniPage } from "./AdminTurniPage";
 
@@ -66,6 +69,7 @@ describe("AdminTurniPage (EP-turni-calcolo)", () => {
     calculateCurrentRoundsAllLeaguesMock.mockReset();
     repairHistoricalRoundsMock.mockReset();
     refreshPredictedLineupsMock.mockReset();
+    runTurniBatchMock.mockReset();
     calculateCurrentRoundMock.mockReset();
     saveStoredSession({
       accessToken: "token-123",
@@ -243,5 +247,183 @@ describe("AdminTurniPage (EP-turni-calcolo)", () => {
     });
 
     expect(button!.disabled).toBe(false);
+  });
+
+  describe("Esegui tutti", () => {
+    function click(testId: string) {
+      const element = container.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`);
+      expect(element, testId).not.toBeNull();
+      return act(async () => {
+        element!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+    }
+
+    function batchOf(overrides: Partial<TurniBatch> = {}): TurniBatch {
+      return {
+        batchId: "batch-1",
+        status: "completed",
+        operations: [
+          { key: "importa-stagione", label: "Importa calendario stagione", status: "ok", message: "Stagioni create: 0." },
+          { key: "genera-calendario", label: "Genera calendario", status: "failed", message: "Quota del fornitore finita." },
+          { key: "sincronizza-turni", label: "Sincronizza turni", status: "ok", message: "Leghe: 2." },
+          { key: "formazioni-probabili", label: "Aggiorna probabili", status: "skipped", message: "Saltata: già in esecuzione." },
+          { key: "formazioni-ia", label: "Genera formazioni IA", status: "ok", message: "Turni processati: 1." },
+        ],
+        ok: 3,
+        failed: 1,
+        skipped: 1,
+        startedAt: null,
+        finishedAt: null,
+        ...overrides,
+      };
+    }
+
+    it("asks «Sei sicuro?» with the list of operations and the provider quota notice", async () => {
+      fetchAdminLeagueTurnStatusMock.mockResolvedValue([league()]);
+      await act(async () => {
+        root.render(createElement(AdminTurniPage));
+      });
+
+      expect(container.querySelector('[data-testid="admin-turni-run-all-confirm-text"]')).toBeNull();
+      await click("admin-turni-run-all");
+
+      const text = container.querySelector('[data-testid="admin-turni-run-all-confirm-text"]');
+      expect(text).not.toBeNull();
+      expect(container.textContent).toContain("Sei sicuro?");
+      for (const label of [
+        "Importa calendario stagione",
+        "Genera calendario",
+        "Sincronizza turni",
+        "Aggiorna probabili",
+        "Genera formazioni IA",
+      ]) {
+        expect(text!.textContent).toContain(`• ${label}`);
+      }
+      expect(text!.textContent).toContain("la quota del fornitore sportivo");
+      expect(text!.textContent).toContain("Non omologa nessun turno");
+      expect(runTurniBatchMock).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when the confirmation is cancelled", async () => {
+      fetchAdminLeagueTurnStatusMock.mockResolvedValue([league()]);
+      await act(async () => {
+        root.render(createElement(AdminTurniPage));
+      });
+
+      await click("admin-turni-run-all");
+      await click("admin-turni-run-all-confirm-cancel");
+
+      expect(runTurniBatchMock).not.toHaveBeenCalled();
+      expect(container.querySelector('[data-testid="admin-turni-run-all-confirm-text"]')).toBeNull();
+    });
+
+    it("runs the batch and shows the outcome of every operation and the summary", async () => {
+      fetchAdminLeagueTurnStatusMock.mockResolvedValue([league()]);
+      runTurniBatchMock.mockResolvedValue(batchOf());
+      await act(async () => {
+        root.render(createElement(AdminTurniPage));
+      });
+
+      await click("admin-turni-run-all");
+      await click("admin-turni-run-all-confirm-confirm");
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(runTurniBatchMock).toHaveBeenCalledTimes(1);
+      expect(runTurniBatchMock.mock.calls[0]![0]).toBe("token-123");
+      const result = container.querySelector('[data-testid="admin-turni-run-all-result"]');
+      expect(result).not.toBeNull();
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-result-summary"]')!.textContent,
+      ).toBe("Riuscite 3 operazioni su 5 · 1 non riuscita · 1 saltata.");
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-result-genera-calendario"]')!
+          .textContent,
+      ).toContain("Non riuscita: Quota del fornitore finita.");
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-result-sincronizza-turni"]')!
+          .textContent,
+      ).toContain("Riuscita: Leghe: 2.");
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-result-formazioni-probabili"]')!
+          .textContent,
+      ).toContain("Saltata");
+      // A fine blocco la tabella delle leghe si rilegge.
+      expect(fetchAdminLeagueTurnStatusMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("shows the progress while the operations run", async () => {
+      fetchAdminLeagueTurnStatusMock.mockResolvedValue([league()]);
+      let finish: (batch: TurniBatch) => void = () => undefined;
+      runTurniBatchMock.mockImplementation(
+        (_token: string, options: { onProgress: (batch: TurniBatch) => void }) =>
+          new Promise<TurniBatch>((resolve) => {
+            options.onProgress(
+              batchOf({
+                status: "running",
+                operations: [
+                  { key: "importa-stagione", label: "Importa calendario stagione", status: "ok", message: "Fatto." },
+                  { key: "genera-calendario", label: "Genera calendario", status: "running", message: null },
+                  { key: "sincronizza-turni", label: "Sincronizza turni", status: "pending", message: null },
+                ],
+                ok: 1,
+                failed: 0,
+                skipped: 0,
+              }),
+            );
+            finish = resolve;
+          }),
+      );
+      await act(async () => {
+        root.render(createElement(AdminTurniPage));
+      });
+
+      await click("admin-turni-run-all");
+      await click("admin-turni-run-all-confirm-confirm");
+
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-result-summary"]')!.textContent,
+      ).toBe("In corso: 1 operazione su 3 finite.");
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-result-genera-calendario"]')!
+          .textContent,
+      ).toContain("In corso");
+      expect(
+        container.querySelector<HTMLButtonElement>('[data-testid="admin-turni-run-all"]')!.disabled,
+      ).toBe(true);
+
+      await act(async () => {
+        finish(batchOf({ failed: 0, skipped: 0, ok: 5 }));
+        await Promise.resolve();
+      });
+      expect(
+        container.querySelector<HTMLButtonElement>('[data-testid="admin-turni-run-all"]')!.disabled,
+      ).toBe(false);
+    });
+
+    it("shows the server message when the batch is refused (already running)", async () => {
+      fetchAdminLeagueTurnStatusMock.mockResolvedValue([league()]);
+      runTurniBatchMock.mockRejectedValue(
+        new ApiError(
+          "Le operazioni dei turni sono già in corso: aspetta che finiscano prima di rilanciarle.",
+          409,
+          "turni_batch_already_running",
+        ),
+      );
+      await act(async () => {
+        root.render(createElement(AdminTurniPage));
+      });
+
+      await click("admin-turni-run-all");
+      await click("admin-turni-run-all-confirm-confirm");
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(
+        container.querySelector('[data-testid="admin-turni-run-all-error"]')!.textContent,
+      ).toContain("già in corso");
+    });
   });
 });

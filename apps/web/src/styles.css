@@ -11194,3 +11194,120 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   border-top: 1px solid var(--fa-color-border);
   font-weight: 700;
 }
+
+/* ── «Esegui» e «Esegui tutti» (pannello operatore, 1.5) ───────────────── */
+
+.fa-run-confirm__text {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.fa-run-result {
+  display: grid;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+  border-left-width: 4px;
+}
+
+.fa-run-result--success {
+  border-left-color: var(--fa-color-success);
+}
+
+.fa-run-result--warning {
+  border-left-color: var(--fa-color-warning);
+}
+
+.fa-run-result--error {
+  border-left-color: var(--fa-color-danger);
+}
+
+.fa-run-result__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fa-run-result__summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.fa-run-result__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--fa-space-xs);
+}
+
+.fa-run-result__line {
+  display: grid;
+  gap: 0.1rem;
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+  border-left: 3px solid var(--fa-color-border);
+  overflow-wrap: anywhere;
+}
+
+.fa-run-result__line--success {
+  border-left-color: var(--fa-color-success);
+}
+
+.fa-run-result__line--warning {
+  border-left-color: var(--fa-color-warning);
+}
+
+.fa-run-result__line--error {
+  border-left-color: var(--fa-color-danger);
+}
+
+.fa-run-result__line span {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-jobs__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fa-space-sm) var(--fa-space-md);
+}
+
+.fa-jobs__toolbar-hint {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-job__run {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fa-space-sm) var(--fa-space-md);
+}
+
+.fa-job__run-status {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.fa-job__run-status--running {
+  color: var(--fa-color-accent);
+  font-weight: 600;
+}
+
+.fa-job__run-status--failed {
+  color: var(--fa-color-danger);
+}
+
+@media (max-width: 640px) {
+  .fa-job__run .fa-btn,
+  .fa-jobs__toolbar .fa-btn {
+    width: 100%;
+  }
+}

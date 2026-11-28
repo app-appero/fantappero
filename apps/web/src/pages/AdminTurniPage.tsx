@@ -1,4 +1,14 @@
-import { labelFantasyTurnStatus, type AdminLeagueTurnStatus } from "@fantappero/contracts";
+import {
+  RUN_ALL_LABEL,
+  isTurniBatchFinished,
+  labelFantasyTurnStatus,
+  turniBatchConfirmation,
+  turniBatchOperationOutcome,
+  turniBatchSummary,
+  turniBatchTone,
+  type AdminLeagueTurnStatus,
+  type TurniBatch,
+} from "@fantappero/contracts";
 import {
   Badge,
   Breadcrumb,
@@ -25,9 +35,12 @@ import {
   recoverStaleResults,
   refreshPredictedLineups,
   repairHistoricalRounds,
+  runTurniBatch,
   syncAllLeagueTurns,
   syncCalendarForAllLeagues,
 } from "../api/admin";
+import { RunConfirmModal } from "../admin/RunConfirmModal";
+import { RunOutcomeList } from "../admin/RunOutcomeList";
 import {
   calculateCurrentRound,
   openFantasyTurn,
@@ -38,6 +51,11 @@ import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 
 const COMMAND_LEGEND: { label: string; description: string }[] = [
+  {
+    label: RUN_ALL_LABEL,
+    description:
+      "Lancia una dopo l'altra Importa calendario stagione, Genera calendario, Sincronizza turni, Aggiorna probabili e Genera formazioni IA. Non omologa nessun turno e non ricalcola lo storico; se una operazione non riesce, le altre vanno avanti.",
+  },
   {
     label: "Sincronizza turni",
     description: "Apre i turni pronti e ricalcola i cutoff per tutte le leghe attive.",
@@ -172,6 +190,11 @@ export function AdminTurniPage() {
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [repairError, setRepairError] = useState<string | null>(null);
 
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batch, setBatch] = useState<TurniBatch | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
+
   const [refreshingPredicted, setRefreshingPredicted] = useState(false);
   const [predictedResult, setPredictedResult] = useState<string | null>(null);
   const [predictedError, setPredictedError] = useState<string | null>(null);
@@ -230,6 +253,26 @@ export function AdminTurniPage() {
       setTurnsError(getApiErrorMessage(error, "Sincronizzazione turni non riuscita."));
     } finally {
       setSyncingTurns(false);
+    }
+  }
+
+  async function onRunBatch() {
+    setBatchConfirmOpen(false);
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    setBatchRunning(true);
+    setBatchError(null);
+    setBatch(null);
+    try {
+      const finished = await runTurniBatch(session.accessToken, { onProgress: setBatch });
+      setBatch(finished);
+      await load();
+    } catch (error) {
+      setBatchError(getApiErrorMessage(error, "Esegui tutti non riuscito."));
+    } finally {
+      setBatchRunning(false);
     }
   }
 
@@ -515,6 +558,40 @@ export function AdminTurniPage() {
           <div className="fa-ds-showcase__row">
             <Button
               type="button"
+              loading={batchRunning}
+              disabled={batchRunning}
+              onClick={() => setBatchConfirmOpen(true)}
+              data-testid="admin-turni-run-all"
+            >
+              {RUN_ALL_LABEL}
+            </Button>
+          </div>
+          <p className="fa-jobs__toolbar-hint">
+            Lancia una dopo l&apos;altra le operazioni che si possono rilanciare senza danni.
+            Non omologa nessun turno: «Calcola giornata corrente», «Recupera risultati» e
+            «Ricalcola storico» restano qui sotto, uno alla volta.
+          </p>
+          {batch ? (
+            <RunOutcomeList
+              title={RUN_ALL_LABEL}
+              summary={turniBatchSummary(batch)}
+              tone={isTurniBatchFinished(batch) ? turniBatchTone(batch) : "neutral"}
+              lines={batch.operations.map(turniBatchOperationOutcome)}
+              testId="admin-turni-run-all-result"
+            />
+          ) : null}
+          {batchError ? (
+            <UiStatePanel
+              state="error"
+              title="Esegui tutti non riuscito"
+              message={batchError}
+              testId="admin-turni-run-all-error"
+            />
+          ) : null}
+          <div className="fa-ds-showcase__row">
+            <Button
+              type="button"
+              variant="secondary"
               loading={syncingTurns}
               disabled={syncingTurns}
               onClick={() => void onSyncTurns()}
@@ -965,6 +1042,12 @@ export function AdminTurniPage() {
           ) : null}
         </CardBody>
       </Card>
+      <RunConfirmModal
+        copy={batchConfirmOpen ? turniBatchConfirmation() : null}
+        onConfirm={() => void onRunBatch()}
+        onCancel={() => setBatchConfirmOpen(false)}
+        testId="admin-turni-run-all-confirm"
+      />
     </PageContainer>
   );
 }

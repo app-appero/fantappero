@@ -36,7 +36,10 @@ import type {
   AdminTurniSyncResult,
   PredictedLineupSyncResult,
   SystemJob,
+  SystemJobRunAllResult,
+  SystemJobRunResult,
   SystemJobUpdate,
+  TurniBatch,
   AdminUser,
   PaginatedAdminLeagues,
   PaginatedAdminUsers,
@@ -62,6 +65,22 @@ export function updateSystemJob(
     accessToken,
     method: "PATCH",
     body,
+  });
+}
+
+/** «Esegui» su un job (1.5): lo manda al worker subito, anche se è spento. 409 se già in corso. */
+export function runSystemJob(accessToken: string, jobKey: string): Promise<SystemJobRunResult> {
+  return apiRequest<SystemJobRunResult>(`/admin/job/${encodeURIComponent(jobKey)}/esegui`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+/** «Esegui tutti» nei Job (1.5): lancia i job accesi, esito per job. */
+export function runAllSystemJobs(accessToken: string): Promise<SystemJobRunAllResult> {
+  return apiRequest<SystemJobRunAllResult>("/admin/job/esegui-tutti", {
+    accessToken,
+    method: "POST",
   });
 }
 
@@ -334,6 +353,45 @@ export async function syncCalendarForAllLeagues(
     await new Promise((resolve) => {
       window.setTimeout(resolve, pollIntervalMs);
     });
+  }
+}
+
+/** «Esegui tutti» nei Turni (1.5): avvia il blocco di operazioni sul server (409 se già in corso). */
+export function startTurniBatch(accessToken: string): Promise<TurniBatch> {
+  return apiRequest<TurniBatch>("/admin/turni/esegui-tutti", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function fetchTurniBatch(accessToken: string, batchId: string): Promise<TurniBatch> {
+  return apiRequest<TurniBatch>(`/admin/turni/esegui-tutti/${encodeURIComponent(batchId)}`, {
+    accessToken,
+  });
+}
+
+/**
+ * Avvia «Esegui tutti» nei Turni e rilegge l'avanzamento finché le operazioni non sono finite
+ * (bene o male): `onProgress` riceve ogni stato, il risultato è l'ultimo.
+ */
+export async function runTurniBatch(
+  accessToken: string,
+  options?: {
+    onProgress?: (batch: TurniBatch) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<TurniBatch> {
+  let batch = await startTurniBatch(accessToken);
+  const pollIntervalMs = options?.pollIntervalMs ?? 1500;
+  for (;;) {
+    options?.onProgress?.(batch);
+    if (batch.status === "completed" || batch.status === "failed") {
+      return batch;
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, pollIntervalMs);
+    });
+    batch = await fetchTurniBatch(accessToken, batch.batchId);
   }
 }
 
