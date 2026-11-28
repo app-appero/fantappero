@@ -93,6 +93,7 @@ import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AvatarImage } from "../components/AvatarImage";
 import { italianAbsenceText } from "@fantappero/contracts";
+import { STARTERS_COUNTER_COLOR_TOKEN, startersCounterTone } from "./formation/startersCounter";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -1551,7 +1552,15 @@ export function FormationScreen() {
         <View style={styles.progressHead}>
           <View style={styles.progressTitle}>
             <Text style={styles.progressLabel}>Titolari</Text>
-            <Text style={[styles.progressCount, missing === 0 ? styles.progressOk : null]}>
+            <Text
+              style={[
+                styles.progressCount,
+                startersCounterTone(filledCount, totalSlots) === "complete"
+                  ? styles.progressOk
+                  : styles.progressPending,
+              ]}
+              testID="formation-starters-count"
+            >
               {filledCount}/{totalSlots}
             </Text>
           </View>
@@ -2316,7 +2325,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
   },
-  progressOk: { color: colors.success },
+  progressOk: { color: colors[STARTERS_COUNTER_COLOR_TOKEN.complete] },
+  // Sotto gli 11 titolari: colore del testo del tema (prima nessun colore, nero sul fondo scuro).
+  progressPending: { color: colors[STARTERS_COUNTER_COLOR_TOKEN.incomplete] },
   progressTrack: {
     height: 6,
     borderRadius: 999,
