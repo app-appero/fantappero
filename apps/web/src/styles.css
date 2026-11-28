@@ -4505,6 +4505,22 @@ h2 {
 .fa-matchday-competitions-tabs .fa-tablist::-webkit-scrollbar { display: none; }
 .fa-matchday-competitions-tabs .fa-tab { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
 
+/* Turni europei su telefono (Rosario 27/11, Chrome su Android a 390px): la pagina era più larga
+   dello schermo (516px) e il lato destro restava tagliato, senza scorrimento: la barra dei
+   campionati (Bundesliga · Serie A · Ligue 1 · La Liga…, schede su una riga sola) fissava la
+   larghezza della colonna della pagina, che è una griglia con una sola colonna «auto»: la
+   colonna cresceva quanto il contenuto invece di stare nello schermo. Come nel Listone, negli
+   Storici della Rosa e nei Turni dell'operatore, la colonna è larga quanto lo schermo: le carte
+   delle partite stanno dentro e la barra dei campionati scorre da sola nel suo riquadro. */
+.fa-matchday-page > .fa-page-container__body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fa-matchday-page .fa-tabs,
+.fa-matchday-page .fa-tab-panel {
+  min-width: 0;
+}
+
 /* Directory: filtro staccato dalle card, riepilogo e card leggibili */
 .fa-manager-directory { gap: var(--fa-space-xl, 2rem); }
 .fa-manager-directory__panel {

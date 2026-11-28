@@ -795,6 +795,7 @@ export function MatchdayPage() {
   return (
     <PageContainer
       title="Turni"
+      className="fa-matchday-page"
       header={
         <Breadcrumb
           items={[
