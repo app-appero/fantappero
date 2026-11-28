@@ -94,6 +94,7 @@ import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContex
 import { AvatarImage } from "../components/AvatarImage";
 import { italianAbsenceText } from "@fantappero/contracts";
 import { STARTERS_COUNTER_COLOR_TOKEN, startersCounterTone } from "./formation/startersCounter";
+import { BenchRoleDot } from "./formation/BenchRoleDot";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -1681,6 +1682,7 @@ export function FormationScreen() {
                   )}
                   <View style={styles.benchBody}>
                     <View style={styles.benchNameRow}>
+                      {row ? <BenchRoleDot role={role} testID={`formation-bench-role-${index}`} /> : null}
                       <AthleteName plain athleteId={id} style={styles.benchName}>
                         {name}
                       </AthleteName>
@@ -1752,6 +1754,7 @@ export function FormationScreen() {
                       )}
                       <View style={styles.benchBody}>
                         <View style={styles.benchNameRow}>
+                          {row ? <BenchRoleDot role={role} testID={`formation-bench-role-${index}`} /> : null}
                           <AthleteName plain athleteId={id} style={styles.benchName}>
                             {name}
                           </AthleteName>
