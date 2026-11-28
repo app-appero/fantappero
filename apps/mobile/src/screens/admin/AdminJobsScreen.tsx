@@ -1,11 +1,27 @@
-import type { SystemJob } from "@fantappero/contracts";
-import { JOBS_INTRO, jobsSummaryTiles } from "@fantappero/contracts";
+import type { ConfirmCopy, RunOutcomeLine, RunTone, SystemJob } from "@fantappero/contracts";
+import {
+  JOBS_INTRO,
+  JOBS_POLL_MS,
+  RUN_ALL_LABEL,
+  RUN_JOB_LABEL,
+  jobLastRunLabel,
+  jobRunConfirmation,
+  jobRunOutcome,
+  jobsRunAllConfirmation,
+  jobsRunAllSummary,
+  jobsRunAllTone,
+  jobsSummaryTiles,
+  runnableJobs,
+} from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
 import { lazyStyles } from "../../theme/lazyStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
-import { fetchSystemJobs, updateSystemJob } from "../../api/admin";
+import { fetchSystemJobs, runAllSystemJobs, runSystemJob, updateSystemJob } from "../../api/admin";
+import { ApiError } from "../../api/client";
+import { RunOutcomeList } from "../../admin/RunOutcomeList";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
@@ -67,6 +83,26 @@ function progressPercent(job: SystemJob): number {
   return Math.min(100, Math.max(0, Math.round(((Date.now() - start) / (end - start)) * 100)));
 }
 
+type PendingRun = { kind: "one"; job: SystemJob } | { kind: "all" };
+
+type RunReport = {
+  title: string;
+  summary: string | null;
+  tone: RunTone;
+  lines: RunOutcomeLine[];
+};
+
+/** Un lancio rifiutato o non partito: «già in esecuzione» (409) è un avviso, il resto un errore. */
+function runErrorLine(job: SystemJob, error: unknown): RunOutcomeLine {
+  const conflict = error instanceof ApiError && error.status === 409;
+  return {
+    key: job.key,
+    title: job.title,
+    tone: conflict ? "warning" : "error",
+    text: getApiErrorMessage(error, `«${job.title}» non lanciato.`),
+  };
+}
+
 /** Job periodici — mobile port of `apps/web/src/pages/AdminJobsPage.tsx`. */
 export function AdminJobsScreen() {
   const { accessToken } = useAuthSession();
@@ -75,6 +111,9 @@ export function AdminJobsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [pendingRun, setPendingRun] = useState<PendingRun | null>(null);
+  const [runBusy, setRunBusy] = useState<string | null>(null);
+  const [runReport, setRunReport] = useState<RunReport | null>(null);
 
   const load = useCallback(async () => {
     if (!accessToken) {
@@ -106,6 +145,86 @@ export function AdminJobsScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Rilegge l'elenco senza il «Caricamento…»: serve a vedere «In esecuzione» e l'esito. */
+  const refreshJobs = useCallback(async () => {
+    if (!accessToken) {
+      return;
+    }
+    try {
+      const next = await fetchSystemJobs(accessToken);
+      setJobs(next);
+    } catch {
+      // L'elenco già a schermo resta com'è: il prossimo giro riprova.
+    }
+  }, [accessToken]);
+
+  const anyRunning = jobs.some((job) => job.running);
+  useEffect(() => {
+    if (!anyRunning) {
+      return;
+    }
+    const timer = setInterval(() => void refreshJobs(), JOBS_POLL_MS);
+    return () => clearInterval(timer);
+  }, [anyRunning, refreshJobs]);
+
+  async function confirmRun() {
+    const request = pendingRun;
+    setPendingRun(null);
+    if (!request || !accessToken) {
+      return;
+    }
+    setRunReport(null);
+    if (request.kind === "one") {
+      const { job } = request;
+      const title = `Lancio di «${job.title}»`;
+      setRunBusy(job.key);
+      try {
+        const line = jobRunOutcome(await runSystemJob(accessToken, job.key));
+        setRunReport({ title, summary: null, tone: line.tone, lines: [line] });
+      } catch (runError) {
+        const line = runErrorLine(job, runError);
+        setRunReport({ title, summary: null, tone: line.tone, lines: [line] });
+      } finally {
+        setRunBusy(null);
+      }
+    } else {
+      setRunBusy("all");
+      try {
+        const result = await runAllSystemJobs(accessToken);
+        setRunReport({
+          title: RUN_ALL_LABEL,
+          summary: jobsRunAllSummary(result),
+          tone: jobsRunAllTone(result),
+          lines: result.results.map(jobRunOutcome),
+        });
+      } catch (runError) {
+        setRunReport({
+          title: RUN_ALL_LABEL,
+          summary: null,
+          tone: "error",
+          lines: [
+            {
+              key: "esegui-tutti",
+              title: RUN_ALL_LABEL,
+              tone: "error",
+              text: getApiErrorMessage(runError, "Lancio dei job non riuscito."),
+            },
+          ],
+        });
+      } finally {
+        setRunBusy(null);
+      }
+    }
+    await refreshJobs();
+  }
+
+  const pendingCopy: ConfirmCopy | null =
+    pendingRun === null
+      ? null
+      : pendingRun.kind === "one"
+        ? jobRunConfirmation(pendingRun.job)
+        : jobsRunAllConfirmation(jobs);
 
   function replaceJob(updated: SystemJob) {
     setJobs((current) => current.map((job) => (job.key === updated.key ? updated : job)));
@@ -169,6 +288,34 @@ export function AdminJobsScreen() {
             ))}
           </View>
         ) : null}
+        {!loading && !error && jobs.length > 0 ? (
+          <View style={styles.rowActions}>
+            <Pressable
+              style={[
+                styles.button,
+                (runBusy !== null || runnableJobs(jobs).length === 0) && styles.disabled,
+              ]}
+              disabled={runBusy !== null || runnableJobs(jobs).length === 0}
+              accessibilityRole="button"
+              onPress={() => setPendingRun({ kind: "all" })}
+              testID="admin-jobs-run-all"
+            >
+              <Text style={styles.buttonLabel}>{RUN_ALL_LABEL}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {!loading && !error && jobs.length > 0 ? (
+          <Text style={styles.meta}>Lancia ora, una volta sola, tutti i job attivi.</Text>
+        ) : null}
+        {runReport ? (
+          <RunOutcomeList
+            title={runReport.title}
+            summary={runReport.summary}
+            tone={runReport.tone}
+            lines={runReport.lines}
+            testID="admin-jobs-run-result"
+          />
+        ) : null}
         {loading ? (
           <UiStatePanel state="loading" title="Caricamento job" message="Lettura dello schedule…" testID="admin-jobs-loading" />
         ) : null}
@@ -222,6 +369,30 @@ export function AdminJobsScreen() {
                       <View style={[local.barFill, { width: `${progressPercent(job)}%` }]} />
                     </View>
                   ) : null}
+                  <View style={local.runRow}>
+                    <Pressable
+                      style={[styles.secondaryButton, (runBusy !== null || job.running) && styles.disabled]}
+                      disabled={runBusy !== null || job.running}
+                      accessibilityRole="button"
+                      onPress={() => setPendingRun({ kind: "one", job })}
+                      testID={`admin-job-run-${job.key}`}
+                    >
+                      <Text style={styles.secondaryButtonLabel}>{RUN_JOB_LABEL}</Text>
+                    </Pressable>
+                    {jobLastRunLabel(job) ? (
+                      <Text
+                        style={[
+                          styles.meta,
+                          job.running && local.runStatusRunning,
+                          !job.running && job.lastRun?.outcome === "failed" && local.runStatusFailed,
+                        ]}
+                        testID={`admin-job-last-run-${job.key}`}
+                      >
+                        {jobLastRunLabel(job)}
+                        {!job.running && job.lastRun ? ` · ${formatDateTime(job.lastRun.finishedAt)}` : ""}
+                      </Text>
+                    ) : null}
+                  </View>
                   <Text style={local.timeLabel}>Ogni</Text>
                   <TextInput
                     style={styles.input}
@@ -262,6 +433,12 @@ export function AdminJobsScreen() {
             })
           : null}
       </View>
+      <ConfirmDialog
+        copy={pendingCopy}
+        onCancel={() => setPendingRun(null)}
+        onConfirm={() => void confirmRun()}
+        testID="admin-jobs-confirm"
+      />
     </PageContainer>
   );
 }
@@ -359,6 +536,16 @@ const local = lazyStyles(() => StyleSheet.create({
   },
   timeNext: {
     color: colors.accent,
+  },
+  runRow: {
+    gap: spacing.sm,
+  },
+  runStatusRunning: {
+    color: colors.accent,
+    fontWeight: "600",
+  },
+  runStatusFailed: {
+    color: colors.danger,
   },
   bar: {
     height: 6,

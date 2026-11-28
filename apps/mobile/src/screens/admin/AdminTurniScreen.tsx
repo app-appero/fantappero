@@ -1,4 +1,14 @@
-import { labelFantasyTurnStatus, type AdminLeagueTurnStatus } from "@fantappero/contracts";
+import {
+  RUN_ALL_LABEL,
+  isTurniBatchFinished,
+  labelFantasyTurnStatus,
+  turniBatchConfirmation,
+  turniBatchOperationOutcome,
+  turniBatchSummary,
+  turniBatchTone,
+  type AdminLeagueTurnStatus,
+  type TurniBatch,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -11,6 +21,7 @@ import {
   recoverStaleResults,
   refreshPredictedLineups,
   repairHistoricalRounds,
+  runTurniBatch,
   syncAllLeagueTurns,
   syncCalendarForAllLeagues,
 } from "../../api/admin";
@@ -22,6 +33,8 @@ import {
   runAiLineups,
 } from "../../api/leagues";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
+import { RunOutcomeList } from "../../admin/RunOutcomeList";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
@@ -35,6 +48,11 @@ const HOMOLOGATION_LABEL: Record<string, string> = {
 };
 
 const COMMAND_LEGEND: { label: string; description: string }[] = [
+  {
+    label: RUN_ALL_LABEL,
+    description:
+      "Lancia una dopo l'altra Importa calendario stagione, Genera calendario, Sincronizza turni, Aggiorna probabili e Genera formazioni IA. Non omologa nessun turno e non ricalcola lo storico; se una operazione non riesce, le altre vanno avanti.",
+  },
   {
     label: "Sincronizza turni",
     description: "Apre i turni pronti e ricalcola i cutoff per tutte le leghe attive.",
@@ -153,6 +171,10 @@ export function AdminTurniScreen() {
   } | null>(null);
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [repairError, setRepairError] = useState<string | null>(null);
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batch, setBatch] = useState<TurniBatch | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
   const [refreshingPredicted, setRefreshingPredicted] = useState(false);
   const [predictedResult, setPredictedResult] = useState<string | null>(null);
   const [predictedError, setPredictedError] = useState<string | null>(null);
@@ -227,6 +249,25 @@ export function AdminTurniScreen() {
       setTurnsError(getApiErrorMessage(error, "Sincronizzazione turni non riuscita."));
     } finally {
       setSyncingTurns(false);
+    }
+  }
+
+  async function onRunBatch() {
+    setBatchConfirmOpen(false);
+    if (!accessToken) {
+      return;
+    }
+    setBatchRunning(true);
+    setBatchError(null);
+    setBatch(null);
+    try {
+      const finished = await runTurniBatch(accessToken, { onProgress: setBatch });
+      setBatch(finished);
+      await load({ silent: true });
+    } catch (error) {
+      setBatchError(getApiErrorMessage(error, "Esegui tutti non riuscito."));
+    } finally {
+      setBatchRunning(false);
     }
   }
 
@@ -490,9 +531,40 @@ export function AdminTurniScreen() {
 
       <View style={styles.section} testID="admin-turni-massive">
         <Text style={styles.sectionTitle}>Azioni massive — tutte le leghe attive</Text>
+        <Pressable
+          style={[styles.button, batchRunning && styles.disabled]}
+          disabled={batchRunning}
+          accessibilityRole="button"
+          onPress={() => setBatchConfirmOpen(true)}
+          testID="admin-turni-run-all"
+        >
+          <Text style={styles.buttonLabel}>{RUN_ALL_LABEL}</Text>
+        </Pressable>
+        <Text style={styles.meta}>
+          Lancia una dopo l'altra le operazioni che si possono rilanciare senza danni. Non omologa
+          nessun turno: «Calcola giornata corrente», «Recupera risultati» e «Ricalcola storico»
+          restano qui sotto, uno alla volta.
+        </Text>
+        {batch ? (
+          <RunOutcomeList
+            title={RUN_ALL_LABEL}
+            summary={turniBatchSummary(batch)}
+            tone={isTurniBatchFinished(batch) ? turniBatchTone(batch) : "neutral"}
+            lines={batch.operations.map(turniBatchOperationOutcome)}
+            testID="admin-turni-run-all-result"
+          />
+        ) : null}
+        {batchError ? (
+          <UiStatePanel
+            state="error"
+            title="Esegui tutti non riuscito"
+            message={batchError}
+            testID="admin-turni-run-all-error"
+          />
+        ) : null}
         <View style={styles.rowActions}>
           <Pressable
-            style={[styles.button, syncingTurns && styles.disabled]}
+            style={[styles.secondaryButton, syncingTurns && styles.disabled]}
             disabled={syncingTurns}
             onPress={() => void onSyncTurns()}
             testID="admin-turni-sync-all"
@@ -794,6 +866,13 @@ export function AdminTurniScreen() {
           </View>
         ))}
       </View>
+      <ConfirmDialog
+        copy={batchConfirmOpen ? turniBatchConfirmation() : null}
+        busy={batchRunning}
+        onCancel={() => setBatchConfirmOpen(false)}
+        onConfirm={() => void onRunBatch()}
+        testID="admin-turni-run-all-confirm"
+      />
     </PageContainer>
   );
 }
