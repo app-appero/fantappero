@@ -9,6 +9,7 @@ import type {
   FantasyCoachDirectoryItem,
   LeagueMember,
   LeagueRules,
+  RemovalCounts,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
 import {
@@ -17,6 +18,7 @@ import {
   avatarInitials,
   calendarErrorNeedsParticipants,
   calendarGeneratedMessage,
+  memberRemovedMessage,
   missingMembersLabel,
   orderLeagueSetupBlockers,
   removeMemberConfirmation,
@@ -75,7 +77,6 @@ import {
   canAssignRandomRoster,
   canManageMember,
   canOpenMemberProfile,
-  memberRemovedMessage,
   memberRoleLabel,
   randomRosterAssignedMessage,
 } from "../leagues/memberRow";
@@ -449,18 +450,32 @@ export function LeagueAdminScreen() {
     }
   }
 
+  /**
+   * Previsti, minimo e iscritti rimasti dopo «Rimuovi», letti prima della rimozione: servono a
+   * dire se i previsti cambiano davvero (stessa regola del server).
+   */
+  function removalCounts(): RemovalCounts {
+    return {
+      participantCount: rules?.participantCount,
+      participantMin: rules?.participantMin,
+      remaining: Math.max(0, members.length - 1),
+    };
+  }
+
   async function onRemove(userId: string, displayName: string) {
     setActionError(null);
     setMembersSuccess(null);
     if (!leagueId || !accessToken) {
       return;
     }
+    const counts = removalCounts();
     setWorkingId(`remove-${userId}`);
     try {
       await removeLeagueMember(accessToken, leagueId, userId);
-      // Il backend abbassa participantCount agli iscritti rimasti: ricarica tutto.
+      // Il backend abbassa participantCount agli iscritti rimasti (se ne restano almeno 4 e i
+      // previsti sono di più): ricarica tutto.
       await loadAll();
-      setMembersSuccess(memberRemovedMessage(displayName));
+      setMembersSuccess(memberRemovedMessage(displayName, counts));
     } catch (error) {
       setActionError(getApiErrorMessage(error, `Impossibile rimuovere ${displayName}.`));
     } finally {
@@ -1529,7 +1544,7 @@ export function LeagueAdminScreen() {
         </DialogFrame>
       </Modal>
       <ConfirmDialog
-        copy={removeTarget ? removeMemberConfirmation(removeTarget.displayName) : null}
+        copy={removeTarget ? removeMemberConfirmation(removeTarget.displayName, removalCounts()) : null}
         destructive
         busy={workingId !== null}
         onCancel={() => setRemoveTarget(null)}

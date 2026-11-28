@@ -50,8 +50,3 @@ export function randomRosterAssignedMessage(
 ): string {
   return `Rosa random assegnata a ${displayName}: ${roster.filledSlots}/${roster.rosterSize} giocatori.`;
 }
-
-/** Dopo «Rimuovi» e conferma: il partecipante esce e i previsti si allineano agli iscritti. */
-export function memberRemovedMessage(displayName: string): string {
-  return `${displayName} è stato rimosso dalla lega. Il numero partecipanti previsti è stato allineato agli iscritti.`;
-}

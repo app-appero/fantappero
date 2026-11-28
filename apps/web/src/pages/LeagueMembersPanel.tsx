@@ -1,6 +1,7 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
 import {
   avatarInitials,
+  memberRemovedMessage,
   missingMembersLabel,
   pendingInvitesLabel,
   removeMemberConfirmation,
@@ -217,6 +218,11 @@ export function LeagueMembersPanel({
     });
   }
 
+  /** Previsti e iscritti rimasti dopo «Rimuovi»: servono a dire se i previsti cambiano davvero. */
+  function removalCounts(remaining: number) {
+    return { participantCount, participantMin, remaining };
+  }
+
   async function onRemove(target: LeagueMember) {
     setError(null);
     setSuccess(null);
@@ -224,7 +230,7 @@ export function LeagueMembersPanel({
       const next = members.filter((member) => member.userId !== target.userId);
       setMembers(next);
       onMembersLoadedRef.current?.(next.length);
-      setSuccess(`${target.displayName} è stato rimosso dalla lega.`);
+      setSuccess(memberRemovedMessage(target.displayName, removalCounts(next.length)));
       onMembersChanged?.();
       return;
     }
@@ -239,9 +245,7 @@ export function LeagueMembersPanel({
       const next = members.filter((member) => member.userId !== removed.userId);
       setMembers(next);
       onMembersLoadedRef.current?.(next.length);
-      setSuccess(
-        `${removed.displayName} è stato rimosso dalla lega. Il numero partecipanti previsti è stato allineato agli iscritti.`,
-      );
+      setSuccess(memberRemovedMessage(removed.displayName, removalCounts(next.length)));
       onMembersChanged?.();
     } catch (removeError) {
       setError(getApiErrorMessage(removeError, "Impossibile rimuovere il partecipante."));
@@ -361,7 +365,7 @@ export function LeagueMembersPanel({
   }
 
   const removeConfirmation = removeTarget
-    ? removeMemberConfirmation(removeTarget.displayName)
+    ? removeMemberConfirmation(removeTarget.displayName, removalCounts(members.length - 1))
     : null;
 
   return (
