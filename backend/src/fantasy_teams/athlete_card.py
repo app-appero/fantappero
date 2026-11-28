@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
+from fantasy_ratings.config import DEFAULT_FORMULA_VERSION
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyRosterSlot
 from fantasy_teams.schemas import (
@@ -258,20 +259,30 @@ def _season_stats(
     if not counted:
         return None, None
     fixture_ids = [fixture.id for _, fixture in counted]
-    fantasy_by_fixture = {
-        row.fixture_id: row.fantasy_score
-        for row in session.scalars(
-            select(PlayerMatchRating).where(
-                PlayerMatchRating.athlete_id == athlete_id,
-                PlayerMatchRating.fixture_id.in_(fixture_ids),
-                or_(
-                    PlayerMatchRating.league_id == league_id,
-                    PlayerMatchRating.league_id.is_(None),
-                ),
-                PlayerMatchRating.fantasy_score.is_not(None),
-            )
-        ).all()
-    }
+    # Fantavoto e voto di FantApperò per partita, dalla stessa lettura. «Media voto» è la media
+    # dei NOSTRI voti (`display`, formula in uso), non di quelli del fornitore: come il listone e
+    # la riga della stagione in corso della carriera (3.15, QA del 28/11). Un solo voto per
+    # partita: il più alto fra lega e globale, come nello storico.
+    fantasy_by_fixture: dict[UUID, float] = {}
+    vote_by_fixture: dict[UUID, float] = {}
+    for rating_row in session.scalars(
+        select(PlayerMatchRating).where(
+            PlayerMatchRating.athlete_id == athlete_id,
+            PlayerMatchRating.fixture_id.in_(fixture_ids),
+            or_(
+                PlayerMatchRating.league_id == league_id,
+                PlayerMatchRating.league_id.is_(None),
+            ),
+        )
+    ).all():
+        if rating_row.fantasy_score is not None:
+            fantasy_by_fixture[rating_row.fixture_id] = rating_row.fantasy_score
+        if (
+            rating_row.display is not None
+            and rating_row.formula_version == DEFAULT_FORMULA_VERSION
+            and rating_row.display > vote_by_fixture.get(rating_row.fixture_id, float("-inf"))
+        ):
+            vote_by_fixture[rating_row.fixture_id] = rating_row.display
     matches = goals = assists = 0
     ratings: list[float] = []
     live: AthleteCardLiveResponse | None = None
@@ -292,7 +303,7 @@ def _season_stats(
         matches += 1
         goals += _int(goal_block.get("total"))
         assists += _int(goal_block.get("assists"))
-        rating = _rating(stat.provider_rating)
+        rating = vote_by_fixture.get(fixture.id)
         if rating is not None:
             ratings.append(rating)
     fantasy_scores = [v for k, v in fantasy_by_fixture.items() if v is not None]
